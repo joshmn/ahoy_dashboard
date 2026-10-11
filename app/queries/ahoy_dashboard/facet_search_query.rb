@@ -55,7 +55,7 @@ module AhoyDashboard
     def call
       return [] if term.length < MINIMUM_TERM
 
-      rows = Rails.cache.fetch(cache_key, expires_in: TTL) { group_rows }
+      rows = AhoyDashboard.cache.fetch(cache_key, expires_in: TTL) { group_rows }
       current = dimensions.index_by(&:key)
       rows.map do |key, values, more|
         Group.new(dimension: current.fetch(key), more: more,

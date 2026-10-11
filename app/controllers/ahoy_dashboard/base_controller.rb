@@ -39,6 +39,10 @@ module AhoyDashboard
 
     helper_method :query, :remembered_view?, :ask_panel, :ask_screen?, :ask_installed?, :palette
 
+    def cache_store
+      AhoyDashboard.config.cache_store || super
+    end
+
     def self.requires_installed(*names, **options)
       before_action(**options) { require_installed!(*names) }
     end

@@ -51,6 +51,10 @@ module AhoyDashboard
       yield(config)
     end
 
+    def cache
+      config.cache_store || Rails.cache
+    end
+
     # Every range, bucket and label is read in one zone rather than UTC, because
     # a visit at 11pm belongs to the day the person had, not the day Postgres
     # had.

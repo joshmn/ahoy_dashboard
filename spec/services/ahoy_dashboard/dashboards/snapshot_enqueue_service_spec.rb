@@ -112,4 +112,36 @@ RSpec.describe AhoyDashboard::Dashboards::SnapshotEnqueueService do
 
     expect(described_class.call(expected_key: key)).to be_a(snapshots::SnapshotRefreshJob)
   end
+
+  context "with a configured cache" do
+    around do |example|
+      previous_store = AhoyDashboard.config.cache_store
+      AhoyDashboard.config.cache_store = :memory_store
+      example.run
+    ensure
+      AhoyDashboard.config.cache_store = previous_store
+    end
+
+    it "deduplicates refreshes even when the host has no cache" do
+      Rails.cache = ActiveSupport::Cache::NullStore.new
+      2.times { described_class.call(expected_key: key) }
+
+      expect(snapshots::SnapshotRefreshJob.queue_adapter.enqueued_jobs.length).to eq(1)
+    end
+
+    it "skips refreshes when the selected store cannot retain snapshots" do
+      AhoyDashboard.config.cache_store = :null_store
+      described_class.call(expected_key: key)
+
+      expect(snapshots::SnapshotRefreshJob.queue_adapter.enqueued_jobs).to be_empty
+    end
+
+    it "releases the configured lease after a job finishes" do
+      job = described_class.call(expected_key: key)
+      snapshots::SnapshotRefreshJob.perform_now(*job.arguments)
+      described_class.call(expected_key: key)
+
+      expect(snapshots::SnapshotRefreshJob.queue_adapter.enqueued_jobs.length).to eq(2)
+    end
+  end
 end

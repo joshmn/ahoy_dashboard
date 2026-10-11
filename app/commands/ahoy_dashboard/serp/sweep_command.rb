@@ -18,7 +18,7 @@ module AhoyDashboard
       QUEUED_KEY = "ahoy_dashboard/serp/queued".freeze
 
       def self.queued?(keyword)
-        Rails.cache.exist?(queued_key(keyword))
+        AhoyDashboard.cache.exist?(queued_key(keyword))
       end
 
       def self.queued_key(keyword)
@@ -105,7 +105,7 @@ module AhoyDashboard
       def enqueue(keywords)
         keywords.sum do |each|
           each.locations.each { |location| Keywords::CheckJob.perform_later(each.id, location) }
-          Rails.cache.write(self.class.queued_key(each), now.to_i, expires_in: QUEUED_FOR)
+          AhoyDashboard.cache.write(self.class.queued_key(each), now.to_i, expires_in: QUEUED_FOR)
 
           each.locations.size
         end

@@ -1,6 +1,6 @@
 # Configuration
 
-Almost everything is set in the dashboard, under Settings. The initializer, `config/initializers/ahoy_dashboard.rb`, only holds the parts that have to be code: who's allowed in, your own ahoy models, your own mailers, and where an alert goes the moment it fires.
+Almost everything is set in the dashboard, under Settings. The initializer, `config/initializers/ahoy_dashboard.rb`, only holds the parts that have to be code: who's allowed in, your own ahoy models, your own mailers, the cache store, and where an alert goes the moment it fires.
 
 ```ruby
 AhoyDashboard.configure do |config|
@@ -21,6 +21,7 @@ The dashboard reads no environment variables and no Rails credentials. Keys and 
 | `sign_in_path` | `"/"` | Where a refused, signed-out request is sent. A string, or a lambda called with the controller. |
 | `visit_model` | `"Ahoy::Visit"` | The model over your visits table |
 | `event_model` | `"Ahoy::Event"` | The model over your events table. It needs a `visit` association. |
+| `cache_store` | `nil` (uses `Rails.cache`) | A cache-store instance or Rails cache-store configuration for this engine. Leaves the host cache unchanged. |
 | `alerts[:mailer]` | `"AhoyDashboard::AlertMailer"` | The alert email's mailer class, as a string. Point it at a subclass to change the email. |
 | `alerts[:parent_mailer]` | `"ActionMailer::Base"` | What `AhoyDashboard::AlertMailer` inherits from, as a string. Point it at `"ApplicationMailer"` to pick up your defaults. |
 | `reports[:mailer]` | `"AhoyDashboard::ReportMailer"` | The traffic email's mailer class, as a string |
@@ -55,11 +56,30 @@ Renaming the models doesn't rename the tables. The SQL reads `ahoy_visits` and `
 
 A replacement `assets_root` needs `builds/ahoy_dashboard.css`, `builds/ahoy_dashboard.js`, `builds/ahoy_dashboard.js.map` and the `fonts/*.woff2` files. Leave it alone unless you've forked the front end.
 
+## Cache store
+
+By default, the dashboard uses the host application's `Rails.cache`. To give the engine its own store, set `cache_store` in `config/initializers/ahoy_dashboard.rb`:
+
+```ruby
+AhoyDashboard.configure do |config|
+  config.cache_store = :redis_cache_store, {
+    url: ENV.fetch("AHOY_DASHBOARD_CACHE_URL"),
+    namespace: "ahoy_dashboard"
+  }
+end
+```
+
+The host supplies the adapter dependencies and connection settings, as for its normal Rails cache. You can also supply an existing `ActiveSupport::Cache::Store` instance. Store configurations are resolved once when assigned; `nil` restores the default use of `Rails.cache`.
+
+This setting covers analytical results, discovery and facet queries, Search Console results, snapshots and their refresh leases, report and funnel HTML fragments, favicon results and fetch coordination, and rank-check queue markers. It does not replace `Rails.cache` or change the host's controller cache store. HTML fragments still respect the host's `perform_caching` setting.
+
+Configure web processes and background workers to use the same shared backend and namespace. A memory store remains local to its process; a null store retains nothing. Separate deployments should use separate namespaces. Cache selection is independent of the **Precompute default dashboard** checkbox, which remains off by default.
+
 ## Analytical cache
 
-The dashboard uses the host application's `Rails.cache` without choosing or changing its cache store. Numerical analytical query results expire after 30 seconds. Keys include the database connection identity, schema search path, configured site host and exact scoped query, including filter values, metric and time zone where relevant. Cached entries contain counts and chart rows, not Active Record models or user-specific labels.
+The dashboard uses the configured engine cache. Numerical analytical query results expire after 30 seconds. Keys include the database connection identity, schema search path, configured site host and exact scoped query, including filter values, metric and time zone where relevant. Cached entries contain counts and chart rows, not Active Record models or user-specific labels.
 
-A shared Rails cache lets application workers reuse those readings. A memory store keeps a separate cache in each worker; `:null_store` computes each reading directly. New traffic can take up to 30 seconds to appear in cached analytics. Realtime uses its separate refresh behavior. Rolling exclusion previews align their default 30-day start to a 30-second boundary; explicitly supplied boundaries stay exact.
+A shared cache lets application workers reuse those readings. A memory store keeps a separate cache in each worker; `:null_store` computes each reading directly. New traffic can take up to 30 seconds to appear in cached analytics. Realtime uses its separate refresh behavior. Rolling exclusion previews align their default 30-day start to a 30-second boundary; explicitly supplied boundaries stay exact.
 
 Comparisons for ongoing named periods use the same 30-second boundary so their moving cutoff can share cached readings. Completed periods and explicit custom ranges retain exact comparison boundaries.
 
@@ -69,7 +89,7 @@ Open Settings, General, check **Precompute default dashboard**, and save. It sta
 
 The default dashboard summary and its initial panels use a snapshot for Last 30 days, Visitors, daily grouping, no comparison and no filters. A configured default segment, included crawlers or included internal traffic uses the ordinary query path. Remembered views are resolved before eligibility is checked. Other ranges, metrics, filters, chart refreshes, report details and exports continue to run their existing queries.
 
-Snapshots use the host's `Rails.cache`; the engine does not change the cache store. Background refresh across processes needs a shared store accessible to both web and Active Job workers. The host schedules the existing `AhoyDashboard::TickJob` every minute, with workers processing `low` for the tick and `default` for snapshot builds. These are host infrastructure requirements; saving the checkbox does not start workers. A memory store is local to each process, and `:null_store` cannot reuse snapshots and skips background snapshot enqueueing. An inline job adapter skips background refresh; asynchronous panels then run their ordinary queries when no usable snapshot exists.
+Snapshots use the [configured engine cache](#cache-store), defaulting to `Rails.cache`. Background refresh across processes needs a shared store accessible to both web and Active Job workers. The host schedules the existing `AhoyDashboard::TickJob` every minute, with workers processing `low` for the tick and `default` for snapshot builds. These are host infrastructure requirements; saving the checkbox does not start workers. A memory store is local to each process, and `:null_store` cannot reuse snapshots and skips background snapshot enqueueing. An inline job adapter skips background refresh; asynchronous panels then run their ordinary queries when no usable snapshot exists.
 
 A snapshot is fresh for 30 seconds. The minute tick queues upkeep while the setting is enabled, including when the dashboard is idle. A later eligible request can also serve the existing snapshot while queuing one refresh; a worker leaves an already fresh snapshot alone. The snapshot is retained for at most 270 seconds, allowing for the underlying analytical cache's 30-second freshness window and bounding numerical staleness to five minutes. A missing or expired snapshot queues a background build while each requested panel runs its own ordinary query. The initial shell and summary never wait for a full-dashboard rebuild. The explicit complete response (`?loading=complete`), used by the no-JavaScript link, retains its synchronous fallback. A healthy scheduled tick and worker keep idle snapshots prepared. Cache eviction, midnight range changes, changed definitions or a delayed worker can still cause a cold request. The host configures the recurring schedule once; dashboard users only change the checkbox. See [Background jobs](background-jobs.md#precomputed-dashboard-refresh).
 
@@ -77,7 +97,7 @@ Keys include database and schema identity for engine, visit and event models; th
 
 Tenant isolation must appear in the database, schema or model scope SQL used by the key. Session-variable-only PostgreSQL row-level security is not included in that identity; leave this feature disabled for those setups.
 
-When the host enables Rails fragment caching, report and funnel HTML from a prepared snapshot can also use the host cache for that snapshot generation. Realtime and session-specific controls remain uncached.
+When the host enables Rails fragment caching, report and funnel HTML from a prepared snapshot can also use the configured engine cache for that snapshot generation. Realtime and session-specific controls remain uncached.
 
 The stored payload contains bounded analytical results and record IDs. Each panel request reloads only the definitions needed for its slice; the summary reads realtime activity separately. The dashboard displays "Snapshot updated" in its configured time zone. This timestamp describes snapshot assembly; the realtime pill and subsequent chart refreshes have their own freshness.
 

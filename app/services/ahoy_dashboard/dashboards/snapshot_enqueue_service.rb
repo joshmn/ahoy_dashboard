@@ -10,7 +10,7 @@ module AhoyDashboard
       class << self
         def call(expected_key: nil)
           return unless Preferences.read(:site, :precomputed_dashboard)
-          return if Rails.cache.is_a?(ActiveSupport::Cache::NullStore)
+          return if AhoyDashboard.cache.is_a?(ActiveSupport::Cache::NullStore)
           return if SnapshotRefreshJob.queue_adapter.is_a?(ActiveJob::QueueAdapters::InlineAdapter)
 
           expected_key ||= default_key

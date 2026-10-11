@@ -16,14 +16,14 @@ module AhoyDashboard
     end
 
     def call
-      return if Rails.cache.is_a?(ActiveSupport::Cache::NullStore)
+      return if AhoyDashboard.cache.is_a?(ActiveSupport::Cache::NullStore)
       return if FaviconFetchJob.queue_adapter.is_a?(ActiveJob::QueueAdapters::InlineAdapter)
-      return if Rails.cache.exist?("#{FaviconService::ICON_KEY}/#{domain}")
-      return unless Rails.cache.write(pending_key, true, expires_in: PENDING_TTL, unless_exist: true)
+      return if AhoyDashboard.cache.exist?("#{FaviconService::ICON_KEY}/#{domain}")
+      return unless AhoyDashboard.cache.write(pending_key, true, expires_in: PENDING_TTL, unless_exist: true)
 
       FaviconFetchJob.perform_later(domain)
     rescue StandardError => error
-      Rails.cache.delete(pending_key)
+      AhoyDashboard.cache.delete(pending_key)
       Rails.logger.warn("favicon enqueue failed: #{error.class}: #{error.message}")
       nil
     end

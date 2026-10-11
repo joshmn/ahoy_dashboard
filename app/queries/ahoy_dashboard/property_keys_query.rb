@@ -30,7 +30,7 @@ module AhoyDashboard
     # An allowlisted key with no events in the range still appears. A property
     # that stopped being sent is worth seeing go quiet.
     def call
-      (allowlisted + Rails.cache.fetch(cache_key, expires_in: TTL) { keys }).uniq.first(limit)
+      (allowlisted + AhoyDashboard.cache.fetch(cache_key, expires_in: TTL) { keys }).uniq.first(limit)
     end
 
     private

@@ -35,6 +35,13 @@ module AhoyDashboard
     # and when is under Settings, Emails.
     attr_reader :alerts, :reports
 
+    # A store instance or Rails cache-store configuration. Nil uses Rails.cache.
+    attr_reader :cache_store
+
+    def cache_store=(store)
+      @cache_store = store.nil? ? nil : ActiveSupport::Cache.lookup_store(store)
+    end
+
     def initialize
       @authorize = nil
       @signed_in = ->(_controller) { true }
@@ -43,6 +50,7 @@ module AhoyDashboard
       @visit_model = "Ahoy::Visit"
       @event_model = "Ahoy::Event"
       @assets_root = nil
+      @cache_store = nil
       @alert_notifier = nil
       @alerts = ActiveSupport::OrderedOptions.new.merge!(mailer: "AhoyDashboard::AlertMailer", parent_mailer: "ActionMailer::Base")
       @reports = ActiveSupport::OrderedOptions.new.merge!(mailer: "AhoyDashboard::ReportMailer", parent_mailer: "ActionMailer::Base")

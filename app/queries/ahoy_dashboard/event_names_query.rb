@@ -24,7 +24,7 @@ module AhoyDashboard
     # narrower under a chip, and a key built out of the range alone handed that
     # narrowed list straight back to the unfiltered screen for five minutes.
     def call
-      Rails.cache.fetch(cache_key, expires_in: TTL) { names }
+      AhoyDashboard.cache.fetch(cache_key, expires_in: TTL) { names }
     end
 
     private

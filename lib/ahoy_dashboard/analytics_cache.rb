@@ -13,12 +13,12 @@ module AhoyDashboard
         # Read inside the lock: Rails' request-local cache can remember a miss
         # even after another thread has populated the shared cache store.
         FILL_LOCKS[cache_key.hash % FILL_LOCKS.length].synchronize do
-          Rails.cache.fetch(cache_key, expires_in: ScopeQuery::TOTAL_TTL) { yield }
+          AhoyDashboard.cache.fetch(cache_key, expires_in: ScopeQuery::TOTAL_TTL) { yield }
         end
       end
 
       def write(key:, value:, connection:)
-        Rails.cache.write(self.key(key: key, connection: connection), value, expires_in: ScopeQuery::TOTAL_TTL)
+        AhoyDashboard.cache.write(self.key(key: key, connection: connection), value, expires_in: ScopeQuery::TOTAL_TTL)
       end
 
       def key(key:, connection:)

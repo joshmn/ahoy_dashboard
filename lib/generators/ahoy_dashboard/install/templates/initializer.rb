@@ -10,6 +10,9 @@ AhoyDashboard.configure do |config|
   # config.signed_in = ->(controller) { controller.user_signed_in? }
   # config.sign_in_path = ->(_controller) { Rails.application.routes.url_helpers.new_user_session_path }
 
+  # Defaults to Rails.cache. Accepts a store instance or Rails cache-store options.
+  # config.cache_store = :redis_cache_store, { url: ENV.fetch("AHOY_DASHBOARD_CACHE_URL"), namespace: "ahoy_dashboard" }
+
   # Everything else is set in the dashboard, under Settings. What is left here
   # is code: your own ahoy models, your own mailers, and where an alert goes the
   # moment it fires.

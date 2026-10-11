@@ -20,21 +20,21 @@ module AhoyDashboard
         end
 
         def read_value(key:)
-          fresh_local_cache { Rails.cache.read(key) }
+          fresh_local_cache { AhoyDashboard.cache.read(key) }
         end
 
         def write_value(key:, value:, expires_in:)
-          fresh_local_cache { Rails.cache.write(key, value, expires_in: expires_in) }
+          fresh_local_cache { AhoyDashboard.cache.write(key, value, expires_in: expires_in) }
         end
 
         def delete(key:)
-          fresh_local_cache { Rails.cache.delete(key) }
+          fresh_local_cache { AhoyDashboard.cache.delete(key) }
         end
 
         private
 
         def fresh_local_cache(&block)
-          Rails.cache.respond_to?(:with_local_cache) ? Rails.cache.with_local_cache(&block) : block.call
+          AhoyDashboard.cache.respond_to?(:with_local_cache) ? AhoyDashboard.cache.with_local_cache(&block) : block.call
         end
       end
     end

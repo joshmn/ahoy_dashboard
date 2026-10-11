@@ -112,7 +112,7 @@ module AhoyDashboard
       end
 
       def known_domains
-        Current.favicon_domains ||= Rails.cache.fetch(DOMAINS_KEY, expires_in: DOMAINS_TTL) { referring_domains }
+        Current.favicon_domains ||= AhoyDashboard.cache.fetch(DOMAINS_KEY, expires_in: DOMAINS_TTL) { referring_domains }
       end
 
       private
@@ -150,7 +150,7 @@ module AhoyDashboard
       return unless self.class.enabled?
       return if domain.nil?
 
-      outcome = Rails.cache.read(cache_key) || store(fetch)
+      outcome = AhoyDashboard.cache.read(cache_key) || store(fetch)
 
       outcome.is_a?(Icon) ? outcome : nil
     end
@@ -159,7 +159,7 @@ module AhoyDashboard
       return unless self.class.enabled?
       return if domain.nil?
 
-      outcome = Rails.cache.read(cache_key)
+      outcome = AhoyDashboard.cache.read(cache_key)
       outcome if outcome.is_a?(Icon)
     end
 
@@ -171,11 +171,11 @@ module AhoyDashboard
       "#{ICON_KEY}/#{domain}"
     end
 
-    # Rails.cache.fetch cannot vary its expiry by what the block came back with,
+    # AhoyDashboard.cache.fetch cannot vary its expiry by what the block came back with,
     # and the three outcomes here are worth keeping for three different lengths
     # of time, so the read and the write are written out instead.
     def store(outcome)
-      Rails.cache.write(cache_key, outcome, expires_in: ttl(outcome))
+      AhoyDashboard.cache.write(cache_key, outcome, expires_in: ttl(outcome))
 
       outcome
     end

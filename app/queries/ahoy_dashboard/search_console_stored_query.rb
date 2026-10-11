@@ -17,7 +17,7 @@ module AhoyDashboard
     end
 
     def call
-      Rails.cache.fetch(cache_key, expires_in: CACHE_TTL) do
+      AhoyDashboard.cache.fetch(cache_key, expires_in: CACHE_TTL) do
         {top: {query: rows(:query), page: rows(:page)},
          totals: sums(SearchConsoleTotal.in_range(range)),
          counted: sums(SearchConsoleRow.in_range(range))}
