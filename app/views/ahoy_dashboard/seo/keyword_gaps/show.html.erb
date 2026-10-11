@@ -1,0 +1,105 @@
+<% content_for :title, @presenter.title %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "keyword_gap", site: @site } do %>
+  <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter %>
+
+  <% if !@presenter.tracking? || !@presenter.site? %>
+    <%= dash_card do %>
+      <%= dash_empty **@presenter.rank_empty %>
+    <% end %>
+  <% elsif @presenter.no_rivals? %>
+    <%= dash_card do %>
+      <%= dash_empty **@presenter.competitor_notice %>
+    <% end %>
+  <% elsif !@presenter.any? %>
+    <%= dash_card do %>
+      <%= dash_empty **@presenter.rank_empty(hint: "Competitors are set up, but no check in this range has scored them. Try a longer date range.") %>
+    <% end %>
+  <% else %>
+    <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "How often each competitor shows up" do %>
+        <span class="g-hint">Share of your tracked searches</span>
+        <% if @presenter.presence.any? %>
+          <%= seo_csv(@presenter, "competitors") %>
+        <% end %>
+      <% end %>
+
+      <%= dash_table label: "Competitors", cols: "minmax(0, 1fr) minmax(0, 1.4fr) 88px" do %>
+        <thead>
+          <tr>
+            <th scope="col">Competitor</th>
+            <th scope="col">Share of searches</th>
+            <th scope="col" class="num">Searches</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @presenter.presence.each do |rival, appearances, share| %>
+            <tr>
+              <td>
+                <div class="t-main seo-cell">
+                  <%= seo_label(rival.name) %>
+                  <span class="seo-sub flex-none"><%= rival.domain %></span>
+                </div>
+              </td>
+              <td>
+                <div class="seo-figure seo-figure--start">
+                  <%= tag.span(class: "seo-meter seo-meter--wide", **seo_bar(share)) %>
+                  <span class="seo-figure__pct"><%= @presenter.percent(share) %></span>
+                </div>
+              </td>
+              <td class="num"><%= @presenter.number(appearances) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+
+      <%= dash_card_footer do %>A domain that shows up on only a few of your searches is not much of a competitor.<% end %>
+    <% end %>
+
+    <% @presenter.groups.each do |group| %>
+      <%= dash_card class: "mt-3 seo-group", id: "gap-#{group.key}" do %>
+        <% group_title = capture do %>
+            <%= group.title %>
+            <%= dash_badge group.rows.size, tone: group.tone, class: "seo-count" %>
+        <% end %>
+        <%= dash_card_header group_title, title_class: "seo-group-title" do %>
+          <span class="g-hint"><%= group.note %></span>
+          <%= seo_csv(@presenter, group.key) %>
+        <% end %>
+
+        <%= dash_table label: group.title, cols: @presenter.table_cols do %>
+          <thead>
+            <tr>
+              <th scope="col">Search</th>
+              <% if @presenter.places? %><th scope="col">Place</th><% end %>
+              <th scope="col" class="num">You</th>
+              <% @presenter.rivals.each do |rival| %>
+                <th scope="col" class="num" title="<%= rival.domain %>"><%= rival.name.truncate(14) %></th>
+              <% end %>
+              <th scope="col" class="ps-2">Gap</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% group.rows.each do |row| %>
+              <tr>
+                <td><div class="t-main"><%= seo_link(row.query, @presenter.tracked_path(row)) %></div></td>
+                <% if @presenter.places? %>
+                  <td><%= seo_label(row.place.label) %></td>
+                <% end %>
+                <td class="num <%= row.ranked? ? "seo-pos" : "nil" %>"><%= @presenter.position_label(row.ours) %></td>
+                <% row.rivals.each do |standing| %>
+                  <td class="num <%= standing&.ranked? ? "t2" : "nil" %>"><%= @presenter.position_label(standing) %></td>
+                <% end %>
+                <td class="ps-2">
+                  <%= render "ahoy_dashboard/seo/shared/change", kind: @presenter.gap_kind(row), text: @presenter.gap_text(row) %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

@@ -1,0 +1,8 @@
+<% content_for :title, "Search and commands" %>
+<section class="container-xxl py-4">
+  <h1 class="h4">Search and commands</h1>
+  <p><%= link_to "Search pages, sources and other values", filter_values_path(query.to_query) %></p>
+  <%= dash_card element: :nav, class: "p-3", "aria-label": "Dashboard commands" do %>
+    <%= render "ahoy_dashboard/palettes/commands", interactive: false %>
+  <% end %>
+</section>

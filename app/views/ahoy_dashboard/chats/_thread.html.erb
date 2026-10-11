@@ -1,0 +1,65 @@
+<%= dash_frame_tag AhoyDashboard::ChatsController::THREAD_FRAME,
+      src: chat_path(chat, view: AhoyDashboard::ChatsController::THREAD_VIEW),
+      rendered: true do %>
+  <% if chat.chat_messages.none? %>
+    <%= render "ahoy_dashboard/chats/blank", picks: local_assigns[:picks] %>
+  <% else %>
+    <div class="chat-thread">
+      <% AhoyDashboard::ChatMessageDecorator.wrap(chat.chat_messages).each do |message| %>
+        <% if message.user? %>
+          <div class="chat-turn chat-turn--user">
+            <div class="chat-said"><%= message.content %></div>
+          </div>
+        <% else %>
+          <div class="chat-turn chat-turn--assistant">
+            <p class="chat-who">
+              <span class="chat-who__mark" aria-hidden="true"></span>
+              <span class="chat-who__name">AhoyDashboard</span>
+            </p>
+
+            <% if message.pending? %>
+              <div data-controller="dash--chat-stream"
+                   data-dash--chat-stream-url-value="<%= chat_stream_path(chat, message_id: message.id) %>"
+                   data-dash--chat-stream-frame-value="<%= AhoyDashboard::ChatsController::THREAD_FRAME %>">
+                <div class="chat-body chat-body--writing"
+                     data-dash--chat-stream-target="body"><%= message.content %></div>
+
+                <p class="chat-work" role="status" aria-live="polite">
+                  <span class="chat-work__dots" aria-hidden="true"
+                        data-dash--chat-stream-target="dots"
+                        <%= "hidden" if message.content.present? %>>
+                    <span></span><span></span><span></span>
+                  </span>
+                  <span data-dash--chat-stream-target="label"><%= dash_chat_work_label(message) %></span>
+                </p>
+              </div>
+            <% else %>
+              <div class="chat-body"><%= dash_markdown(message.content) %></div>
+
+              <% shown = AhoyDashboard::Assistant::ViewPresenter.wrap(message.shown) %>
+              <% if shown.any? %>
+                <div class="chat-views">
+                  <%= render partial: "ahoy_dashboard/chats/view", collection: shown, as: :view %>
+                </div>
+              <% end %>
+
+              <% if message.looked_at.any? %>
+                <p class="chat-meta">
+                  <span>Read <%= message.looked_at.to_sentence %></span>
+                  <% if message.tokens %>
+                    <span class="chat-meta__dot" aria-hidden="true"></span>
+                    <span><%= dash_number(message.tokens) %> tokens</span>
+                  <% end %>
+                </p>
+              <% end %>
+            <% end %>
+
+            <% if message.failed? %>
+              <p class="chat-meta">The question was saved. The answer was not.</p>
+            <% end %>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

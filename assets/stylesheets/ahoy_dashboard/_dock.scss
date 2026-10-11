@@ -1,0 +1,77 @@
+@mixin dash-below($width) {
+  @media (max-width: $width) {
+    @content;
+  }
+
+  @if $width + $ask-dock-width >= $ask-dock-from {
+    @media (min-width: $ask-dock-from) and (max-width: $width + $ask-dock-width) {
+      :where(html[data-ask="open"]) {
+        @content;
+      }
+    }
+  }
+}
+
+@mixin dash-above($width) {
+  @media (min-width: $width) {
+    :where(html:not([data-ask="open"])) {
+      @content;
+    }
+  }
+
+  @if $width < $ask-dock-from {
+    @media (min-width: $width) and (max-width: $ask-dock-from - 0.02px) {
+      :where(html[data-ask="open"]) {
+        @content;
+      }
+    }
+  }
+
+  @media (min-width: max($width + $ask-dock-width, $ask-dock-from)) {
+    :where(html[data-ask="open"]) {
+      @content;
+    }
+  }
+}
+
+:root {
+  --ask-w: #{$ask-dock-width};
+}
+
+@media (min-width: $ask-dock-from) {
+  html[data-ask="open"] body {
+    padding-right: var(--ask-w);
+  }
+
+  html[data-ask="open"] .glow {
+    right: var(--ask-w);
+  }
+
+  html[data-ask-live] body {
+    transition: padding-right 0.18s cubic-bezier(0.2, 1, 0.4, 1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-ask-live] body {
+    transition: none;
+  }
+}
+
+@media (min-width: $ask-dock-from) and (max-width: map-get($grid-breakpoints, md) + $ask-dock-width - 0.02px) {
+  html[data-ask="open"] .col-md-6,
+  html[data-ask="open"] .row-cols-md-2 > * {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}
+
+@media (min-width: $ask-dock-from) and (max-width: map-get($grid-breakpoints, xl) + $ask-dock-width - 0.02px) {
+  html[data-ask="open"] .col-xl-4,
+  html[data-ask="open"] .col-xl-5,
+  html[data-ask="open"] .col-xl-6,
+  html[data-ask="open"] .col-xl-7 {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}

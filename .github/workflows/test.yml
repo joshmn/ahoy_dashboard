@@ -1,0 +1,70 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rspec:
+    name: Rails ${{ matrix.rails }} / Ruby ${{ matrix.ruby }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rails: "6.0"
+            ruby: "2.5.9"
+            gemfile: rails_6_0
+          - rails: "6.1"
+            ruby: "2.5.9"
+            gemfile: rails_6_1
+          - rails: "7.0"
+            ruby: "2.7.8"
+            gemfile: rails_7_0
+          - rails: "7.1"
+            ruby: "2.7.8"
+            gemfile: rails_7_1
+          - rails: "7.2"
+            ruby: "3.1"
+            gemfile: rails_7_2
+          - rails: "8.0"
+            ruby: "3.2"
+            gemfile: rails_8_0
+          - rails: "8.1"
+            ruby: "3.2"
+            gemfile: rails_8_1
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/${{ matrix.gemfile }}.gemfile
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ahoy_dashboard_test
+      RAILS_ENV: test
+    steps:
+      - uses: actions/checkout@v6
+      - name: Start PostgreSQL
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql libpq-dev
+          sudo systemctl start postgresql
+          sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler: latest
+          bundler-cache: true
+      - name: Migrate the dummy application
+        run: bundle exec rake -f spec/dummy/Rakefile db:create db:migrate
+      - name: Run specs
+        run: bundle exec rspec
+
+  javascript:
+    name: JavaScript runtime
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test the frame queue
+        run: node --experimental-default-type=module --test spec/javascript/*_test.mjs

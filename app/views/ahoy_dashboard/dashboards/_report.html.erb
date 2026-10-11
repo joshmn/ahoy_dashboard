@@ -1,0 +1,6 @@
+<div class="col-6 panel-col">
+  <%= dash_frame_tag presenter.frame_id,
+        src: presenter.card_path, rendered: true do %>
+    <%= render "ahoy_dashboard/reports/card", report: presenter.report, tab: presenter.tab, presenter: presenter %>
+  <% end %>
+</div>

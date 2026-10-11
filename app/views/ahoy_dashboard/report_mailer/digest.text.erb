@@ -1,0 +1,25 @@
+<%= @digest.headline %>, <%= @digest.period_heading %>
+<%= @digest.summary %>
+<% @digest.tiles.each do |tile| -%>
+
+<%= tile.label %>: <%= tile.value %><%= " (#{tile.change})" if tile.change %>
+<%= @tile_urls[tile.key] %>
+<% end -%>
+<% if @digest.nothing_listed? -%>
+
+<%= @digest.nothing_listed_note %>
+<% else -%>
+<% @digest.lists.each do |list| -%>
+
+<%= list.title %>
+<% list.rows.each do |row| -%>
+<%= row.label %>, <%= row.value %>
+<% end -%>
+See all: <%= @list_urls[list.key] %>
+<% end -%>
+<% end -%>
+
+Open the dashboard: <%= @dashboard_url %>
+
+<%= @digest.scope_note %>
+<%= @digest.footer %>

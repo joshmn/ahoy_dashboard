@@ -1,0 +1,45 @@
+<%# The strip and the chart are one card, so the row that holds the tiles also
+    holds the controls that change how the chart is drawn. A tile with no
+    comparison prints no pill rather than an empty one; the space is held by the
+    row, so switching metric cannot change the height of anything. %>
+<% comparing = query.comparison.present? %>
+<% comparison_label = comparing ? @presenter.comparison_label : AhoyDashboard::DashboardPresenter::COMPARISON_LABELS["previous_period"] %>
+<% comparison_toggle = comparing ? nil : "previous_period" %>
+
+<div class="stat-row">
+  <%= form_with url: root_path,
+        method: :get,
+        data: { tm_frame: "_top", controller: "dash--metric",
+                "dash--metric-url-value": dashboard_path(format: :json) } do %>
+    <%= render "ahoy_dashboard/shared/query_fields", except: [ :metric ] %>
+
+    <%= dash_tiles label: "Metrics" do %>
+      <% @presenter.tiles.each do |tile| %>
+        <%= dash_tile tile.label, tile.display,
+              button: true, current: tile.active?, delta: tile.delta, value_title: tile.full,
+              name: "metric", value: tile.key,
+              data: { action: "dash--metric#select", "dash--metric-key-param": tile.key } %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <div class="chart-controls">
+<%# A link rather than a checkbox: it has to survive the JavaScript being off,
+    and everything else on this screen is a link too. Which comparison is picked
+    stays in the bar's menu, because there are three of them and a switch can
+    only say two. %>
+    <%= link_to root_path(query.with(comparison: comparison_toggle).to_query),
+          class: "cmp",
+          role: "switch", data: { tm_frame: "_top" },
+          "aria-checked": comparing.to_s,
+          title: comparing ? "Stop comparing" : "Compare to #{comparison_label.downcase}" do %>
+      <span class="cmp-lbl"><%= comparison_label %></span>
+      <span class="form-check form-switch bs-switch"><i></i></span>
+    <% end %>
+
+    <%= dash_icon_button :download,
+          label: "Download this chart as CSV",
+          title: "Download CSV",
+          data: { action: "dash--chart#export" } %>
+  </div>
+</div>

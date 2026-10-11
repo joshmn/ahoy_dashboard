@@ -1,0 +1,29 @@
+<% content_for :title, "Funnels" %>
+
+<section class="sec">
+  <%= dash_page_head title: "Funnels", lede: "Goals in order, and how many people make it through each step.",
+        actions: dash_button("Manage funnels", settings_funnels_path, tone: :link) %>
+
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <p class="mb-0 text-body-secondary"><%= @presenter.summary %> · <%= @presenter.range_label %></p>
+    <%= dash_button "Back to dashboard", root_path(query.to_query), tone: :link %>
+  </div>
+
+  <% if @presenter.empty? %>
+    <%= dash_card do %>
+      <%= dash_empty title: "No funnels yet", hint: "Create a funnel to see how visitors move through your goals.",
+            action: { label: "Create a funnel", url: new_settings_funnel_path } %>
+    <% end %>
+  <% else %>
+    <div class="grid row" aria-label="Funnels">
+      <%= render partial: "ahoy_dashboard/dashboards/funnel", collection: @presenter.funnel_presenters, as: :presenter %>
+    </div>
+
+    <% if @presenter.paged? %>
+      <%= dash_pager @presenter.page_label, label: "Pages of funnels",
+            previous: @presenter.previous_page_path, following: @presenter.next_page_path %>
+    <% end %>
+
+    <%= render partial: "ahoy_dashboard/funnels/modal", collection: @presenter.funnels, as: :funnel %>
+  <% end %>
+</section>

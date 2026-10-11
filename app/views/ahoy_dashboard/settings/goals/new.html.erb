@@ -1,0 +1,14 @@
+<% content_for :title, "New goal" %>
+<% content_for :dash_settings_section, "goals" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "New goal",
+          lede: "It counts every match already in the data as soon as you save." %>
+
+    <%= dash_card do %>
+      <%= render "ahoy_dashboard/settings/goals/form",
+            url: settings_goals_path, method: :post, submit_label: "Create goal" %>
+    <% end %>
+  </section>
+</div>

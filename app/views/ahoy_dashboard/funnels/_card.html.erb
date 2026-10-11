@@ -1,0 +1,20 @@
+<%= dash_card element: :section, class: "panel h-100", "aria-labelledby": "tm-card-#{presenter.modal_key}-title" do %>
+  <%= dash_card_header presenter.title, id: "tm-card-#{presenter.modal_key}-title", element: :header %>
+
+  <%= render "ahoy_dashboard/funnels/rows", presenter: presenter %>
+
+  <%= dash_card_footer action: true do %>
+    <%= dash_button presenter.details_path,
+          tone: :link,
+          class: "more",
+          "aria-haspopup": "dialog",
+          data: {
+            tm_frame: AhoyDashboard::FunnelPresenter.details_frame_id(presenter.funnel),
+            action: "dash--modal#open",
+            "dash--modal-key-param": presenter.modal_key
+          } do %>
+      <span>Details</span>
+      <%= dash_icon(:chevron_right) %>
+    <% end %>
+  <% end %>
+<% end %>

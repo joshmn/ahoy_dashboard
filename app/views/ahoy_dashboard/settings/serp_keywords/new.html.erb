@@ -1,0 +1,14 @@
+<% content_for :title, "Track keyword" %>
+<% content_for :dash_settings_section, "serp_keywords" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Track keyword",
+          lede: "Tracking starts today. Past rankings cannot be fetched.",
+          actions: dash_button("Import a list instead", new_settings_serp_keyword_import_path,
+                               data: { tm_frame: "_top" }) %>
+
+    <%= render "ahoy_dashboard/settings/serp_keywords/form",
+          plan: @plan, url: settings_serp_keywords_path, method: :post, submit_label: "Track it" %>
+  </section>
+</div>

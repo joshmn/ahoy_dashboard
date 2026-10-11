@@ -1,0 +1,7 @@
+<%= dash_bar_tag(row.share, inset: 320) %>
+<span class="rn">
+  <span class="nm" title="<%= row.display_label %>"><%= row.display_label %></span>
+</span>
+<% presenter.columns.each do |column| %>
+  <span class="cnt cnt--<%= column[:key] %>"><%= row.values[column[:key]] %></span>
+<% end %>

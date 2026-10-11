@@ -1,0 +1,179 @@
+require "rails_helper"
+require "generators/ahoy_dashboard/install/install_generator"
+
+RSpec.describe AhoyDashboard::Generators::InstallGenerator, "migrations" do
+  let(:engine_migrations) { AhoyDashboard::Installation.migrations_root }
+
+  around do |example|
+    Dir.mktmpdir do |dir|
+      @destination = dir
+      example.run
+    end
+  end
+
+  def run_generator(klass = described_class, args = [])
+    capture = StringIO.new
+    original = [ $stdout, $stderr ]
+    $stdout = $stderr = capture
+    klass.start([ "--skip-routes", *args ], destination_root: @destination)
+    capture.string
+  ensure
+    $stdout, $stderr = original
+  end
+
+  def copied
+    Dir[File.join(@destination, "db/migrate/*.rb")].map { |file| File.basename(file)[/\A\d+_(.+)\.ahoy_dashboard\.rb\z/, 1] }.sort
+  end
+
+  def names_in(*groups)
+    groups.flat_map { |group| engine_migrations.join(group).glob("*.rb") }.map { |file| file.basename(".rb").to_s.sub(/\A\d+_/, "") }.sort
+  end
+
+  def install_legacy(names)
+    FileUtils.mkdir_p(File.join(@destination, "db/migrate"))
+    names.each_with_index do |name, index|
+      File.write(File.join(@destination, "db/migrate/2026080100#{format("%04d", index)}_#{name}.ahoy_dashboard.rb"), "")
+    end
+  end
+
+  it "copies every feature on a fresh install, in order, with a version on each" do
+    run_generator
+
+    expect(copied).to eq(names_in(*engine_migrations.children.select(&:directory?).map { |dir| dir.basename.to_s }))
+
+    files = Dir[File.join(@destination, "db/migrate/*.rb")].sort
+    expect(files.map { |file| File.basename(file)[/\A\d+_(.+)\.ahoy_dashboard\.rb\z/, 1] })
+      .to eq(AhoyDashboard::Installation::GROUPS.values.flatten)
+    expect(File.read(files.first)).to start_with("# This migration comes from ahoy_dashboard\n")
+  end
+
+  it "numbers its copies after the newest migration already in the app" do
+    FileUtils.mkdir_p(File.join(@destination, "db/migrate"))
+    File.write(File.join(@destination, "db/migrate/99990101000000_create_widgets.rb"), "")
+
+    run_generator(described_class, %w[--only reports])
+
+    versions = Dir[File.join(@destination, "db/migrate/*.ahoy_dashboard.rb")].map { |file| File.basename(file).to_i }
+    expect(versions.min).to be > 99990101000000
+  end
+
+  it "copies core and only the named features, with the tables they share" do
+    output = run_generator(described_class, %w[--only keywords,alerts])
+
+    expect(copied).to eq(names_in("core", "search_providers", "keywords", "alerts"))
+    expect(output).to include("installed: core, keywords, alerts")
+    expect(output).to include("not installed: search_console, serp, backlinks, places, assistant, ai_visibility, reports")
+  end
+
+  it "tells you to use commas when names are separated by spaces" do
+    expect(run_generator(described_class, %w[--only serp reports])).to include("separate features with commas, not spaces: --only serp,reports")
+    expect(run_generator(described_class, %w[--skip serp reports])).to include("--skip serp,reports")
+    expect(copied).to be_empty
+  end
+
+  it "lists every feature in its help" do
+    lines = AhoyDashboard::Installation::FEATURES.map { |feature| match(/^\s+#{feature.name}\s+#{feature.label}$/) }
+
+    expect { described_class.help(Thor::Base.shell.new) }.to output(lines.reduce(include("comma separated"), :and)).to_stdout
+  end
+
+  it "copies every feature but the skipped ones" do
+    run_generator(described_class, %w[--skip serp,assistant])
+
+    expect(copied).not_to include(*names_in("serp", "assistant"))
+    expect(copied).to include(*names_in("core", "search_providers", "keywords", "backlinks", "alerts"))
+  end
+
+  it "keeps to what is installed on a later run, and adds a feature when asked" do
+    run_generator(described_class, %w[--only alerts])
+    before = copied
+
+    run_generator
+    expect(copied).to eq(before)
+
+    run_generator(described_class, %w[--only serp])
+    expect(copied).to eq(names_in("core", "alerts", "search_providers", "serp"))
+  end
+
+  it "copies nothing into an app that already ran the migrations these replace" do
+    legacy = described_class::LEGACY.values.flatten.uniq + names_in("core", "keywords", "backlinks", "places", "reports")
+    install_legacy(legacy)
+    count = copied.size
+
+    output = run_generator
+
+    expect(copied.size).to eq(count)
+    expect(output).to include("installed: core, search_console, serp, keywords, backlinks, places, assistant, ai_visibility, alerts, reports")
+  end
+
+  it "refuses an app with only some of the migrations one of these replaces" do
+    install_legacy(described_class::LEGACY.values.flatten.uniq - %w[add_floor_to_ahoy_dashboard_alert_rules] +
+                   names_in("core", "keywords", "backlinks", "places", "reports"))
+    count = copied.size
+
+    output = run_generator
+
+    expect(output).to include("is missing some of its migrations: add_floor_to_ahoy_dashboard_alert_rules")
+    expect(output).not_to include("identical")
+    expect(copied.size).to eq(count)
+  end
+
+  it "refuses a feature it does not know and both flags at once" do
+    expect(run_generator(described_class, %w[--only rankings])).to include("no feature named rankings")
+    expect(run_generator(described_class, %w[--only serp --skip alerts])).to include("pass --only or --skip, not both")
+    expect(copied).to be_empty
+  end
+
+  it "writes nothing when a feature name is wrong" do
+    run_generator(described_class, %w[--only nope])
+
+    expect(File).not_to exist(File.join(@destination, "config/initializers/ahoy_dashboard.rb"))
+    expect(copied).to be_empty
+  end
+
+  it "keeps an initializer that is already there when it runs again" do
+    run_generator
+    initializer = File.join(@destination, "config/initializers/ahoy_dashboard.rb")
+    File.write(initializer, "# mine")
+
+    output = run_generator(described_class, %w[--only serp])
+
+    expect(File.read(initializer)).to eq("# mine")
+    expect(output).to include("exist  config/initializers/ahoy_dashboard.rb")
+  end
+
+  describe "the feature list" do
+    def created_tables(groups)
+      groups.flat_map { |group| engine_migrations.join(group).glob("*.rb") }
+        .flat_map { |file| file.read.scan(/create_table :(\w+)/).flatten }.sort
+    end
+
+    it "names exactly the tables each feature's migrations create" do
+      AhoyDashboard::Installation::FEATURES.each do |feature|
+        expect(feature.tables.sort).to eq(created_tables(feature.groups)), feature.name.to_s
+      end
+    end
+
+    it "accounts for every migration directory and leaves no migration outside one" do
+      groups = AhoyDashboard::Installation::FEATURES.flat_map(&:groups) + [ AhoyDashboard::Installation::CORE ]
+
+      expect(engine_migrations.children.select(&:directory?).map { |dir| dir.basename.to_s }).to match_array(groups.uniq)
+      expect(AhoyDashboard::Installation::GROUPS.keys).to match_array(groups.uniq)
+      expect(engine_migrations.glob("*.rb")).to be_empty
+    end
+
+    it "orders every migration file and nothing else" do
+      AhoyDashboard::Installation::GROUPS.each do |group, names|
+        expect(engine_migrations.join(group).glob("*.rb").map { |file| file.basename(".rb").to_s }).to match_array(names), group
+      end
+    end
+
+    it "keeps version numbers out of the engine's file names" do
+      expect(engine_migrations.glob("**/*.rb").map { |file| file.basename.to_s }.grep(/\A\d/)).to be_empty
+    end
+
+    it "is the list that can be switched on, less site icons, which need no tables" do
+      expect(AhoyDashboard::Installation.names).to match_array(AhoyDashboard::Features.names - [ :favicons ])
+    end
+  end
+end

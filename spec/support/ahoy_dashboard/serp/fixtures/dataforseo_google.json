@@ -1,0 +1,64 @@
+{
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "cost": 0.0012,
+  "tasks": [
+    {
+      "id": "08201200-1535-0139-0000-c8c1b1a2f3d4",
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "result": [
+        {
+          "keyword": "federal prison visiting hours",
+          "se_domain": "google.com",
+          "location_code": 2840,
+          "language_code": "en",
+          "check_url": "https://www.google.com/search?q=federal+prison+visiting+hours",
+          "items_count": 4,
+          "item_types": [ "organic", "ai_overview" ],
+          "items": [
+            {
+              "type": "ai_overview",
+              "rank_group": 1,
+              "rank_absolute": 1,
+              "asynchronous_ai_overview": false,
+              "items": [
+                { "type": "ai_overview_element", "text": "Visiting hours are set by each institution." }
+              ],
+              "references": [
+                { "type": "ai_overview_reference", "source": "BOP", "domain": "bop.gov", "url": "https://www.bop.gov/inmates/visiting.jsp", "title": "Visiting a Federal Inmate" },
+                { "type": "ai_overview_reference", "source": "FPD", "domain": "federalprisondude.com", "url": "https://federalprisondude.com/going-to-federal-prison/visits", "title": "Visiting hours, plainly" }
+              ]
+            },
+            {
+              "type": "organic",
+              "rank_group": 1,
+              "rank_absolute": 2,
+              "domain": "www.bop.gov",
+              "title": "Visiting a Federal Inmate",
+              "url": "https://www.bop.gov/inmates/visiting.jsp",
+              "description": "Institutions set their own visiting hours."
+            },
+            {
+              "type": "paid",
+              "rank_group": 1,
+              "rank_absolute": 3,
+              "domain": "ads.example.com",
+              "title": "An advert",
+              "url": "https://ads.example.com/x"
+            },
+            {
+              "type": "organic",
+              "rank_group": 2,
+              "rank_absolute": 4,
+              "domain": "federalprisondude.com",
+              "title": "Visiting hours, plainly",
+              "url": "https://federalprisondude.com/going-to-federal-prison/visits",
+              "description": "What visiting day actually looks like."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

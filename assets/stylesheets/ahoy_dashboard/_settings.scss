@@ -1,0 +1,470 @@
+// What the settings screens need on top of the design.
+//
+// The shell itself — .set-wrap, .set-nav, .set-main, .sec, .sec-hd and
+// the rest — is the design's own and lives in ahoy_dashboard/_mock.scss. Everything
+// here exists because the real screens do something the mock's demo does not:
+// nine separate pages instead of one page with hidden sections, forms that post,
+// lists that reorder, and destinations the mock has no equivalent for.
+
+// The mock's section heading is an h1. There is one h1 per page here and it is
+// the site name in the header, so the section heading is an h2 wearing the same
+// clothes.
+.sec-hd h2 {
+  font-size: $h1-font-size;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+// Reordering. The design has no equivalent, because its lists are demo arrays
+// with no order that outlives the page. Ours is a column of its own beside the
+// edit and delete actions rather than those two stretched to make room, so both
+// columns keep the width the design gave them.
+.row-actions .btn-icon:disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.tm-flip {
+  transform: rotate(180deg);
+}
+
+// The line under a card's title that says what range it covers. Same size and
+// colour as the design's own .g-hint, which is the thing it sits beside.
+.tm-lede {
+  font-size: $font-size-md;
+  color: var(--t3);
+  line-height: 1.55;
+  margin: 0;
+}
+
+// One step in the funnel form: its number, the goal, and the button that takes
+// it out. The design's funnel form has no step rows at all — its steps are a
+// list of selects with no numbering — so this borrows .sf-row's geometry and the
+// report's own .fn-n, and a step reads the same here as it does there.
+.fs-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 28px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+// The operator sits in the auto column the design gives the word "is", so it is
+// sized to its own content rather than stretching the row.
+.sf-op.sel {
+  width: auto;
+  min-width: 0;
+}
+
+// ---------- the value picker ----------
+// It is the command menu holding the dropdown menus' rows, so every class in it
+// is the design's. The one thing the design has no rule for is a menu item on a
+// list that is not inside a dropdown, which is where its width comes from.
+.cmdk-list .menu-item {
+  width: 100%;
+}
+
+// ---------- the search console page ----------
+// Four numbers across the top. The design has no equivalent: the dashboard's
+// stat strip is one card of seven tiles that switch the chart, and these are
+// four separate cards that switch nothing.
+// The filter box in a card head. Narrower than a form field and flat, because it
+// sits in a 46px strip beside the tabs rather than in a form.
+.sc-find {
+  min-width: 0;
+  max-width: 320px;
+  flex: 1 1 200px;
+}
+
+// The trend column. Its own size, because 200px of sparkline does not fit in a
+// table cell beside four numbers.
+.sc-spark {
+  display: block;
+  width: 90px;
+  margin-left: auto;
+  overflow: visible;
+}
+
+// ---------- one keyword, in a dialog ----------
+// The title is the keyword, so it is mono like the row it was opened from.
+.dialog-sub {
+  margin: 2px 0 0;
+  font-size: $font-size-sm;
+  color: var(--t3);
+}
+
+// The dialog's figures are the ones somebody opened the dialog to read, so they
+// are the size of a number rather than the size of a footnote.
+.m-list .tiles-compact {
+  border-bottom: 1px solid var(--border);
+  margin: -6px -8px 0;
+}
+
+// A rule between each is four rules across a 660px panel, and the numbers stop
+// reading as one row.
+.m-list .tiles-compact .tile {
+  border-right: 0;
+}
+
+.m-list .tiles-compact .tile-value {
+  font-size: $font-size-2xl;
+}
+
+.kw-spark {
+  padding: 16px 6px 4px;
+}
+
+.kw-spark svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.kw-heading {
+  margin: 10px 0 8px;
+  padding: 0 6px;
+  font-size: $font-size-md;
+  font-weight: 600;
+}
+
+.kw-note {
+  margin: 10px 0 0;
+  padding: 0 6px;
+  font-size: $font-size-sm;
+  color: var(--t3);
+}
+
+// ---------- the filter row builder ----------
+.fx {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.fx-lede {
+  margin: 0;
+  font-size: $font-size-sm;
+  color: var(--t2);
+}
+
+.fx-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fx > .fx-block:first-of-type > .fx-or {
+  display: none;
+}
+
+.fx-set {
+  border: 1px solid var(--border);
+  border-radius: var(--bs-border-radius-lg);
+  background: var(--secondary-fill);
+}
+
+.fx-set__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: $font-size-xs;
+  color: var(--t3);
+}
+
+.fx-set__head b {
+  font-weight: 600;
+  color: var(--t2);
+}
+
+.fx-set__head .btn {
+  margin-left: auto;
+}
+
+.fx-or {
+  padding-left: 12px;
+  font-size: $font-size-xs;
+  font-weight: 600;
+  color: var(--t3);
+  text-transform: lowercase;
+}
+
+.fx-rows:not(:has(.fx-row)) {
+  display: none;
+}
+
+.fx-row {
+  display: grid;
+  grid-template-columns: 150px 118px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 8px 4px 12px;
+}
+
+.fx-row + .fx-row {
+  border-top: 1px solid var(--border);
+}
+
+.fx-row:hover {
+  background: var(--hover);
+}
+
+.fx-dim,
+.fx-op,
+.fx-edit,
+.fx-editing,
+.fx-row__actions {
+  grid-row: 1;
+}
+
+.fx-dim {
+  display: inline-flex;
+  grid-column: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: $font-size-sm;
+  font-weight: 500;
+  color: var(--t1);
+  white-space: nowrap;
+}
+
+.fx-dim__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+select.cis.fx-op {
+  grid-column: 2;
+  height: 28px;
+  padding: 0 22px 0 8px;
+  border: 1px solid var(--tm-line-strong);
+  border-radius: var(--bs-border-radius);
+  background-color: var(--raised);
+  background-position: right 7px center;
+  font-size: $font-size-sm;
+}
+
+.fx-edit {
+  grid-column: 3;
+  min-width: 0;
+}
+
+.fx-edit[open] {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.fx-edit[open] > .fx-values {
+  display: none;
+}
+
+.fx-editing {
+  display: none;
+  grid-column: 3;
+  padding-left: 8px;
+  font-size: $font-size-sm;
+  color: var(--t3);
+}
+
+.fx-row:has(> .fx-edit[open]) > .fx-editing {
+  display: block;
+}
+
+.fx-values {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--bs-border-radius);
+  background: transparent;
+  color: var(--t1);
+  font-size: $font-size-sm;
+  list-style: none;
+  cursor: pointer;
+}
+
+.fx-values::-webkit-details-marker {
+  display: none;
+}
+
+.fx-values:hover,
+.fx-values:focus-visible {
+  border-color: var(--tm-line-strong);
+  background: var(--raised);
+}
+
+.fx-values__list {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fx-values__more {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: var(--bs-border-radius-pill);
+  background: var(--selected);
+  font-size: $font-size-xs;
+  color: var(--t2);
+  white-space: nowrap;
+}
+
+.fx-values__more[hidden] {
+  display: none;
+}
+
+.fx-row__actions {
+  display: inline-flex;
+  grid-column: 4;
+  align-items: center;
+  gap: 2px;
+}
+
+.fx-mixed {
+  grid-column: 1 / 4;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.fx-summary {
+  font-size: $font-size-sm;
+  font-weight: 500;
+  color: var(--t1);
+  overflow-wrap: anywhere;
+}
+
+.fx-note {
+  margin: 2px 0 0;
+  font-size: $font-size-xs;
+  color: var(--t3);
+}
+
+.fx-warn {
+  display: block;
+  margin-top: 2px;
+  color: var(--warn-t);
+}
+
+.fx-add {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px 6px;
+}
+
+.fx-rows:has(.fx-row) + .fx-add {
+  border-top: 1px solid var(--border);
+}
+
+.fx-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 12px;
+  margin: 2px 0 8px;
+  padding: 12px;
+  border: 1px solid var(--tm-line-strong);
+  border-radius: var(--bs-border-radius);
+  background: var(--raised);
+}
+
+.fx-editor__text {
+  display: block;
+  width: 100%;
+  min-height: 200px;
+  padding: 8px 10px;
+  border: 1px solid var(--tm-line-strong);
+  border-radius: var(--bs-border-radius);
+  background: var(--bg);
+  color: var(--t1);
+  font-family: var(--mono);
+  font-size: 0.78125rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.fx-editor__side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.78125rem;
+  color: var(--t2);
+}
+
+.fx-editor__side p {
+  margin: 0;
+}
+
+.fx-editor__count {
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.fx-editor__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+}
+
+@media (max-width: 575.98px) {
+  .fx-row {
+    grid-template-columns: minmax(0, 1fr) max-content max-content;
+    gap: 6px 8px;
+    padding: 6px 6px 6px 10px;
+  }
+
+  select.cis.fx-op {
+    grid-column: 2;
+  }
+
+  .fx-row__actions {
+    grid-column: 3;
+  }
+
+  .fx-edit,
+  .fx-editing {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .fx-edit[open] {
+    grid-row: 3;
+  }
+
+  .fx-values {
+    padding-left: 0;
+  }
+
+  .fx-mixed {
+    grid-column: 1 / 3;
+  }
+
+  .fx-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.fx-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fx-preview-text {
+  margin: 0;
+  font-size: $font-size-md;
+  color: var(--t2);
+}
+
+.fx > .fx-block:only-of-type .fx-set:not(:has(.fx-row)) .fx-set__head .btn {
+  display: none;
+}

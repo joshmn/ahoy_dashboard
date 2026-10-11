@@ -1,0 +1,129 @@
+<%# The question as a sentence. Every control is a menu of links carrying the
+    rest of the question along, so this works with the JavaScript off and the
+    result is a URL somebody can keep.
+
+    Two rows, not one. The sentence is what is being asked; the row under it is
+    how the answer is drawn, and the two were one wrapping line with the columns
+    menu pushed right by ms-auto, so at four filters it landed mid sentence and
+    the line read "compared to Previous period 3 columns Show crawlers".
+
+    Each connector keeps its own control inside one part, because the sentence
+    wraps between parts and "over" was ending a line with its date range
+    starting the next one. %>
+<% carried = explore.to_query.slice(*AhoyDashboard::DashboardHelper::DESTINATION_KEYS) %>
+
+<div class="ex-ask">
+  <div class="ex-ask__sentence">
+    <span class="ex-ask__part">
+      <%= dash_link_menu(id: "tm-ask-metric",
+            label: query.metric.label,
+            section: "Measure",
+            items: presenter.metric_options) %>
+    </span>
+
+    <span class="ex-ask__part">
+      <span class="ex-ask__word">by</span>
+
+      <%= dash_link_menu(id: "tm-ask-dimension",
+            label: presenter.dimension.label,
+            section: "Break down by",
+            groups: presenter.dimension_groups) %>
+    </span>
+
+<%# The one part that is allowed to wrap inside itself: a filter list has no
+    length limit and the chips have to be able to run onto a second line without
+    taking the rest of the sentence with them. %>
+    <span class="ex-ask__part ex-ask__part--filters">
+      <span class="ex-ask__word">where</span>
+
+      <% remove_path = ->(index) { presenter.remove_filter_path(index) } %>
+      <% query.filters.groups.zip(query.filters.group_starts).each do |group, start| %>
+        <%= render "ahoy_dashboard/shared/filter_group", group: group, start: start, remove_path: remove_path,
+              destination: "explore", carried: carried %>
+      <% end %>
+
+      <% if query.defaulted? %>
+        <span class="ex-ask__note">
+          <span>Default filters</span>
+          <span class="vr"></span>
+          <%= link_to "Show everything", explore_path(query.default_clear_params.merge(carried)),
+                class: "link-secondary text-decoration-underline" %>
+        </span>
+      <% end %>
+
+      <%= render "ahoy_dashboard/dashboards/filter_menu",
+            destination: "explore", carried: carried %>
+    </span>
+
+    <span class="ex-ask__part">
+      <span class="ex-ask__word">over</span>
+
+      <%= dash_link_menu(id: "tm-ask-period",
+            label: presenter.period_label,
+            section: "Date range",
+            items: presenter.period_options) %>
+    </span>
+
+    <% if query.intervals.many? %>
+      <span class="ex-ask__part">
+        <span class="ex-ask__word">by</span>
+
+        <%= dash_link_menu(id: "tm-ask-interval",
+              label: presenter.interval_label,
+              section: "Group the chart by",
+              items: presenter.interval_options) %>
+      </span>
+    <% end %>
+
+    <span class="ex-ask__part">
+      <span class="ex-ask__word">compared to</span>
+
+      <%= dash_link_menu(id: "tm-ask-comparison",
+            label: presenter.comparison_label,
+            section: "Compare to",
+            items: presenter.comparison_options) %>
+    </span>
+  </div>
+
+<%# How the answer is drawn, which is not part of the question and no longer
+    reads as if it were. Only what this dimension can actually answer is offered:
+    scroll depth on a dimension the engagement event cannot be grouped by would
+    print 0, which reads as nobody scrolled rather than as a question this cannot
+    answer. %>
+  <div class="ex-ask__views">
+    <% if query.period.custom? %>
+      <%= render "ahoy_dashboard/shared/range_fields",
+            url: explore_path,
+            clear_path: presenter.clear_range_path,
+            carried: explore.to_query.except(:page),
+            card: false %>
+    <% end %>
+
+    <span class="ex-ask__status">
+      <% if query.include_crawlers? %>
+        <span class="g-hint">Crawlers included</span>
+        <%= dash_button "Leave them out", presenter.crawler_toggle_path, tone: :link %>
+      <% end %>
+
+      <% if query.include_internal? %>
+        <span class="g-hint">Hidden traffic included</span>
+        <%= dash_button "Hide it", presenter.internal_toggle_path, tone: :link %>
+      <% elsif query.hidden_visits.positive? %>
+        <span class="g-hint"><%= pluralize(query.hidden_visits, "visit") %> hidden</span>
+        <%= dash_button "Manage", settings_exclusions_path, tone: :link,
+              "aria-label": "Manage exclusions" %>
+      <% end %>
+
+      <% if query.filters.any? %>
+        <%= dash_button "Clear filters", presenter.clear_filters_path, tone: :link %>
+      <% end %>
+
+      <%= dash_link_menu(id: "tm-ask-options",
+            button_class: "tm-dashed text-body-secondary",
+            label: "Options",
+            section: "Options",
+            align: :end,
+            groups: presenter.option_groups) %>
+    </span>
+  </div>
+</div>

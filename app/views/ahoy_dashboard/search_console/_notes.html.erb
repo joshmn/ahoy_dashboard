@@ -1,0 +1,27 @@
+<%# The card reads a range and nothing else. Every other card on the dashboard
+    narrows when a filter is on, so a card that quietly did not would read as the
+    same question answered differently. %>
+<% filtered = query.filters.any? %>
+
+<% if presenter.problem_note.present? || presenter.disconnected_note.present? || presenter.through_note.present? || filtered %>
+  <%= dash_card_footer do %>
+    <% if presenter.through_note.present? %>
+      <p class="mb-0"><%= presenter.through_note %></p>
+    <% end %>
+
+    <% if presenter.problem_note.present? %>
+      <p class="mb-0">
+        <%= presenter.problem_note %>
+        <%= link_to "Fix connection", settings_google_connection_path, data: { tm_frame: "_top" } %>
+      </p>
+    <% end %>
+
+    <% if presenter.disconnected_note.present? %>
+      <p class="mb-0"><%= presenter.disconnected_note %></p>
+    <% end %>
+
+    <% if filtered %>
+      <p class="mb-0">Filters do not reach search data, so this is the whole site.</p>
+    <% end %>
+  <% end %>
+<% end %>

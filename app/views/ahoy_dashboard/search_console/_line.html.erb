@@ -1,0 +1,25 @@
+<%# The whole row is the link to that query's history, so the box cannot live
+    inside it. A trackable line is the box beside the row instead of a cell in
+    it, and the header spacer in _columns keeps the counts lined up. %>
+<% body = capture do %>
+  <% if row.keyword_path %>
+    <%= link_to row.keyword_path, class: "data-row", title: row.title, data: { tm_frame: "_top" } do %>
+      <%= render "ahoy_dashboard/search_console/row", presenter: presenter, row: row %>
+    <% end %>
+  <% else %>
+    <div class="data-row data-row--static" title="<%= row.display_label %>">
+      <%= render "ahoy_dashboard/search_console/row", presenter: presenter, row: row %>
+    </div>
+  <% end %>
+<% end %>
+
+<% if form %>
+  <div class="data-line">
+    <span class="data-line__box">
+      <%= seo_track_box(row.label, form: form, index: row_counter, compact: true) if row.label.present? %>
+    </span>
+    <%= body %>
+  </div>
+<% else %>
+  <%= body %>
+<% end %>

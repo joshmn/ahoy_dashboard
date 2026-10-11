@@ -1,0 +1,17 @@
+<% arrived = presenter.arrived(busy) %>
+<tr>
+  <td><div class="t-main"><%= seo_link(busy.query, presenter.tracked_path(busy)) %></div></td>
+  <td class="small text-body-secondary"><%= presenter.on_label(busy.on) %></td>
+  <td class="num seo-pos"><%= busy.score.round(1) %></td>
+  <td class="num t2"><%= presenter.percent(busy.turnover) %></td>
+  <td class="num t2"><%= presenter.percent(busy.shuffle) %></td>
+  <td class="ps-2">
+    <% if arrived.any? %>
+      <div class="d-flex flex-wrap gap-1">
+        <% arrived.each do |domain| %><%= dash_badge domain, title: domain %><% end %>
+      </div>
+    <% else %>
+      <span class="nil">&mdash;</span>
+    <% end %>
+  </td>
+</tr>

@@ -1,0 +1,24 @@
+<% mono = local_assigns[:mono] %>
+
+<%= dash_card element: :section, class: "panel h-100" do %>
+  <%= dash_card_header title, element: :header do %>
+    <span class="g-hint">Visitors</span>
+  <% end %>
+
+  <% if rows.empty? %>
+    <%= dash_empty title: "Nothing to show yet", fill: true, compact: true %>
+  <% else %>
+    <div class="p-list">
+      <% rows.each do |row| %>
+        <div class="data-row" title="<%= row.label %>">
+          <%= dash_bar_tag(row.share) %>
+          <span class="<%= class_names("rn", "mono" => mono) %>">
+            <%= dash_row_chip(chip, row.label) if chip %>
+            <%= dash_row_label(row.label, split: mono) %>
+          </span>
+          <span class="cnt"><%= dash_number(row.visitors) %></span>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

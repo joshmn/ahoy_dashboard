@@ -1,0 +1,36 @@
+<%# A read-only plot. No controller, no data attributes, no tween: it is drawn
+    by the server and it is still there with the JavaScript off. %>
+<% values = points.map { |point| point.last.to_f } %>
+<% height = local_assigns.fetch(:height, 96) %>
+<% scale = { floor: local_assigns[:floor], ceiling: local_assigns[:ceiling] }.compact %>
+<% bands = Array(local_assigns[:bands]) %>
+<% path = seo_plot(values, height: height, **scale) %>
+
+<% if !seo_charted?(points) %>
+  <p class="mb-0 px-3 py-3 text-body-secondary"><%= seo_readings(points) %></p>
+<% elsif path.present? %>
+  <div class="<%= class_names("chart-wrap seo-plot", "seo-plot--banded" => bands.any?) %>">
+    <div class="seo-plot__frame">
+    <% if bands.any? %>
+      <div class="seo-plot__axis" aria-hidden="true">
+        <% bands.each do |value, label| %>
+          <span class="seo-plot__band-label" style="top: <%= seo_plot_percent(value, height: height, **scale) %>%"><%= label %></span>
+        <% end %>
+      </div>
+    <% end %>
+    <svg viewBox="0 0 640 <%= height %>" preserveAspectRatio="none"
+         role="img" aria-label="<%= local_assigns.fetch(:label, "Trend") %>">
+      <% bands.each do |value, _label| %>
+        <line class="seo-plot__band" x1="0" x2="640" y1="<%= seo_plot_y(value, height: height, **scale) %>" y2="<%= seo_plot_y(value, height: height, **scale) %>"></line>
+      <% end %>
+      <path class="prev" d="<%= path %>"
+            style="stroke: rgba(255,255,255,.06); stroke-dasharray: none; stroke-width: 6"></path>
+      <path class="line" d="<%= path %>"></path>
+    </svg>
+    </div>
+    <div class="seo-plot__dates">
+      <span><%= points.first.first %></span>
+      <span><%= points.last.first %></span>
+    </div>
+  </div>
+<% end %>

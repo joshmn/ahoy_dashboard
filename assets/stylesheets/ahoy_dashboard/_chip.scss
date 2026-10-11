@@ -1,0 +1,116 @@
+// Chips, badges and the live dot. Every small bordered thing that carries a
+// value rather than triggering one.
+
+// The box in front of a row's name is the design's own .lc, so only what the
+// design has no equivalent for lives here: the design fills it with a coloured
+// letter and we fill it with the site's real icon, fetched and served by us.
+// The letter stays underneath, which is what shows while the icon is still
+// coming, if the domain has none, if fetching is switched off, or if the row
+// names something that is not a website at all.
+.lc {
+  text-transform: uppercase;
+  background: var(--tm-chip-bg);
+  color: var(--bs-secondary-color);
+  overflow: hidden;
+}
+
+.lc--icon {
+  position: relative;
+  background: transparent;
+}
+
+.lc__letter {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--tm-chip-bg);
+  border-radius: inherit;
+}
+
+.lc__icon {
+  position: relative;
+  display: block;
+}
+
+@keyframes tm-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+// The operator inside a segment's chip is a select, not the design's plain .cis
+// text, because a segment can be built on all four operators and a chip that
+// could only say "is" would quietly narrow what a segment is allowed to be. It
+// is stripped back to read as the text it stands in for; only the caret says it
+// opens.
+select.cis {
+  appearance: none;
+  -webkit-appearance: none;
+  width: auto;
+  height: auto;
+  padding: 0 12px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%235f6672' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 6.5 8 10l3.5-3.5'/%3E%3C/svg%3E")
+    right center / 9px no-repeat;
+  box-shadow: none;
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+select.cis:focus-visible {
+  outline: 2px solid rgba(94, 106, 210, 0.65);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+select.cis option {
+  background: var(--raised);
+  color: var(--t1);
+}
+
+.chip-group {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip-group--or {
+  padding: 2px 3px 2px 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--bs-border-radius-lg);
+  background: var(--secondary-fill);
+}
+
+.chip-group__or {
+  padding: 0 2px;
+  font-size: $font-size-sm;
+  color: var(--t3);
+}
+
+.chip--value {
+  padding-left: 7px;
+}
+
+.chip-group__add.btn-icon {
+  width: 22px;
+  height: 22px;
+  min-width: 0;
+  padding: 0;
+  color: var(--t3);
+}
+
+.chip-group__add.btn-icon:hover,
+.chip-group__add.btn-icon:focus-visible {
+  color: var(--t1);
+  background: var(--hover);
+}
+
+.chip-group__note {
+  font-size: $font-size-sm;
+  color: var(--warn-t);
+}
+

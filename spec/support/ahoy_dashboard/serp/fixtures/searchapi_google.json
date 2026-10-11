@@ -1,0 +1,23 @@
+{
+  "search_metadata": {
+    "id": "search_9aBcDeFgHiJk",
+    "status": "Success",
+    "request_url": "https://www.google.com/search?q=federal+prison+visiting+hours"
+  },
+  "search_parameters": { "engine": "google", "q": "federal prison visiting hours", "gl": "us", "hl": "en" },
+  "ai_overview": {
+    "markdown": "Visiting hours are set by each institution.",
+    "text_blocks": [
+      { "type": "paragraph", "answer": "Visiting hours are set by each institution.", "reference_indexes": [ 0, 1 ] }
+    ],
+    "reference_links": [
+      { "index": 0, "title": "Visiting a Federal Inmate", "link": "https://www.bop.gov/inmates/visiting.jsp", "source": "bop.gov" },
+      { "index": 1, "title": "Visiting hours, plainly", "link": "https://federalprisondude.com/going-to-federal-prison/visits", "source": "federalprisondude.com" }
+    ]
+  },
+  "organic_results": [
+    { "position": 1, "title": "Visiting a Federal Inmate", "link": "https://www.bop.gov/inmates/visiting.jsp", "domain": "www.bop.gov", "snippet": "Institutions set their own visiting hours." },
+    { "position": 2, "title": "Federal prison visitation", "link": "https://www.justice.gov/visiting", "domain": "www.justice.gov", "snippet": "General guidance." },
+    { "position": 3, "title": "Visiting hours, plainly", "link": "https://federalprisondude.com/going-to-federal-prison/visits", "domain": "federalprisondude.com", "snippet": "What visiting day looks like." }
+  ]
+}

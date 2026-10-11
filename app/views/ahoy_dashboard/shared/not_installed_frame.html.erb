@@ -1,0 +1,5 @@
+<%= dash_frame_tag frame_id do %>
+  <%= dash_card element: :section, class: "panel h-100 p-3", "aria-label": "How to install #{state.label}" do %>
+    <%= render "ahoy_dashboard/shared/feature_state", state: state %>
+  <% end %>
+<% end %>

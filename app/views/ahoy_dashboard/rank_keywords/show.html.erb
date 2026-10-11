@@ -1,0 +1,194 @@
+<% content_for :title, @presenter.heading %>
+
+<% check = AhoyDashboard::Serp::CheckNowPresenter.new(keyword: @presenter.keyword) %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: @back.key || "rankings", site: @site } do %>
+  <% actions = capture do %>
+    <% if @presenter.search_options.many? %>
+      <%= dash_link_menu(id: "tm-rank-keyword-search",
+            label: @presenter.search_label, section: "Device and language",
+            items: @presenter.search_options) %>
+    <% end %>
+
+    <% if @presenter.location_options.many? %>
+      <%= dash_link_menu(id: "tm-rank-keyword-place",
+            label: @presenter.result.place.label, section: "Searched from",
+            items: @presenter.location_options) %>
+    <% end %>
+
+    <%= dash_link_menu(id: "tm-rank-keyword-period", icon: :cal,
+          label: @presenter.range_label, section: "Date range", items: @presenter.period_options) %>
+
+    <%= dash_button "See clicks", search_console_keyword_path(@presenter.query.to_query.merge(q: @presenter.heading)),
+          data: { tm_frame: "_top" } %>
+    <%= dash_button_to "Check now", check.path, reason: check.reason, confirm: check.confirm %>
+    <%= dash_button "Edit keyword", @presenter.edit_path, data: { tm_frame: "_top" } %>
+  <% end %>
+
+  <%= dash_page_head back: { label: @back.label, url: @back.url }, title: @presenter.heading,
+        lede: @presenter.summary, actions: actions %>
+
+  <%= dash_unavailable_notice "Check now", check.notice_reason, fix: check.fix %>
+
+  <% if @presenter.empty? %>
+    <%= dash_card do %>
+      <%= dash_empty title: @presenter.empty_title, hint: @presenter.empty_hint %>
+    <% end %>
+  <% else %>
+    <% chart_data = @presenter.chart_data %>
+    <% charted = seo_charted?(@presenter.readings) || chart_data.blank? %>
+    <%= dash_card element: :section, class: "seo-chart-card", "aria-label": "Position over time",
+          data: (dash_chart_data(chart_data, @presenter.chart_options.symbolize_keys, kind: @presenter.chart_kind) if charted) do %>
+      <%= dash_tiles label: "Summary figures", ruled: true do %>
+        <% @presenter.tiles.each_with_index do |tile, index| %>
+          <%= dash_tile tile.label, tile.value, note: tile.note, note_tone: (@presenter.change_tone if index.zero?) %>
+        <% end %>
+      <% end %>
+
+      <% if charted %>
+        <div class="chart-wrap" data-dash--chart-target="canvas">
+          <% if chart_data.blank? %>
+            <%= dash_empty fill: true,
+                  title: "Nothing to draw",
+                  hint: "Your site was not in the results on any check in this range." %>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="mb-0 px-3 py-3 text-body-secondary"><%= seo_readings(@presenter.readings) %></p>
+      <% end %>
+
+      <%= dash_card_footer do %>
+        <%= @presenter.source_line %>
+        Up is better on this chart. A check where your site was not in the results leaves a hole in the line.
+      <% end %>
+    <% end %>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "Every reading" do %>
+        <span class="g-hint">Newest first</span>
+        <% if @presenter.rows.any? %>
+          <%= seo_csv(@presenter, "readings") %>
+        <% end %>
+      <% end %>
+
+      <%= dash_table label: "Every reading", cols: "120px 76px 64px minmax(0, 1fr)" do %>
+        <thead>
+          <tr>
+            <th scope="col">Checked</th>
+            <th scope="col" class="num">Position</th>
+            <th scope="col">AI</th>
+            <th scope="col">URL</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @presenter.rows.each do |point| %>
+            <tr>
+              <td><div class="t-main"><%= @presenter.stamp(point.at) %></div></td>
+              <td class="num"><%= point.position || tag.span("&mdash;".html_safe, class: "nil") %></td>
+              <td>
+                <% if point.cited %>
+                  <%= dash_badge "Cited", tone: :success %>
+                <% elsif point.overview %>
+                  <%= dash_badge "Shown" %>
+                <% else %>
+                  <span class="nil">&mdash;</span>
+                <% end %>
+              </td>
+              <td><%= seo_page_link(seo_url_path(point.url)) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+
+      <%= dash_card_footer do %>Dates are when the check ran, not when Google changed anything.<% end %>
+    <% end %>
+
+    <div class="row g-3 mt-0">
+      <div class="col-12 col-xl-6">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "Who else ranked" do %>
+            <% if @presenter.rivals.any? %>
+              <%= seo_csv(@presenter, "rivals") %>
+            <% end %>
+          <% end %>
+
+          <% if @presenter.rivals.any? %>
+            <%= dash_table label: "Who else ranked", cols: "44px minmax(0, 1fr)" do %>
+              <thead>
+                <tr>
+                  <th scope="col" class="num">#</th>
+                  <th scope="col">Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @presenter.rivals.each do |rival| %>
+                  <tr>
+                    <td class="num"><%= rival.position %></td>
+                    <td>
+                      <div class="seo-stack">
+                        <span class="t-main min-w-0">
+                          <%= seo_label(rival.domain, path: true) %>
+                          <% if @presenter.site && rival.domain == @presenter.site.domain %>
+                            <%= dash_badge "You", tone: :kind %>
+                          <% end %>
+                        </span>
+                        <span class="seo-sub"><%= seo_label(rival.title.presence || rival.link) %></span>
+                      </div>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            <% end %>
+            <%= dash_card_footer do %><%= @presenter.rivals_note %><% end %>
+          <% else %>
+            <%= dash_empty compact: true, title: "No results saved",
+                  hint: "Results are saved each time this search is checked." %>
+          <% end %>
+        <% end %>
+      </div>
+
+      <div class="col-12 col-xl-6">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "The AI overview" do %>
+            <% if @presenter.citations.any? %>
+              <%= seo_csv(@presenter, "citations") %>
+            <% end %>
+          <% end %>
+
+          <% if @presenter.citations.any? %>
+            <%= dash_table label: "Sources cited in the AI overview", cols: "44px minmax(0, 1fr)" do %>
+              <thead>
+                <tr>
+                  <th scope="col" class="num">#</th>
+                  <th scope="col">Cited</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @presenter.citations.each do |citation| %>
+                  <tr>
+                    <td class="num"><%= citation.slot %></td>
+                    <td>
+                      <div class="seo-stack">
+                        <span class="t-main min-w-0">
+                          <%= seo_label(citation.domain, path: true) %>
+                          <% if @presenter.site && citation.domain == @presenter.site.domain %>
+                            <%= dash_badge "You", tone: :kind %>
+                          <% end %>
+                        </span>
+                        <span class="seo-sub"><%= seo_label(citation.title.presence || citation.link) %></span>
+                      </div>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            <% end %>
+            <%= dash_card_footer do %>The sources Google cited on the latest check, in the order it listed them.<% end %>
+          <% else %>
+            <%= dash_empty compact: true, title: "No AI overview on the latest check",
+                  hint: "Google shows one for some searches and not others." %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% end %>

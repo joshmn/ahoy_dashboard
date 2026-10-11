@@ -1,0 +1,8 @@
+<% content_for :title, title %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: current, site: nil } do %>
+  <%= dash_page_head title: title, lede: "Not installed in this app yet." %>
+  <%= dash_card element: :section, class: "p-3", "aria-label": "How to install #{state.label}" do %>
+    <%= render "ahoy_dashboard/shared/feature_state", state: state %>
+  <% end %>
+<% end %>

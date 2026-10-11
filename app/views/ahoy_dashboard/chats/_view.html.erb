@@ -1,0 +1,58 @@
+<figure class="chat-view">
+  <figcaption class="chat-view__hd">
+    <span class="chat-view__title"><%= view.title %></span>
+    <% if view.subtitle.present? %>
+      <span class="chat-view__sub"><%= view.subtitle %></span>
+    <% end %>
+  </figcaption>
+
+  <% if view.series? %>
+    <%= tag.div(data: dash_chart_data(view.chart_data, view.chart_options).merge("dash--chart-height-value": view.height)) do %>
+      <div class="chart-wrap" data-dash--chart-target="canvas"></div>
+    <% end %>
+  <% elsif view.table? %>
+    <%= dash_table label: view.title.presence || "Result", cols: view.grid_template do %>
+      <thead>
+        <tr>
+          <% view.columns.each do |column| %>
+            <%= tag.th(column[:label], scope: "col", class: ("num" if view.alignment(column) == "end")) %>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody>
+        <% view.rows.each do |row| %>
+          <tr>
+            <% view.columns.each_with_index do |column, index| %>
+              <%= tag.td(class: ("num" if view.alignment(column) == "end")) do %>
+                <% if index.zero? %>
+                  <div class="t-main"><%= view.cell(row, column) %></div>
+                <% else %>
+                  <%= view.cell(row, column) %>
+                <% end %>
+              <% end %>
+            <% end %>
+          </tr>
+        <% end %>
+      </tbody>
+    <% end %>
+  <% else %>
+    <div class="chat-view__figures">
+      <% view.figures.each do |figure| %>
+        <div class="chat-view__figure">
+          <span class="chat-view__flbl">
+            <%= figure[:label] %>
+            <% if (delta = view.delta(figure[:change])) %>
+              <%= dash_delta(**delta) %>
+            <% end %>
+          </span>
+          <span class="chat-view__fval"><%= figure[:value] %></span>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if view.path.present? %>
+    <%= dash_button view.path_label || "Open it", view.path, tone: :link, class: "chat-view__open",
+          data: { tm_frame: "_top" } %>
+  <% end %>
+</figure>

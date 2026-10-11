@@ -1,0 +1,37 @@
+{
+  "search_metadata": {
+    "id": "68a1b2c3d4e5f60718293a4b",
+    "status": "Success",
+    "google_url": "https://www.google.com/search?q=federal+prison+visiting+hours"
+  },
+  "search_parameters": {
+    "engine": "google",
+    "q": "federal prison visiting hours",
+    "gl": "us",
+    "hl": "en",
+    "device": "desktop"
+  },
+  "ai_overview": {
+    "text_blocks": [
+      { "type": "paragraph", "snippet": "Visiting hours are set by each institution." },
+      { "type": "paragraph", "snippet": "Most federal facilities take visits on weekends and holidays." }
+    ],
+    "references": [
+      { "title": "Visiting a Federal Inmate", "link": "https://www.bop.gov/inmates/visiting.jsp", "source": "bop.gov", "index": 1 },
+      { "title": "Visiting hours, plainly", "link": "https://federalprisondude.com/going-to-federal-prison/visits", "source": "federalprisondude.com", "index": 2 },
+      { "title": "Federal prison visitation", "link": "https://www.justice.gov/visiting", "source": "justice.gov", "index": 3 }
+    ]
+  },
+  "organic_results": [
+    { "position": 1, "title": "Visiting a Federal Inmate", "link": "https://www.bop.gov/inmates/visiting.jsp", "snippet": "Institutions set their own visiting hours." },
+    { "position": 2, "title": "Federal prison visitation", "link": "https://www.justice.gov/visiting", "snippet": "General guidance on visitation." },
+    { "position": 3, "title": "Visiting hours, plainly", "link": "https://federalprisondude.com/going-to-federal-prison/visits", "snippet": "What visiting day actually looks like." },
+    { "position": 4, "title": "How prison visits work", "link": "https://www.prisonprofessors.com/visits", "snippet": "A consultant's overview." },
+    { "position": 5, "title": "Visitation rules", "link": "https://www.nolo.com/legal-encyclopedia/visitation", "snippet": "Legal background." },
+    { "position": 6, "title": "Ask a question about visits", "link": "https://www.reddit.com/r/prison/comments/visits", "snippet": "Community answers." },
+    { "position": 7, "title": "Visiting regulations", "link": "https://www.law.cornell.edu/cfr/text/28/540.40", "snippet": "28 CFR 540." },
+    { "position": 8, "title": "Visitor guidelines", "link": "https://www.findlaw.com/criminal/visiting.html", "snippet": "Plain-language summary." },
+    { "position": 9, "title": "What to expect on a visit", "link": "https://portal.federalprisondude.com/guides/visits", "snippet": "A guide." },
+    { "position": 10, "title": "Prison visiting FAQ", "link": "https://www.quora.com/prison-visiting", "snippet": "Assorted answers." }
+  ]
+}

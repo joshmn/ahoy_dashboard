@@ -1,0 +1,212 @@
+<% content_for :title, @presenter.title %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "serp_features", site: @site } do %>
+  <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter %>
+
+  <% if !@presenter.any? %>
+    <%= dash_card do %>
+      <%= dash_empty **@presenter.rank_empty(hint: "Features are read from each rank check. Try a longer date range, or run a check from Rankings.") %>
+    <% end %>
+  <% elsif @presenter.unreadable? %>
+    <%= dash_card do %>
+      <%= dash_empty **@presenter.unreadable_empty %>
+    <% end %>
+  <% else %>
+    <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "Features on your results pages" do %>
+        <span class="g-hint">Latest reading of each search</span>
+        <% if @presenter.features.any? %>
+          <%= seo_csv(@presenter, "features") %>
+        <% end %>
+      <% end %>
+
+      <% if @presenter.features.any? %>
+        <%= dash_table label: "Features on your results pages", cols: @presenter.feature_cols do %>
+          <thead>
+            <tr>
+              <th scope="col">Feature</th>
+              <% if @presenter.shares? %><th scope="col">Share of searches</th><% end %>
+              <th scope="col" class="num">Searches</th>
+              <th scope="col" class="num">Yours</th>
+              <th scope="col" class="ps-3">Held most by</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @presenter.features.each do |feature| %>
+              <tr>
+                <td><div class="t-main"><%= seo_label(feature.label) %></div></td>
+                <% if @presenter.shares? %>
+                  <td>
+                    <div class="seo-figure seo-figure--start">
+                      <%= tag.span(class: "seo-meter seo-meter--wide", **seo_bar(feature.share)) %>
+                      <span class="seo-figure__pct"><%= @presenter.percent(feature.share) %></span>
+                    </div>
+                  </td>
+                <% end %>
+                <td class="num"><%= @presenter.number(feature.seen) %></td>
+                <td class="num">
+                  <% if !feature.ownable %>
+                    <span class="nil">&mdash;</span>
+                  <% elsif feature.ours.positive? %>
+                    <span class="seo-yours"><%= @presenter.number(feature.ours) %></span>
+                  <% else %>
+                    <span class="t2">0</span>
+                  <% end %>
+                </td>
+                <td class="ps-3">
+                  <div class="seo-cell">
+                    <% if feature.ownable %>
+                      <%= seo_label(feature.leader, path: true) %>
+                      <% if @presenter.ours?(feature.leader) %><%= dash_badge "You", tone: :kind %><% end %>
+                    <% else %>
+                      <span class="small text-body-secondary">Nobody holds it</span>
+                    <% end %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        <% end %>
+        <% unless @presenter.shares? %><%= dash_card_footer do %><%= @presenter.share_floor_note %><% end %><% end %>
+      <% else %>
+        <%= dash_empty compact: true, title: "Plain results only",
+              hint: "None of the searches read in this range had anything above or beside the results." %>
+      <% end %>
+    <% end %>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "Search by search" do %>
+        <span class="g-hint">Latest check of each</span>
+        <%= seo_csv(@presenter, "matrix") %>
+      <% end %>
+
+      <%= dash_table label: "Search by search", cols: @presenter.matrix_cols do %>
+        <thead>
+          <tr>
+            <th scope="col">Search</th>
+            <% if @presenter.places? %><th scope="col">Place</th><% end %>
+            <% @presenter.features.each do |feature| %>
+              <th scope="col" class="text-center" title="<%= feature.label %>"><%= feature.short %></th>
+            <% end %>
+            <% if @presenter.snippets? %><th scope="col">Snippet held by</th><% end %>
+          </tr>
+        </thead>
+        <tbody>
+          <% @presenter.rows.each do |row| %>
+            <tr>
+              <td><div class="t-main"><%= seo_link(row.query, @presenter.tracked_path(row)) %></div></td>
+              <% if @presenter.places? %>
+                <td><%= seo_label(row.place.label) %></td>
+              <% end %>
+              <% @presenter.features.each do |feature| %>
+                <% state = @presenter.cell(row, feature) %>
+                <td>
+                  <div class="seo-t-mid">
+                    <span class="seo-dot seo-dot--<%= state %>" title="<%= feature.label %>, <%= @presenter.cell_label(state) %>" aria-hidden="true"></span>
+                    <span class="visually-hidden"><%= feature.label %>, <%= @presenter.cell_label(state) %></span>
+                  </div>
+                </td>
+              <% end %>
+              <% if @presenter.snippets? %>
+                <% owner = row.owner_of("featured_snippet") %>
+                <td>
+                  <div class="seo-cell">
+                    <%= seo_label(owner, path: true) %>
+                    <% if @presenter.ours?(owner) %><%= dash_badge "You", tone: :kind %><% end %>
+                  </div>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+
+      <%= dash_card_footer class: "seo-legend" do %>
+        <span class="seo-legend__item"><span class="seo-dot seo-dot--ours" aria-hidden="true"></span>Shown, with your site in it</span>
+        <span class="seo-legend__item"><span class="seo-dot seo-dot--on" aria-hidden="true"></span>Shown</span>
+        <span class="seo-legend__item"><span class="seo-dot seo-dot--off" aria-hidden="true"></span>Not shown</span>
+        <% unless @presenter.clean? %><span><%= @presenter.blind_note %></span><% end %>
+      <% end %>
+    <% end %>
+
+    <div class="row g-3 mt-0">
+      <div class="col-12 col-xl-7">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "People also ask" do %>
+            <span class="g-hint"><%= @presenter.questions_hint %></span>
+            <% if @presenter.questions.any? %>
+              <%= seo_csv(@presenter, "questions") %>
+            <% end %>
+          <% end %>
+
+          <% if @presenter.questions.any? %>
+            <%= dash_table label: "People also ask", cols: @presenter.question_cols do %>
+              <thead>
+                <tr>
+                  <th scope="col">Question</th>
+                  <% if @presenter.repeats? %><th scope="col" class="num">Searches</th><% end %>
+                  <% if @presenter.answered? %><th scope="col">Answered by</th><% end %>
+                  <th scope="col"><span class="visually-hidden">Track</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <%= render partial: "ahoy_dashboard/seo/serp_features/question", collection: @presenter.questions_head,
+                      as: :asked, locals: { presenter: @presenter } %>
+              </tbody>
+            <% end %>
+
+            <% if @presenter.questions_rest.any? %>
+              <%= dash_disclosure "Show #{@presenter.questions_rest.size} more", less: "Show fewer", bar: true do %>
+                <%= dash_table label: "More questions", cols: @presenter.question_cols do %>
+                  <tbody>
+                    <%= render partial: "ahoy_dashboard/seo/serp_features/question", collection: @presenter.questions_rest,
+                          as: :asked, locals: { presenter: @presenter } %>
+                  </tbody>
+                <% end %>
+              <% end %>
+            <% end %>
+
+            <%= dash_card_footer do %><%= @presenter.answered_by_note %><% end %>
+          <% else %>
+            <%= dash_empty compact: true, title: "No questions found",
+                  hint: "None of the checks in this range included People also ask." %>
+          <% end %>
+        <% end %>
+      </div>
+
+      <div class="col-12 col-xl-5">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "Related searches" do %>
+            <span class="g-hint"><%= @presenter.searches_hint %></span>
+            <% if @presenter.searches.any? %>
+              <%= seo_csv(@presenter, "related") %>
+            <% end %>
+          <% end %>
+
+          <% if @presenter.searches.any? %>
+            <div class="seo-chips">
+              <% @presenter.searches_head.each do |suggestion| %>
+                <%= render "ahoy_dashboard/seo/serp_features/suggestion", suggestion: suggestion %>
+              <% end %>
+            </div>
+
+            <% if @presenter.searches_rest.any? %>
+              <%= dash_disclosure "Show #{@presenter.searches_rest.size} more", less: "Show fewer", bar: true, ruled: true do %>
+                <div class="seo-chips">
+                  <% @presenter.searches_rest.each do |suggestion| %>
+                    <%= render "ahoy_dashboard/seo/serp_features/suggestion", suggestion: suggestion %>
+                  <% end %>
+                </div>
+              <% end %>
+            <% end %>
+          <% else %>
+            <%= dash_empty compact: true, title: "No related searches",
+                  hint: "None of the checks in this range included related searches." %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% end %>

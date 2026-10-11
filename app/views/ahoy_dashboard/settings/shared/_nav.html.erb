@@ -1,0 +1,38 @@
+<%# Two shapes of the same list. The sidebar is the real one; below 880px, where
+    the design folds the settings shell into one column, it comes off and the
+    whole list becomes one menu, stacked under its group headings, with the
+    section you are on as the button. It used to be one dropdown for each group,
+    which is a row of buttons to hunt through. %>
+<% grouped = AhoyDashboard::SettingsSection.grouped %>
+<% current_section = grouped.flat_map(&:last).find { |section| section.current?(controller_path) } %>
+
+<nav class="set-menu mb-3" aria-label="AhoyDashboard sections, as a menu">
+  <%= dash_link_menu id: "tm-set-section-menu", label: current_section&.label || "Settings", section: "Settings",
+        groups: grouped.map { |group, sections|
+          [ group, sections.map { |section|
+            { label: section.label, url: section.path, active: section == current_section, note: section.badge,
+              data: { tm_frame: "_top" } }
+          } ]
+        },
+        button_class: "w-100 d-flex align-items-center justify-content-between", panel_class: "section-menu w-100" %>
+</nav>
+
+<nav class="set-nav" aria-label="AhoyDashboard sections">
+  <% grouped.each do |group, sections| %>
+    <div class="sn-g"><%= group %></div>
+
+    <% sections.each do |section| %>
+      <% current = section.current?(controller_path) %>
+      <%= link_to section.path,
+            class: "sn-item",
+            "aria-current": ("page" if current),
+            data: { tm_frame: "_top" } do %>
+        <%= dash_icon(section.glyph, class_name: "sni") %>
+        <span><%= section.label %></span>
+        <% if section.badge %>
+          <%= dash_badge section.badge, class: "ms-auto" %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+</nav>

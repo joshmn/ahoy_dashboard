@@ -1,0 +1,72 @@
+<div class="ask-body"
+     data-ask-url="<%= ask_path(panel.params) %>"
+     data-controller="dash--chat-ask"
+     data-action="keydown->dash--chat-ask#keydown">
+  <div class="ask-about">
+    <p class="ask-about__what" title="<%= panel.about %>">
+      <span class="ask-about__lbl">About:</span>
+      <%= panel.about %>
+    </p>
+
+    <% if panel.chat %>
+      <div class="ask-about__acts">
+        <%= link_to ask_path(panel.fresh_params), class: "ask-out",
+              title: "Start a new question about the page behind this panel" do %>
+          <%= dash_icon(:plus, size: 12) %>
+          <span>New</span>
+        <% end %>
+
+        <%= link_to chat_path(panel.chat), class: "ask-out", data: { tm_frame: "_top" } do %>
+          <span>Full conversation</span>
+          <%= dash_icon(:share, size: 12) %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="ask-thread" data-chat-scroll>
+    <% if panel.chat %>
+      <%= render "ahoy_dashboard/chats/thread", chat: panel.chat %>
+    <% elsif panel.available? %>
+      <%= render "ahoy_dashboard/chats/blank", picks: AhoyDashboard::AsksController::PICKS,
+            title: "Ask about this page",
+            hint: "Answers come from the same data as the page behind this panel." %>
+    <% else %>
+      <div class="chat-blank ask-off">
+        <span class="chat-blank__mark" aria-hidden="true"><%= dash_icon(:chat, size: 16) %></span>
+        <p class="chat-blank__title">Ask is not available</p>
+        <p class="chat-blank__hint"><%= AhoyDashboard::Settings::Display.assistant_notice %></p>
+        <%= dash_button "Assistant settings", settings_assistant_providers_path,
+              data: { tm_frame: "_top" } %>
+      </div>
+    <% end %>
+  </div>
+
+  <% if panel.chat && !panel.available? %>
+    <%= render "ahoy_dashboard/chats/unavailable", class_name: "ask-notice" %>
+  <% end %>
+
+  <%= form_with url: ask_path(panel.params), method: :post, class: "chat-ask ask-ask",
+        data: { tm_frame: AhoyDashboard::AsksController::FRAME,
+                "dash--chat-ask-target": "form" } do %>
+    <div class="chat-ask__row">
+      <%= label_tag "ask_content", "Ask about this page", class: "visually-hidden" %>
+      <%= text_area_tag "message[content]", nil, id: "ask_content", rows: 1,
+            class: "chat-ask__inp", placeholder: "Ask about this page",
+            autocomplete: "off", autofocus: panel.available? && local_assigns.fetch(:focus, false),
+            disabled: !panel.available?,
+            data: { "dash--chat-ask-target": "input",
+                    action: "input->dash--chat-ask#grow" },
+            "aria-describedby": "ask_hint" %>
+      <button type="submit" class="chat-send" aria-label="Ask" aria-describedby="ask_hint"
+              <%= "disabled" unless panel.available? %>
+              data-dash--chat-ask-target="send">
+        <%= dash_icon(:up, size: 15) %>
+      </button>
+    </div>
+
+    <p class="chat-ask-hint small text-body-tertiary" id="ask_hint">
+      <%= panel.available? ? "Enter to send, Shift+Enter for a new line." : AhoyDashboard::Settings::Display.assistant_notice %>
+    </p>
+  <% end %>
+</div>

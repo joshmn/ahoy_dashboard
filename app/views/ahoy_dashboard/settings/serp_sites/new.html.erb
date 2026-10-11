@@ -1,0 +1,14 @@
+<% content_for :title, "New site" %>
+<% content_for :dash_settings_section, "serp_keywords" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "New site",
+          lede: "A domain to look for in search results." %>
+
+    <%= dash_card do %>
+      <%= render "ahoy_dashboard/settings/serp_sites/form",
+            url: settings_serp_sites_path, method: :post, submit_label: "Add site", adding: true %>
+    <% end %>
+  </section>
+</div>

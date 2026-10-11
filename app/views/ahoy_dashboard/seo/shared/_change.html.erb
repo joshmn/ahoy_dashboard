@@ -1,0 +1,20 @@
+<% amount = local_assigns[:amount] %>
+<% text = local_assigns[:text] %>
+<% case kind %>
+<% when :up %>
+  <%= dash_badge tone: :success, class: class_names("seo-delta", "seo-delta--text" => text) do %>
+    <% if text %><%= text %><% else %><%= dash_icon(:up, size: 12) %><span class="visually-hidden">up </span><%= amount %><% end %>
+  <% end %>
+<% when :down %>
+  <%= dash_badge tone: :danger, class: class_names("seo-delta", "seo-delta--down" => !text, "seo-delta--text" => text) do %>
+    <% if text %><%= text %><% else %><%= dash_icon(:up, size: 12) %><span class="visually-hidden">down </span><%= amount %><% end %>
+  <% end %>
+<% when :new %>
+  <%= dash_badge text || "New", tone: :success, class: "seo-delta seo-delta--text" %>
+<% when :gone %>
+  <%= dash_badge text || "Gone", tone: :danger, class: "seo-delta seo-delta--text" %>
+<% when :level %>
+  <span class="seo-level"><%= text || "No change" %></span>
+<% else %>
+  <span class="nil">&mdash;</span>
+<% end %>

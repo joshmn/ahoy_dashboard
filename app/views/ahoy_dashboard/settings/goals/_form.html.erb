@@ -1,0 +1,57 @@
+<%= dash_form_with model: @form, scope: :goal, url: url, method: method, card: true, class: "goal-form" do |form| %>
+  <%= form.error_summary unlinked: [ :kind ] %>
+
+  <%= form.segmented :kind,
+        [ [ AhoyDashboard::GoalForm::CUSTOM_EVENT, "Custom event" ], [ AhoyDashboard::GoalForm::PAGEVIEW, "Pageview" ] ],
+        label: "What counts" %>
+
+  <%= form.grid do %>
+    <%= form.text_field :event_name, label: "Event name", mono: true,
+          hint: "The event name as it is tracked.",
+          list: "goal_event_name_options", autocomplete: "off",
+          wrapper: { class: "gf-event" },
+          append: dash_icon_button(:search, label: "Pick an event name from the data", title: "Pick from the data",
+                                   data: { tm_pick: "goal_event_name", tm_pick_facet: "events" }) %>
+    <datalist id="goal_event_name_options">
+      <% event_names.each do |name| %>
+        <option value="<%= name %>"></option>
+      <% end %>
+    </datalist>
+
+    <%= form.text_field :path_pattern, label: "Path", mono: true,
+          hint: safe_join([ "Starts with a slash. Use * as a wildcard, like ", tag.span("/blog/*", class: "font-monospace"), "." ]),
+          autocomplete: "off", placeholder: "/pricing",
+          wrapper: { class: "gf-path" },
+          append: dash_icon_button(:search, label: "Pick a page path from the data", title: "Pick from the data",
+                                   data: { tm_pick: "goal_path_pattern", tm_pick_facet: "page" }) %>
+  <% end %>
+
+  <%= form.grid do %>
+    <%= form.text_field :property_key, label: "Property", optional: true, mono: true,
+          hint: "Only count events where this property has the value you set.",
+          list: "goal_property_key_options", autocomplete: "off",
+          append: dash_icon_button(:search, label: "Pick a property key from the data", title: "Pick from the data",
+                                   data: { tm_pick: "goal_property_key", tm_pick_facet: "property_keys" }) %>
+    <datalist id="goal_property_key_options">
+      <% property_keys.each do |key| %>
+        <option value="<%= key %>"></option>
+      <% end %>
+    </datalist>
+
+    <%= form.text_field :property_value, label: "Value", hint: "Exact match.", autocomplete: "off" %>
+  <% end %>
+
+  <%= form.grid do %>
+    <%= form.text_field :display_name, label: "Display name", optional: true,
+          hint: "Defaults to the event name or path." %>
+
+    <%= form.select :currency, AhoyDashboard::Goal::CURRENCIES,
+          { include_blank: "No revenue" },
+          label: "Revenue",
+          hint: "Pick a currency to total the revenue property on matching events." %>
+  <% end %>
+
+  <%= form.actions submit_label, cancel: settings_goals_path %>
+<% end %>
+
+<%= render "ahoy_dashboard/pickers/dialog", scope: AhoyDashboard::PickerFacet::GOAL %>

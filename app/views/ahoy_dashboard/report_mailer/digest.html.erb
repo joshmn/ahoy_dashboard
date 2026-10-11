@@ -1,0 +1,90 @@
+<% font = "font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;" %>
+<% content_for :preheader, @digest.preheader %>
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width: 100%; max-width: 600px; background-color: #ffffff; border: 1px solid #e2e4e9; border-radius: 10px;">
+  <tr>
+    <td style="padding: 16px 24px; border-bottom: 1px solid #eceef2; <%= font %>">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="font-size: 14px; font-weight: 600; color: #1b1d22; <%= font %>"><span style="display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -1px; background-color: #5e6ad2; border-radius: 3px;"></span><%= @digest.host %></td>
+          <td align="right" style="font-size: 13px; color: #6b7280; <%= font %>"><%= @digest.cadence %> traffic</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 24px 24px 8px; <%= font %>">
+      <p style="margin: 0 0 4px; font-size: 13px; color: #6b7280;"><%= @digest.period_heading %></p>
+      <h1 style="margin: 0 0 6px; font-size: 22px; line-height: 1.3; font-weight: 600; color: #111318;"><%= @digest.headline %></h1>
+      <p style="margin: 0 0 22px; font-size: 16px; line-height: 1.5; color: #3f4652;"><%= @digest.summary %></p>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="background-color: #5e6ad2; border-radius: 6px;"><%= link_to "Open the dashboard", @dashboard_url, style: "display: inline-block; padding: 11px 18px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none; #{font}" %></td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 16px 16px 8px; <%= font %>">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <% @digest.tiles.each_slice(2) do |pair| %>
+          <tr>
+            <% pair.each do |tile| %>
+              <td width="50%" style="padding: 8px; vertical-align: top;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border: 1px solid #eceef2; border-radius: 8px;">
+                  <tr>
+                    <td style="padding: 14px 16px; <%= font %>">
+                      <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6b7280;"><%= tile.label %></div>
+                      <div style="padding-top: 4px; font-size: 24px; line-height: 1.2; font-weight: 600; color: #111318;"><%= link_to tile.value, @tile_urls[tile.key], style: "color: #111318; text-decoration: none;" %></div>
+                      <% if tile.change %>
+                        <div style="padding-top: 4px; font-size: 13px; color: <%= tile.color %>;"><%= tile.change %></div>
+                      <% end %>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            <% end %>
+          </tr>
+        <% end %>
+      </table>
+    </td>
+  </tr>
+  <% if @digest.nothing_listed? %>
+    <tr>
+      <td style="padding: 8px 24px 24px; font-size: 14px; line-height: 1.5; color: #4b5563; <%= font %>"><%= @digest.nothing_listed_note %></td>
+    </tr>
+  <% else %>
+    <% @digest.lists.each do |list| %>
+      <tr>
+        <td style="padding: 8px 24px 16px; <%= font %>">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="padding: 12px 0 4px; font-size: 15px; font-weight: 600; color: #111318; <%= font %>"><%= list.title %></td>
+              <td align="right" style="padding: 12px 0 4px; font-size: 13px; <%= font %>"><%= link_to "See all", @list_urls[list.key], style: "color: #4f5bd5; text-decoration: underline;" %></td>
+            </tr>
+            <% list.rows.each do |row| %>
+              <tr>
+                <td style="padding: 10px 0 4px; border-top: 1px solid #eceef2; font-size: 14px; line-height: 1.4; color: #3f4652; word-break: break-all; <%= font %>"><%= truncate(row.label, length: 52) %></td>
+                <td width="96" align="right" style="padding: 10px 0 4px 12px; border-top: 1px solid #eceef2; font-size: 14px; color: #111318; white-space: nowrap; <%= font %>"><%= row.value %></td>
+              </tr>
+              <tr>
+                <td colspan="2" style="padding: 0 0 6px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #eef0f3; border-radius: 2px;">
+                    <tr>
+                      <td width="<%= row.share %>%" height="3" style="background-color: #c7cbf0; border-radius: 2px; font-size: 0; line-height: 0;">&nbsp;</td>
+                      <td height="3" style="font-size: 0; line-height: 0;">&nbsp;</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            <% end %>
+          </table>
+        </td>
+      </tr>
+    <% end %>
+  <% end %>
+  <tr>
+    <td style="padding: 16px 24px; border-top: 1px solid #eceef2; background-color: #fafafb; border-radius: 0 0 10px 10px; font-size: 13px; line-height: 1.5; color: #6b7280; <%= font %>">
+      <%= @digest.scope_note %> <%= @digest.footer %>
+    </td>
+  </tr>
+</table>

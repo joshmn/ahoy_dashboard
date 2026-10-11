@@ -1,0 +1,212 @@
+// The filter dialog. Bootstrap's form control, badges, nav pills, close button
+// and utilities carry the markup; this is the size of the thing and the few
+// states Bootstrap has no class for.
+
+.fm .dialog-frame {
+  width: min(1040px, calc(100% - 32px));
+  max-width: 1040px;
+  height: min(720px, calc(100% - 9vh - 24px));
+}
+
+.fm.fm--full .dialog-frame {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  margin: 0;
+}
+
+.fm.fm--full .fm-rail {
+  width: 17rem;
+}
+
+// The box is a form control that holds more than an input, so it takes the
+// focus ring from whatever inside it has focus.
+.fm-box {
+  min-height: 2.75rem;
+  max-height: 9.5rem;
+  overflow-y: auto;
+  cursor: text;
+}
+
+.fm-box:focus-within {
+  border-color: $input-focus-border-color;
+  background-color: $input-focus-bg;
+  box-shadow: $input-focus-box-shadow;
+}
+
+.fm-input {
+  min-width: 10rem;
+  height: 1.75rem;
+  padding: 0 0.25rem;
+  font-size: $font-size-lg;
+  color: var(--t1);
+  outline: none;
+}
+
+.fm-input::placeholder {
+  color: var(--t3);
+}
+
+// A token and the scope are badges that hold buttons, a select and a chip
+// per value. They wrap rather than truncate: a long group grows the box a line
+// at a time instead of cutting off the value somebody is looking for.
+.fm-token,
+.fm-scope {
+  min-height: 1.625rem;
+  font-size: $font-size-sm;
+  font-weight: 500;
+  white-space: normal;
+  text-align: left;
+}
+
+.fm-scope-item {
+  max-width: 100%;
+}
+
+.fm-scope {
+  box-shadow: 0 0 0 2px var(--bs-success-border-subtle);
+}
+
+.fm-token[data-fm-token] {
+  cursor: pointer;
+}
+
+.fm-token__head {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.fm-token__or {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+// One value. Its own chip so it comes off on its own, and never wider than
+// the box leaves room for, which is where the split label starts to give.
+.fm-value {
+  max-width: min(20rem, 100%);
+  padding: 0.0625rem 0.25rem 0.0625rem 0.375rem;
+  border-radius: var(--bs-border-radius-sm);
+  background: var(--hover);
+}
+
+.fm-scope__op {
+  field-sizing: content;
+  height: 1.25rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: $font-size-xs;
+  background-color: transparent;
+  border-color: var(--bs-success-border-subtle);
+}
+
+.fm-x {
+  font-size: 0.5rem;
+}
+
+
+.fm .fm-body.modal-body {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.fm-rail {
+  width: 14.5rem;
+  border-right: 1px solid var(--bs-border-color);
+}
+
+.fm-rail__heading {
+  font-size: $font-size-xs;
+  letter-spacing: 0.05em;
+}
+
+.fm-rail .nav-link {
+  --bs-nav-link-padding-y: 0.3125rem;
+  --bs-nav-link-font-weight: 400;
+  --bs-nav-link-color: var(--t2);
+}
+
+.fm-rail .nav-link:disabled {
+  opacity: 0.55;
+}
+
+.fm-rail .badge {
+  font-size: $font-size-xs;
+}
+
+// A value row is the dashboard's own row, so the bars and counts read the
+// same as the cards behind the dialog. Pressed is picked, and says so with
+// Bootstrap's own checked box rather than a band across the row, which read as
+// the row being set apart from the rest instead of added to the group.
+.fm-row {
+  height: 2.125rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+// The bar starts after the box, or a short value's bar is a stub behind it.
+.fm-row .bar {
+  left: 2rem;
+}
+
+.fm-row__check {
+  z-index: 1;
+  pointer-events: none;
+}
+
+.fm-row[aria-pressed="true"] .fm-row__check {
+  background-color: $form-check-input-checked-bg-color;
+  background-image: escape-svg($form-check-input-checked-bg-image);
+  border-color: $form-check-input-checked-border-color;
+}
+
+.fm-row[aria-pressed="true"] .nm {
+  color: var(--t1);
+}
+
+.fm-row:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: -2px;
+}
+
+.fm-results__name {
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.fm-tips {
+  max-width: 34rem;
+}
+
+// One side at a time on a phone: the rail until something is typed or a
+// dimension is picked, and the values after.
+@include dash-below(640px) {
+  .fm .dialog-frame {
+    width: calc(100% - 20px);
+    height: calc(100% - 20px);
+    margin: 10px;
+  }
+
+  .fm .fm-rail {
+    width: 100%;
+    border-right: 0;
+  }
+
+  .fm .fm-body[data-mode="browse"] .fm-main,
+  .fm .fm-body:not([data-mode="browse"]) .fm-rail {
+    display: none;
+  }
+}
+
+@include media-breakpoint-down(md) {
+  .fm-body--page .fm-rail {
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--bs-border-color);
+  }
+}

@@ -1,0 +1,10 @@
+<% form = presenter.track_form_id %>
+<div class="p-cols">
+  <% if form %>
+    <span class="pc-box"><%= seo_track_all(form) %></span>
+  <% end %>
+  <span class="pc-l"><%= presenter.label_column %></span>
+  <% presenter.columns.each do |column| %>
+    <span class="pc-n pc-n--<%= column[:key] %>" title="<%= column[:label] %>"><%= column[:heading] %></span>
+  <% end %>
+</div>

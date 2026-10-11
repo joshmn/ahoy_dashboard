@@ -1,0 +1,11 @@
+<% feature = AhoyDashboard::Features.fetch(name) %>
+<% unless feature.enabled? %>
+  <% features_link = link_to("Settings, Features", settings_features_path(anchor: "feature-#{name}")) %>
+  <p class="small text-body-secondary mb-0" id="<%= "#{name}-state" %>">
+    <% if feature.installed? %>
+      Switched off. Nothing here is used until you turn <%= feature.label.sub(/\A./) { |letter| letter.downcase } %> on under <%= features_link %>.
+    <% else %>
+      Not installed in this app yet, so nothing here is used. <%= features_link %> shows how to install it.
+    <% end %>
+  </p>
+<% end %>

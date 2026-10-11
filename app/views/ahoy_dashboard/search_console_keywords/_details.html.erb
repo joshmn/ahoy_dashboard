@@ -1,0 +1,61 @@
+<%# The dialog body: the whole of one keyword, at the grain it is stored at.
+    Title and all, because the title is the keyword and only this frame knows
+    what it is. %>
+<%= dash_dialog_header presenter.keyword, id: "tm-modal-keyword-title", sub: presenter.source_line, tooltip: true,
+      title_class: "sc-title", close_label: "Close #{presenter.keyword}" do %>
+  <%= seo_track_link(presenter.keyword, return_to: seo_referer_path) %>
+<% end %>
+
+<div class="modal-body m-list">
+  <% if presenter.empty? %>
+    <%= dash_empty presenter.empty_title, hint: presenter.empty_hint, compact: true %>
+  <% else %>
+    <%= dash_tiles label: "Figures for this search", compact: true do %>
+      <% presenter.figures.each do |figure| %>
+        <%= dash_tile figure.short, figure.display,
+              delta: figure.delta&.merge(title: "vs #{figure.against} the #{presenter.range_label.downcase} before") %>
+      <% end %>
+    <% end %>
+
+<%# One line, the whole window. Which measure it draws is whichever figure is
+    picked above, and the figures are links, so it changes without leaving. %>
+    <div class="kw-spark">
+      <svg viewBox="0 0 640 60" height="60" preserveAspectRatio="none"
+           role="img"
+           aria-label="<%= presenter.series_label %> for <%= presenter.keyword %> over <%= presenter.range_label.downcase %>"
+           data-controller="dash--spark"
+           data-dash--spark-width-value="640"
+           data-dash--spark-height-value="60"
+           data-dash--spark-values-value="<%= presenter.spark_values.to_json %>"></svg>
+    </div>
+
+    <% if presenter.any_pages? %>
+      <h3 class="kw-heading"><%= presenter.landings_line %></h3>
+
+      <%= dash_table label: "Pages for this search", cols: "minmax(0, 1fr) 90px 76px 76px 78px" do %>
+        <thead>
+          <tr>
+            <th scope="col">Page</th>
+            <th scope="col" class="num">Clicks</th>
+            <th scope="col" class="num">Share</th>
+            <th scope="col" class="num">CTR</th>
+            <th scope="col" class="num">Position</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% presenter.landings.each do |landing| %>
+            <tr>
+              <td><div class="t-main"><%= seo_page_link(seo_url_path(landing.page)) %></div></td>
+              <td class="num"><b><%= landing.clicks %></b></td>
+              <td class="num t2"><%= landing.share %></td>
+              <td class="num t2"><%= landing.ctr %></td>
+              <td class="num t2"><%= landing.position %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+    <% else %>
+      <p class="kw-note"><%= presenter.pages_note %></p>
+    <% end %>
+  <% end %>
+</div>

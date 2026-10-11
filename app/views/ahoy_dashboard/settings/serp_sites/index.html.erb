@@ -1,0 +1,74 @@
+<% content_for :title, "Tracked sites" %>
+<% content_for :dash_settings_section, "serp_keywords" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Rank tracking",
+          lede: "The domains to look for in search results: yours, and any competitors you want to compare against.",
+          actions: dash_button("Add site", new_settings_serp_site_path, tone: :primary,
+                               data: { tm_frame: "_top" }) %>
+
+    <%= dash_page_tabs render("ahoy_dashboard/settings/serp_sites/tabs", current: :sites) %>
+
+    <%= dash_card do %>
+      <% if @sites.any? %>
+        <%= dash_card_header "#{@sites.size} #{"site".pluralize(@sites.size)}" do %>
+          <span class="g-hint">Extra sites cost nothing. <%= AhoyDashboard::Settings::Display.serp_cost_note %></span>
+        <% end %>
+
+        <%= dash_table label: "Tracked sites", cols: "minmax(0, 1fr) minmax(0, 1fr) 130px 90px 56px 64px" do %>
+          <thead>
+            <tr>
+              <th scope="col">Site</th>
+              <th scope="col">Domain</th>
+              <th scope="col">Subdomains</th>
+              <th scope="col" class="num">Keywords</th>
+              <th scope="col"><span class="visually-hidden">Edit</span></th>
+              <th scope="col"><span class="visually-hidden">Delete</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @sites.each do |site| %>
+              <% if @confirming == site.id.to_s %>
+                <% message = capture do %>Delete <b><%= site.name %></b>? Its recorded positions go too. Add it back later and they are read again from the saved searches.<% end %>
+                <%= dash_table_confirm message, span: 6, cancel: settings_serp_sites_path do %>
+                  <%= dash_button_to "Delete", settings_serp_site_path(site), method: :delete, tone: :danger %>
+                <% end %>
+              <% else %>
+                <tr>
+                  <td>
+                    <div class="t-main">
+                      <b><%= site.name %></b>
+                      <% if site.ours? %>
+                        <%= dash_badge "Us", tone: :kind, title: "This is your own site" %>
+                      <% end %>
+                    </div>
+                  </td>
+                  <td><div class="t-mono"><%= site.domain %></div></td>
+                  <td class="t-when"><%= site.match_subdomains? ? "Included" : "Exact host only" %></td>
+                  <td class="num"><%= @keyword_counts.fetch(site.id, 0) %></td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button :gear, label: "Edit #{site.name}",
+                          url: edit_settings_serp_site_path(site), title: "Edit",
+                          data: { tm_frame: "_top" } %>
+                  </td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button :close, label: "Delete #{site.name}",
+                          url: settings_serp_sites_path(confirm: site.id), tone: :danger,
+                          title: "Delete", data: { tm_frame: "_top" } %>
+                  </td>
+                </tr>
+              <% end %>
+            <% end %>
+          </tbody>
+        <% end %>
+      <% else %>
+        <%= dash_empty title: "No sites yet",
+              hint: "Add your own domain first, then any competitors.",
+              action: { label: "Add site", url: new_settings_serp_site_path, data: { tm_frame: "_top" } } %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

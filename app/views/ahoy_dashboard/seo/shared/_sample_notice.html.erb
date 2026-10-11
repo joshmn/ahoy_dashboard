@@ -1,0 +1,5 @@
+<% if presenter.invented? %>
+  <%= dash_notice "These are sample results.", tone: :warning, class: "mb-3",
+        detail: presenter.try(:sample_detail) || "No search provider is set up yet, so every number on this page is made up.",
+        action: dash_button("Choose provider", presenter.providers_path, data: { tm_frame: "_top" }) %>
+<% end %>

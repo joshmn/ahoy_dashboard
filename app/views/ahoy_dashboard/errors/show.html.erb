@@ -1,0 +1,13 @@
+<% content_for :title, @error.failure? ? "#{@error.screen} failed to load" : @error.title %>
+
+<% if @error.seo? %>
+  <%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: @error.rail_key, site: nil } do %>
+    <%= dash_page_head title: @error.title, lede: @error.lede %>
+    <%= render "ahoy_dashboard/errors/card", error: @error %>
+  <% end %>
+<% else %>
+  <section class="ex-page">
+    <%= dash_page_head title: @error.title, lede: @error.lede %>
+    <%= render "ahoy_dashboard/errors/card", error: @error %>
+  </section>
+<% end %>

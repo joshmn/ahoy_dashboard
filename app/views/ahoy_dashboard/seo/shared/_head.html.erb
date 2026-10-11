@@ -1,0 +1,33 @@
+<% actions = capture do %>
+  <%= local_assigns[:controls] %>
+
+  <% if presenter.show_sites? && local_assigns.fetch(:sites, true) %>
+    <%= dash_link_menu(id: "tm-seo-site", icon: :globe,
+          label: presenter.site_label, section: "Site", items: presenter.site_options) %>
+  <% end %>
+
+  <% if presenter.show_tags? %>
+    <%= dash_link_menu(id: "tm-seo-tag", icon: :tag,
+          label: presenter.tag_menu.label, section: "Tag", items: presenter.tag_menu.items) %>
+  <% end %>
+
+  <% if presenter.sliceable? %>
+    <%= render "ahoy_dashboard/search_console/slice_menus", menus: presenter.slice_menus %>
+  <% end %>
+
+  <% if local_assigns.fetch(:period, true) %>
+    <%= dash_link_menu(id: "tm-seo-period", icon: :cal,
+          label: presenter.range_label, section: "Date range", items: presenter.period_options) %>
+  <% end %>
+<% end %>
+
+<%= dash_page_head kicker: local_assigns[:kicker],
+      title: local_assigns[:title] || presenter.title,
+      lede: local_assigns.fetch(:lede, presenter.blurb),
+      actions: actions %>
+
+<%= render "ahoy_dashboard/seo/shared/sample_notice", presenter: presenter %>
+
+<% if presenter.search_console? %>
+  <%= render "ahoy_dashboard/search_console/problem" %>
+<% end %>

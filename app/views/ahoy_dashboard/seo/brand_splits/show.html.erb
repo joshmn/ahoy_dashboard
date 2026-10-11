@@ -1,0 +1,83 @@
+<% content_for :title, "Brand vs. non-brand" %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "brand_split", site: @site } do %>
+  <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false %>
+
+  <% if !@presenter.any? %>
+    <%= dash_card do %>
+      <%= dash_empty **@presenter.search_console_empty(title: "Nothing to split in this range") %>
+    <% end %>
+  <% else %>
+    <%= form_with url: @presenter.terms_form_path, method: :patch, scope: :brand_terms, class: "seo-inline-form" do |form| %>
+      <%= form.label :terms, "Brand words", class: "seo-inline-form__label" %>
+      <%= form.text_field :terms, value: @presenter.terms_text, class: "form-control form-control-sm flex-grow-1",
+            placeholder: "your brand, yourbrand", autocomplete: "off", "aria-describedby": "brand-words-hint" %>
+      <%= form.submit "Save", class: dash_button_class, name: nil %>
+      <span class="seo-inline-form__hint" id="brand-words-hint">Separate them with commas. A search containing any one of them counts as brand, with or without spaces. Saved for next time.</span>
+    <% end %>
+
+    <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
+
+    <div class="row g-3 mt-0">
+      <% [ [ "brand", "Brand", @presenter.brand, @presenter.brand_points, "Brand clicks over the range" ],
+           [ "other", "Non-brand", @presenter.other, @presenter.other_points, "Non-brand clicks over the range" ] ].each do |key, heading, side, points, label| %>
+        <% track = "#{heading.parameterize}-track" %>
+        <div class="col-12 col-xl-6">
+          <%= dash_card class: "h-100" do %>
+            <%= dash_card_header heading do %>
+              <span class="g-hint"><%= @presenter.clicks_hint(side) %></span>
+              <% if side.terms.any? %>
+                <%= seo_track_form(track) %>
+                <%= seo_csv(@presenter, key) %>
+              <% end %>
+            <% end %>
+
+            <% if side.terms.any? %>
+              <%= render "ahoy_dashboard/seo/shared/plot", points: points, label: label %>
+              <%= dash_table label: "#{heading} searches", cols: "66px minmax(0, 1.6fr) 76px 72px",
+                    data: { controller: "dash--check-all" } do %>
+                <thead>
+                  <tr>
+                    <th scope="col"><%= seo_track_all(track) %></th>
+                    <th scope="col">Search</th>
+                    <th scope="col" class="num">Position</th>
+                    <th scope="col" class="num">Clicks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% side.terms.each_with_index do |term, index| %>
+                    <tr>
+                      <td><%= seo_track_box(term.query, form: track, index: index) %></td>
+                      <td><div class="t-main"><%= seo_link(term.query, @presenter.search_path(term.query)) %></div></td>
+                      <td class="num t2"><%= term.position %></td>
+                      <td class="num"><%= @presenter.number(term.clicks) %></td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              <% end %>
+            <% elsif heading == "Brand" %>
+              <%= dash_empty title: "No brand searches", hint: @presenter.no_brand_hint %>
+            <% else %>
+              <%= dash_empty title: "No non-brand searches",
+                    hint: "Every search Google named in this range contains a brand word." %>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "Not named by Google" do %>
+        <span class="g-hint"><%= @presenter.clicks_label(@presenter.unnamed_clicks) %></span>
+      <% end %>
+      <p class="mb-0 px-3 py-3 text-body-secondary">
+        <% if @presenter.unnamed? %>
+          <%= @presenter.number(@presenter.unnamed_clicks) %> of <%= @presenter.clicks_label(@presenter.clicks) %> came from searches too rare for Google to list, so nobody can say whether they were brand or not. They are counted here so the three figures add up to the total, and they are in neither list.
+        <% else %>
+          Google named the search behind every click in this range, so the two lists are the whole total.
+        <% end %>
+      </p>
+      <%= render "ahoy_dashboard/seo/shared/data_note", last_date: @presenter.last_date, slice: @presenter.slice %>
+    <% end %>
+  <% end %>
+<% end %>

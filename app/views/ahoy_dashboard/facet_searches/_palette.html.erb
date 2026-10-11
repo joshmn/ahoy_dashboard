@@ -1,0 +1,24 @@
+<% destination = local_assigns[:destination] %>
+<% carried = local_assigns.fetch(:carried, {}) %>
+<% groups.each_with_index do |group, index| %>
+  <% mono = dash_mono_dimension?(group.key) %>
+  <div role="group" aria-labelledby="tm-palette-found-<%= index %>">
+    <div class="ck-g d-flex align-items-baseline" id="tm-palette-found-<%= index %>">
+      <span>Filter by <%= group.label %></span>
+      <span class="mg-n ms-auto"><%= group.values.size %><%= "+" if group.more? %> <%= "value".pluralize(group.values.size) %></span>
+    </div>
+
+    <% group.values.each do |value| %>
+      <%= link_to dash_destination_path(destination, query.filter_link_params(group.key, value.label).merge(carried)),
+            class: "ck-item",
+            role: "option",
+            "aria-selected": "false",
+            "aria-label": "Filter by #{group.label}: #{value.label}, #{dash_number(value.visitors)} visitors",
+            data: { dash__palette_target: "item", tm_frame: "_top", found: group.key, term: value.label.to_s.downcase } do %>
+        <%= dash_icon(dash_dimension_icon(group.dimension), size: 14, class_name: "cki") %>
+        <span class="<%= class_names("text-truncate", "font-monospace small" => mono) %>"><%= value.label %></span>
+        <span class="ck-n ms-auto ps-3 text-nowrap"><%= dash_number(value.visitors) %></span>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

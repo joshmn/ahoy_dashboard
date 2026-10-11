@@ -1,0 +1,7 @@
+<% if features.any? %>
+  <div class="mt-3">
+    <% features.each do |feature| %>
+      <%= dash_notice detail: sanitize(feature.missing_message), tone: :warning %>
+    <% end %>
+  </div>
+<% end %>

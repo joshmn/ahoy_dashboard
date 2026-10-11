@@ -1,0 +1,41 @@
+<% rail = AhoyDashboard::Seo::RailPresenter.new(query: query, current: current, site: local_assigns[:site], tag: @tag, available: @navigation_available || []) %>
+<% overview = rail.overview %>
+
+<div class="seo-shell">
+  <nav class="d-lg-none" aria-label="SEO pages, as a menu">
+    <%= dash_link_menu id: "seo-section-menu", label: rail.current_label, section: "SEO pages", groups: rail.menu_groups,
+          button_class: "w-100 d-flex align-items-center justify-content-between", panel_class: "section-menu w-100" %>
+  </nav>
+
+  <nav class="seo-rail d-none d-lg-flex" aria-label="SEO pages">
+    <%= link_to overview.label, overview.url,
+          class: "seo-rail__item",
+          "aria-current": ("page" if overview.current?),
+          data: { tm_frame: "_top" } %>
+
+    <% rail.groups.each_with_index do |(group, items), index| %>
+      <div class="seo-rail__group" role="group" aria-labelledby="seo-rail-group-<%= index %>">
+        <p class="seo-rail__heading" id="seo-rail-group-<%= index %>"><%= group %></p>
+
+        <% items.each do |item| %>
+          <%= link_to item.url,
+                class: class_names("seo-rail__item", "seo-rail__item--empty" => !item.ready?),
+                title: (item.installed? ? ("No data yet" unless item.ready?) : item.state.badge),
+                "aria-current": ("page" if item.current?),
+                data: { tm_frame: "_top" } do %>
+            <span class="seo-rail__label"><%= item.label %></span>
+            <% if !item.installed? %>
+              <%= dash_badge item.state.badge, tone: :warning %>
+            <% elsif !item.ready? %>
+              <span class="visually-hidden">, no data yet</span>
+            <% end %>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+  </nav>
+
+  <div class="seo-main">
+    <%= yield %>
+  </div>
+</div>

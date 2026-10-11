@@ -1,0 +1,384 @@
+// The /telemetry dashboard. Bootstrap with the dashboard's palette and density
+// mapped onto its variables, then a custom layer for what Bootstrap has no
+// equivalent for.
+//
+// Dark only. The layout stamps data-bs-theme="dark" and there is no light
+// palette, no prefers-color-scheme branch and no toggle. Colours are declared
+// as custom properties in ahoy_dashboard/_tokens.scss; the variables below exist to
+// reach Bootstrap before it computes its own, and every one of them points back
+// at a token.
+
+@import "bootstrap/functions";
+
+$tm-bg:            #08090a;
+$tm-surface:       #0e0f11;
+$tm-surface-2:     #141518;
+$tm-raised:        #17181c;
+$tm-border:        rgba(255, 255, 255, 0.075);
+$tm-border-strong: rgba(255, 255, 255, 0.14);
+$tm-t1:            #f7f8f8;
+$tm-t2:            #9099a3;
+$tm-t3:            #7b8391;
+$tm-accent:        #5e6ad2;
+$tm-accent-hover:  #5764cc;
+$tm-accent-soft:   rgba(94, 106, 210, 0.14);
+$tm-green:         #4cb782;
+$tm-green-t:       #63c78f;
+$tm-red-t:         #e8837d;
+$tm-warn:          #d2a65e;
+$tm-warn-t:        #dcc08a;
+$tm-selected:      rgba(255, 255, 255, 0.08);
+$tm-hover:         rgba(255, 255, 255, 0.05);
+
+// ---------- color mode ----------
+// Not media-query and not both: one palette, stamped on the html element.
+$color-mode-type: data;
+$enable-dark-mode: false;
+
+// ---------- palette ----------
+// Bootstrap derives its emphasis and subtle shades by tinting the base, which
+// on a near-black ground produces washed pastels rather than the mock's values.
+// Each one is stated.
+$primary:   $tm-accent;
+$secondary: $tm-t2;
+$success:   $tm-green;
+$warning:   $tm-warn;
+$danger:    $tm-red-t;
+
+$primary-text-emphasis:   #9aa3ec;
+$primary-bg-subtle:       $tm-accent-soft;
+$primary-border-subtle:   rgba(94, 106, 210, 0.45);
+$secondary-text-emphasis: $tm-t2;
+$secondary-bg-subtle:     rgba(255, 255, 255, 0.06);
+$secondary-border-subtle: $tm-border;
+$success-text-emphasis:   $tm-green-t;
+$success-bg-subtle:       rgba(76, 183, 130, 0.12);
+$success-border-subtle:   rgba(76, 183, 130, 0.3);
+$warning-text-emphasis:   $tm-warn-t;
+$warning-bg-subtle:       rgba(210, 166, 94, 0.13);
+$warning-border-subtle:   rgba(210, 166, 94, 0.32);
+$danger-text-emphasis:    $tm-red-t;
+$danger-bg-subtle:        rgba(232, 110, 100, 0.12);
+$danger-border-subtle:    rgba(232, 110, 100, 0.35);
+
+$body-bg:              $tm-bg;
+$body-color:           $tm-t1;
+$body-secondary-color: $tm-t2;
+$body-secondary-bg:    $tm-surface-2;
+$body-tertiary-color:  $tm-t3;
+// Surface, not a third shade: cards, menus, dialogs and inputs all sit on it,
+// and on a dark ground it is lighter than the page rather than darker.
+$body-tertiary-bg:     $tm-surface;
+$body-emphasis-color:  $tm-t1;
+$border-color:         $tm-border;
+
+$link-color:            #9aa3ec;
+$link-hover-color:      $tm-t1;
+// The design never underlines. Every interactive thing in it is a button, and
+// the two anchors it does draw carry `a.icon-btn,a.btn{text-decoration:none}`.
+// This port builds rows, tabs and menu items as links, so the underline has to
+// come off at the source as well as in the reset.
+$link-decoration:       none;
+$link-hover-decoration: none;
+$code-color:            #c6cad1;
+
+// ---------- type ----------
+// 13px, not 14. The mock's whole density depends on it and every height below
+// was measured against it.
+$font-family-sans-serif: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+$font-family-monospace:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+// ---------- type scale ----------
+// Plain rem, ascending, each one over sixteen. In rem so the reader's browser
+// font size is respected: a font-size in px ignores somebody who has set their
+// default larger, which is the whole of the accessibility problem with the scale
+// this replaces.
+//
+// The base was 0.8125rem (13px) and the design ran down to 10px under it, which
+// is too small to read. Eighteen ad-hoc sizes between 10 and 26 collapse to the
+// nine tiers below. Heights in the component layer were measured against 13px,
+// so anything fixed had to be checked rather than assumed.
+$font-size-xs:    0.75rem;    // 12px
+$font-size-sm:    0.8125rem;  // 13px
+$font-size-md:    0.875rem;   // 14px
+$font-size-base:  $font-size-md;
+$font-size-lg:    1rem;       // 16px
+$font-size-xl:    1.125rem;   // 18px
+$font-size-2xl:   1.375rem;   // 22px
+$font-size-3xl:   1.5rem;     // 24px
+$small-font-size: $font-size-sm;
+
+// Two Bootstrap derives from the base on its own and neither lands on the
+// scale. Stated so nothing in the build is a size the design does not have.
+$lead-font-size:     $font-size-xl;
+$progress-font-size: $font-size-xs;
+
+$line-height-base: 1.45;
+$headings-color:      var(--bs-emphasis-color);
+$headings-font-weight: 600;
+$headings-line-height: 1.5;
+$h1-font-size: $font-size-3xl;
+$h2-font-size: $font-size-xl;
+$h3-font-size: $font-size-lg;
+$h4-font-size: $font-size-base;
+$h5-font-size: $font-size-base;
+$h6-font-size: $font-size-sm;
+$headings-margin-bottom: 0.5rem;
+$paragraph-margin-bottom: 0.75rem;
+
+// ---------- density ----------
+// Two control heights. 32px in forms and dialogs is Bootstrap's default size,
+// 28px everywhere else is its small size, and a line of text inside either is
+// 20px so the arithmetic lands on whole pixels.
+//
+// Four radii on Bootstrap's own scale: sm 4, base 6, lg 8, xl 12.
+$border-radius-sm: 0.25rem;
+$border-radius:    0.375rem;
+$border-radius-lg: 0.5rem;
+$border-radius-xl: 0.75rem;
+
+$input-btn-font-size:    $font-size-md;
+$input-btn-line-height:  1.4286;
+$input-btn-padding-y:    0.3125rem;
+$input-btn-padding-x:    0.75rem;
+$input-btn-font-size-sm: $font-size-md;
+$input-btn-padding-y-sm: 0.1875rem;
+$input-btn-padding-x-sm: 0.625rem;
+$input-btn-font-size-lg: $font-size-lg;
+$input-btn-padding-y-lg: 0.4375rem;
+$input-btn-padding-x-lg: 1rem;
+$input-btn-focus-width:  0.125rem;
+
+$btn-font-weight:         500;
+$btn-border-radius:       var(--bs-border-radius);
+$btn-border-radius-sm:    var(--bs-border-radius);
+$btn-border-radius-lg:    var(--bs-border-radius);
+$btn-disabled-opacity:    0.6;
+$btn-focus-box-shadow:    0 0 0 $input-btn-focus-width $tm-accent;
+$btn-close-color:         $tm-t2;
+$btn-close-white-filter:  none;
+$btn-close-opacity:       0.8;
+$btn-close-hover-opacity: 1;
+$btn-close-focus-shadow:  $btn-focus-box-shadow;
+
+$input-padding-x:          0.625rem;
+$input-padding-x-sm:       0.5rem;
+$input-bg:                 var(--bs-secondary-bg);
+$input-disabled-bg:        transparent;
+$input-border-color:       var(--tm-line-strong);
+$input-border-radius:      var(--bs-border-radius);
+$input-border-radius-sm:   var(--bs-border-radius);
+$input-focus-bg:           rgba($tm-accent, 0.06);
+$input-focus-border-color: $tm-accent;
+$input-focus-box-shadow:   0 0 0 1px $tm-accent;
+$input-placeholder-color:  $tm-t3;
+$input-group-addon-bg:     transparent;
+$input-group-addon-color:  var(--t3);
+$form-label-margin-bottom: 0.375rem;
+$form-label-font-size:     $font-size-md;
+$form-label-font-weight:   500;
+$form-label-color:         var(--t2);
+$form-text-margin-top:     0.375rem;
+$form-text-font-size:      $font-size-sm;
+$form-text-color:          var(--t3);
+$form-feedback-font-size:  $font-size-sm;
+$form-select-indicator-color:           $tm-t2;
+$form-check-input-bg:                   var(--bs-secondary-bg);
+$form-check-input-border:               1px solid var(--tm-line-strong);
+$form-check-input-checked-bg-color:     $tm-accent;
+$form-check-input-checked-border-color: $tm-accent;
+$form-check-input-focus-box-shadow:     $btn-focus-box-shadow;
+$form-check-label-color:                var(--t2);
+$form-switch-color:                     rgba(255, 255, 255, 0.4);
+$form-switch-focus-color:               $tm-accent;
+$enable-validation-icons: false;
+
+$table-cell-padding-y:    0.5rem;
+$table-cell-padding-x:    0.625rem;
+$table-cell-padding-y-sm: 0.5rem;
+$table-cell-padding-x-sm: 0.625rem;
+$table-bg:                transparent;
+$table-color:             var(--t1);
+$table-hover-bg:          rgba(255, 255, 255, 0.02);
+$table-border-color:      var(--bs-border-color);
+$table-th-font-weight:    500;
+
+$card-spacer-y:       0.875rem;
+$card-spacer-x:       0.875rem;
+$card-title-spacer-y: 0;
+$card-cap-padding-y:  0.5625rem;
+$card-cap-padding-x:  0.875rem;
+$card-cap-bg:         transparent;
+$card-cap-color:      var(--bs-emphasis-color);
+$card-border-color:   var(--bs-border-color);
+$card-border-radius:  var(--bs-border-radius-xl);
+$card-bg:             var(--bs-tertiary-bg);
+
+$dropdown-min-width:           13rem;
+$dropdown-padding-y:           0.25rem;
+$dropdown-padding-x:           0.25rem;
+$dropdown-font-size:           $font-size-md;
+$dropdown-color:               var(--t2);
+$dropdown-bg:                  var(--raised);
+$dropdown-border-color:        rgba(255, 255, 255, 0.1);
+$dropdown-border-radius:       var(--bs-border-radius-lg);
+$dropdown-divider-bg:          var(--bs-border-color);
+$dropdown-item-padding-y:      0.375rem;
+$dropdown-item-padding-x:      0.5625rem;
+$dropdown-item-border-radius:  var(--bs-border-radius);
+$dropdown-link-color:          var(--t2);
+$dropdown-link-hover-color:    var(--t1);
+$dropdown-link-hover-bg:       $tm-hover;
+$dropdown-link-active-bg:      $tm-selected;
+$dropdown-link-active-color:   var(--bs-emphasis-color);
+$dropdown-link-disabled-color: var(--t3);
+$dropdown-header-color:        var(--t3);
+$dropdown-header-padding-y:    0.375rem;
+$dropdown-header-padding-x:    0.5625rem;
+$dropdown-divider-margin-y:    0.25rem;
+
+$nav-link-padding-y:          0.125rem;
+$nav-link-padding-x:          0.5625rem;
+$nav-link-font-size:          $font-size-md;
+$nav-link-font-weight:        500;
+$nav-link-color:              var(--t3);
+$nav-link-hover-color:        var(--bs-emphasis-color);
+$nav-pills-border-radius:     var(--bs-border-radius);
+$nav-pills-link-active-color: var(--bs-emphasis-color);
+$nav-pills-link-active-bg:    $tm-selected;
+
+$modal-content-bg:            var(--bs-tertiary-bg);
+$modal-content-border-radius: var(--bs-border-radius-xl);
+$modal-content-border-width:  1px;
+$modal-content-border-color:  rgba(255, 255, 255, 0.1);
+$modal-header-border-color:   var(--bs-border-color);
+$modal-footer-border-color:   var(--bs-border-color);
+$modal-footer-margin-between: 0.5rem;
+$modal-title-line-height:     1.45;
+$modal-inner-padding:         1rem;
+$modal-header-padding-y:      0.75rem;
+$modal-header-padding-x:      1rem;
+$modal-backdrop-bg:           #000;
+$modal-backdrop-opacity:      0.6;
+$modal-lg:                    880px;
+
+$badge-font-size:     $font-size-sm;
+$badge-font-weight:   500;
+$badge-padding-y:     0.1875rem;
+$badge-padding-x:     0.4375rem;
+$badge-border-radius: var(--bs-border-radius);
+
+$alert-padding-y:     0.6875rem;
+$alert-padding-x:     0.875rem;
+$alert-margin-bottom: 0;
+$alert-border-radius: var(--bs-border-radius-lg);
+
+$toast-max-width:        28rem;
+$toast-padding-x:        0.8125rem;
+$toast-padding-y:        0.5625rem;
+$toast-font-size:        $font-size-md;
+$toast-color:            var(--t1);
+$toast-background-color: var(--raised);
+$toast-border-color:     rgba(255, 255, 255, 0.1);
+$toast-border-radius:    var(--bs-border-radius-lg);
+$toast-box-shadow:       0 16px 40px -12px rgba(0, 0, 0, 0.7);
+
+$pagination-padding-y:        0.1875rem;
+$pagination-padding-x:        0.625rem;
+$pagination-padding-y-sm:     0.125rem;
+$pagination-padding-x-sm:     0.5rem;
+$pagination-font-size:        $font-size-md;
+$pagination-color:            var(--t2);
+$pagination-bg:               transparent;
+$pagination-border-width:     0;
+$pagination-margin-start:     0.125rem;
+$pagination-border-radius:    var(--bs-border-radius);
+$pagination-hover-color:      var(--t1);
+$pagination-hover-bg:         $tm-hover;
+$pagination-focus-bg:         $tm-hover;
+$pagination-focus-box-shadow: $btn-focus-box-shadow;
+$pagination-active-color:     var(--t1);
+$pagination-active-bg:        $tm-selected;
+$pagination-disabled-color:   var(--t3);
+$pagination-disabled-bg:      transparent;
+
+$progress-height:        0.5rem;
+$progress-bg:            var(--bs-secondary-bg);
+$progress-bar-bg:        $tm-accent;
+$progress-border-radius: var(--bs-border-radius-sm);
+
+$focus-ring-width:   0.125rem;
+$focus-ring-opacity: 1;
+$focus-ring-color:   $tm-accent;
+
+$transition-base: all 0.15s cubic-bezier(0.2, 0, 0, 1);
+
+$enable-shadows: false;
+$enable-negative-margins: true;
+
+$container-max-widths: (sm: 540px, md: 720px, lg: 960px, xl: 1140px, xxl: 1200px);
+
+$ask-dock-width: 420px;
+$ask-dock-from:  1100px;
+
+@import "bootstrap/variables";
+@import "bootstrap/variables-dark";
+@import "bootstrap/maps";
+@import "bootstrap/mixins";
+@import "bootstrap/utilities";
+
+// Flex children do not shrink below their content without this, and every
+// truncating label on the dashboard is a flex child.
+$utilities: map-merge($utilities, (
+  "min-width": (property: min-width, class: min-w, values: (0: 0)),
+  "font-variant-numeric": (property: font-variant-numeric, class: font, values: (tabular: tabular-nums))
+));
+
+@import "bootstrap/root";
+@import "bootstrap/reboot";
+@import "bootstrap/type";
+@import "bootstrap/containers";
+@import "bootstrap/grid";
+@import "bootstrap/tables";
+@import "bootstrap/forms";
+@import "bootstrap/buttons";
+@import "bootstrap/alert";
+@import "bootstrap/list-group";
+@import "bootstrap/transitions";
+@import "bootstrap/dropdown";
+@import "bootstrap/button-group";
+@import "bootstrap/nav";
+@import "bootstrap/navbar";
+@import "bootstrap/card";
+@import "bootstrap/badge";
+@import "bootstrap/pagination";
+@import "bootstrap/progress";
+@import "bootstrap/modal";
+@import "bootstrap/toasts";
+@import "bootstrap/close";
+@import "bootstrap/placeholders";
+@import "bootstrap/helpers";
+@import "bootstrap/utilities/api";
+
+@import "ahoy_dashboard/dock";
+@import "ahoy_dashboard/fonts";
+@import "ahoy_dashboard/tokens";
+@import "ahoy_dashboard/base";
+@import "ahoy_dashboard/chrome";
+@import "ahoy_dashboard/chip";
+@import "ahoy_dashboard/popover";
+@import "ahoy_dashboard/dashboard";
+@import "ahoy_dashboard/overlay";
+@import "ahoy_dashboard/settings";
+@import "ahoy_dashboard/table";
+@import "ahoy_dashboard/chat";
+
+// The design, verbatim. Last, so it wins.
+@import "ahoy_dashboard/mock";
+
+@import "ahoy_dashboard/polish";
+@import "ahoy_dashboard/polish_dashboard";
+@import "ahoy_dashboard/polish_seo";
+@import "ahoy_dashboard/polish_app";
+
+@import "ahoy_dashboard/components";
+@import "ahoy_dashboard/filter_modal";

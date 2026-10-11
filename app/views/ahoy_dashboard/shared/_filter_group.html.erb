@@ -1,0 +1,38 @@
+<% destination = local_assigns[:destination] %>
+<% carried = local_assigns.fetch(:carried, {}) %>
+<% first = group.to_a.first %>
+<% note_id = "tm-filter-group-note-#{start}" if group.negative_or? %>
+<% adding = query.to_query
+     .merge(dash_carried_params(carried))
+     .merge(destination.present? ? { return: destination } : {})
+     .merge(dimension: first.dimension.key) %>
+<% joinable = group.uniform? && first.operator.in?(AhoyDashboard::FilterGroup::JOINING) %>
+
+<span class="<%= class_names("chip-group", "chip-group--or" => !group.single?) %>"
+      role="group"
+      aria-label="<%= group.label %>"
+      <% if note_id %>aria-describedby="<%= note_id %>"<% end %>>
+  <% group.each_with_index do |filter, offset| %>
+    <% if offset.positive? %>
+      <span class="chip-group__or">or</span>
+    <% end %>
+
+    <%= render "ahoy_dashboard/shared/filter_chip", filter: filter, index: start + offset,
+          remove_path: remove_path.call(start + offset),
+          compact: offset.positive? && group.uniform?,
+          destination: destination, carried: carried %>
+  <% end %>
+
+  <% if joinable %>
+    <%= dash_icon_button :plus,
+          label: "Add another option to #{group.label}",
+          url: filter_values_path(adding),
+          class: "chip-group__add",
+          "aria-haspopup": "dialog",
+          data: { tm_filter: "", tm_filter_dimension: first.dimension.key, tm_filter_operator: first.operator } %>
+  <% end %>
+</span>
+
+<% if note_id %>
+  <span class="chip-group__note" id="<%= note_id %>">Not this or not that matches nearly every visit.</span>
+<% end %>

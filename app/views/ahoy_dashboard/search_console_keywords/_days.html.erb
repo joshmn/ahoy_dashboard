@@ -1,0 +1,30 @@
+<%= dash_card class: "mt-3" do %>
+  <%= dash_card_header "Every day it showed up" do %>
+    <%= dash_button "All stored rows", presenter.rows_path, tone: :link, data: { tm_frame: "_top" } %>
+  <% end %>
+
+  <%= dash_table label: "#{presenter.keyword} by day", cols: "minmax(0, 1fr) 80px 104px 72px 76px" do %>
+    <thead>
+      <tr>
+        <th scope="col">Day</th>
+        <th scope="col" class="num">Clicks</th>
+        <th scope="col" class="num">Impressions</th>
+        <th scope="col" class="num">CTR</th>
+        <th scope="col" class="num">Position</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% presenter.rows.each do |row| %>
+        <tr>
+          <td><div class="t-main"><%= seo_date(row.date) %></div></td>
+          <td class="num"><%= row.clicks %></td>
+          <td class="num t2"><%= row.impressions %></td>
+          <td class="num t2"><%= row.ctr %></td>
+          <td class="num t2"><%= row.position %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  <% end %>
+
+  <%= dash_card_footer do %>Only the days Google reported this query.<% end %>
+<% end %>

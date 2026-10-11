@@ -1,0 +1,81 @@
+<% found = row.found %>
+<% label = local_assigns[:label] || row.label %>
+<% lower = local_assigns[:lower] || label.downcase %>
+<% base = "#{prefix}[rows][#{row.key}]" %>
+<% id = "#{prefix}_row_#{row.key}" %>
+
+<div class="<%= class_names("fx-row", "fx-row--mixed" => row.mixed?) %>" role="group" aria-labelledby="<%= id %>_label"
+     data-dash--filters-target="row" data-key="<%= row.key %>" data-dimension="<%= row.dimension %>"
+     <%= "data-mixed" if row.mixed? %>>
+  <% if local_assigns[:blocks] %>
+    <%= hidden_field_tag "#{base}[block]", row.block, id: nil, data: { "dash--filters-target": "blockField" } %>
+  <% end %>
+
+  <% if row.mixed? %>
+    <div class="fx-mixed">
+      <span class="fx-summary" id="<%= id %>_label"><%= row.summary %></span>
+      <% row.members.each do |member| %>
+        <%= hidden_field_tag "#{base}[entries][][dimension]", member["dimension"], id: nil %>
+        <%= hidden_field_tag "#{base}[entries][][operator]", member["operator"], id: nil %>
+        <%= hidden_field_tag "#{base}[entries][][value]", member["value"], id: nil %>
+      <% end %>
+      <p class="fx-note">
+        This group mixes different filters, so it can only be removed here.
+        <% if row.negative_or? %>
+          <span class="fx-warn">Two &ldquo;is not&rdquo; or &ldquo;does not contain&rdquo; filters joined by &ldquo;or&rdquo; match almost every visit.</span>
+        <% end %>
+      </p>
+    </div>
+  <% else %>
+    <span class="fx-dim" id="<%= id %>_label">
+      <%= dash_icon(found ? dash_dimension_icon(found) : :layers, size: 13) %>
+      <span class="fx-dim__name"><%= label %></span>
+    </span>
+
+    <%= hidden_field_tag "#{base}[dimension]", row.dimension, id: nil %>
+    <label class="visually-hidden" for="<%= id %>_operator">How <%= lower %> is matched</label>
+    <%= select_tag "#{base}[operator]",
+          options_for_select(AhoyDashboard::Filter::OPERATORS.map { |key, text| [ text, key ] }, row.operator),
+          id: "#{id}_operator", class: "cis fx-op",
+          data: { action: "change->dash--filters#changed" } %>
+
+    <span class="fx-editing">Editing <span data-fx-count><%= row.values.size %></span> <span data-fx-noun><%= "value".pluralize(row.values.size) %></span> below</span>
+
+    <details class="fx-edit" data-fx-edit>
+      <summary class="fx-values" title="<%= row.values.join(", ") %>">
+        <span class="visually-hidden">Edit the <%= lower %> values: </span>
+        <span class="fx-values__list" data-fx-list><%= row.shown.join(", ") %></span>
+        <span class="fx-values__more" data-fx-more <%= "hidden" if row.hidden_count.zero? %>><%= row.hidden_count %> more</span>
+      </summary>
+
+      <div class="fx-editor">
+        <div>
+          <label class="visually-hidden" for="<%= id %>_values">The <%= lower %> values, one per line</label>
+          <textarea class="fx-editor__text" name="<%= base %>[values_text]" id="<%= id %>_values" rows="8" spellcheck="false"
+                    autocomplete="off" data-fx-text
+                    data-action="input->dash--filters#typed"><%= row.values_text %></textarea>
+        </div>
+
+        <div class="fx-editor__side">
+          <p class="fx-editor__count"><span data-fx-count><%= row.values.size %></span> <span data-fx-noun><%= "value".pluralize(row.values.size) %></span></p>
+          <p>One per line. Paste a whole list if you have one. Blank lines and repeats are dropped when you press Done.</p>
+          <%= dash_button "Pick from your traffic", icon: :plus,
+                "aria-haspopup": "dialog",
+                data: { action: "dash--filters#more", tm_filter: "", tm_filter_dimension: row.dimension,
+                        tm_filter_locked: "" } %>
+          <div class="fx-editor__actions">
+            <%= dash_button "Done", type: "submit", tone: :primary, name: "#{prefix}[done]", value: row.key,
+                  formnovalidate: true, data: { action: "dash--filters#done" } %>
+            <%= dash_button "Cancel", tone: :link, hidden: true, data: { action: "dash--filters#cancel", fx_cancel: "" } %>
+          </div>
+        </div>
+      </div>
+    </details>
+  <% end %>
+
+  <span class="fx-row__actions">
+    <%= dash_icon_button :close, label: "Remove the #{row.mixed? ? 'group' : "#{lower} filter"}",
+          type: "submit", name: "#{prefix}[remove]", value: row.key, formnovalidate: true,
+          data: { action: "dash--filters#removeRow" } %>
+  </span>
+</div>

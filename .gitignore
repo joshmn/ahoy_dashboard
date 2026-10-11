@@ -1,0 +1,6 @@
+tmp
+spec/dummy/log/*
+spec/dummy/tmp/*
+spec/examples.txt
+.bundle/
+gemfiles/*.gemfile.lock

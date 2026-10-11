@@ -1,0 +1,27 @@
+<%= dash_form_with model: @form, scope: :saved_query, url: url, method: method, card: true do |form| %>
+  <%= form.error_summary unlinked: [ :params ] %>
+
+  <div class="d-flex flex-column gap-1">
+    <span class="f-label">Question</span>
+    <p class="sq-question mb-0"><%= AhoyDashboard::SavedQuerySentence.call(@form.question) %></p>
+    <% if local_assigns[:change_path].present? %>
+      <p class="small text-body-tertiary mb-0">
+        <%= dash_link "Change the question in Explore", change_path,
+              data: { tm_frame: "_top" } %>
+      </p>
+    <% end %>
+  </div>
+
+  <%= form.grid do %>
+    <%= form.text_field :name, label: "Name", autocomplete: "off", placeholder: "Trial signups from organic" %>
+  <% end %>
+
+  <%= form.check :pinned, label: "Pin it to the dashboard",
+        hint: "Up to #{AhoyDashboard::SavedQuery::MAX_PINNED} pinned questions show on the dashboard, in list order." %>
+
+  <% @form.question_fields.each do |name, value| %>
+    <%= hidden_field_tag name, value, id: nil %>
+  <% end %>
+
+  <%= form.actions submit_label, cancel: settings_saved_queries_path %>
+<% end %>

@@ -1,0 +1,20 @@
+<% content_for :title, @presenter.heading %>
+
+<section class="ex-page">
+  <%= dash_page_head title: "Explore",
+        actions: capture {
+          dash_button(@presenter.editing? ? "Save changes" : "Save",
+                      @presenter.editing? ? @presenter.update_path : @presenter.save_path,
+                      tone: (@presenter.editing? ? :primary : :secondary),
+                      icon: :bookmark,
+                      title: @presenter.save_label,
+                      data: { tm_frame: "_top" }) +
+            dash_button("Download CSV", @presenter.csv_path, icon: :download, data: { tm_frame: "_top" })
+        } %>
+
+  <%= render "ahoy_dashboard/explores/question", presenter: @presenter, explore: @explore %>
+
+  <%= render "ahoy_dashboard/explores/chart", chart: @chart %>
+
+  <%= render "ahoy_dashboard/explores/result", presenter: @presenter, explore: @explore %>
+</section>

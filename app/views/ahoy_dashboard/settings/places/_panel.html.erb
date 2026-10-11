@@ -1,0 +1,57 @@
+<%# One step of the place picker.
+
+    Every row is two controls, not one. The name picks the place; the chevron
+    opens what is inside it. A state is both a place you can search from and a
+    list of cities, and a row that only did one of those would make half of them
+    unreachable. %>
+<%= dash_frame_tag AhoyDashboard::Settings::PlacesController::FRAME do %>
+  <% if parent %>
+    <div class="pop-hd">
+      <%= dash_icon_button :back, label: "Back to #{parent.parent_readable.presence || 'the country list'}",
+            data: { parent: parent.parent_code, action: "dash--place-picker#up" } %>
+      <b><%= parent.readable %></b>
+    </div>
+  <% end %>
+
+  <div class="pop-sc pl-sc">
+    <% if result.empty? %>
+      <p class="pop-none">
+        <% if term.strip.present? %>
+          Nothing here matches &ldquo;<%= term.strip %>&rdquo;
+        <% else %>
+          Nothing inside this one. Pick it above to search the whole of it.
+        <% end %>
+      </p>
+    <% else %>
+      <% result.places.each do |place| %>
+        <div class="pl-row">
+          <%= dash_menu_item note: tag.span(place.kind, class: "pl-kind"), class: "pl-pick",
+                role: "option", "aria-selected": "false",
+                data: { "dash--place-picker-target": "item",
+                        code: place.code, country: place.country_code,
+                        name: (place.country? ? "" : place.name), label: place.readable,
+                        parent: place.parent_code, parent_label: place.parent_readable,
+                        action: "dash--place-picker#choose" } do %>
+            <span class="pl-name"><%= place.label %></span>
+            <% if place.parent_readable.present? %>
+              <span class="pl-in"><%= place.parent_readable %></span>
+            <% end %>
+          <% end %>
+
+          <% if place.children? %>
+            <%= dash_icon_button :chevron_right, label: "Open #{place.readable}",
+                  class: "pl-into",
+                  data: { parent: place.code, label: place.readable,
+                          action: "dash--place-picker#into" } %>
+          <% end %>
+        </div>
+      <% end %>
+
+      <% if result.more %>
+        <p class="pop-none pl-more">
+          <%= term.strip.present? ? "More match than fit. Keep typing to narrow it." : "There are more than fit. Type to find one further down." %>
+        </p>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

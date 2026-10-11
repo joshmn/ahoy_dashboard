@@ -1,0 +1,49 @@
+<% stacks = seo_stacks(presenter.distribution.days, keys: AhoyDashboard::Serp::RankBand::KEYS) %>
+
+<%= dash_card element: :section, class: "mt-3 seo-dist", "aria-labelledby": "tm-rank-dist-title" do %>
+  <%= dash_card_header "Rankings distribution", id: "tm-rank-dist-title" do %>
+    <span class="g-hint"><%= presenter.site.domain %></span>
+  <% end %>
+
+  <% if stacks.any? %>
+    <div class="seo-dist__plot">
+      <svg viewBox="0 0 <%= AhoyDashboard::SeoHelper::PLOT_WIDTH %> <%= AhoyDashboard::SeoHelper::PLOT_HEIGHT %>"
+           preserveAspectRatio="none" role="img" aria-label="<%= presenter.distribution_label %>">
+        <% stacks.each do |stack| %>
+          <g>
+            <title><%= presenter.day_title(stack[:day]) %></title>
+            <% stack[:segments].each do |segment| %>
+              <rect class="seo-dist__seg seo-band--<%= segment[:key] %>" x="<%= stack[:x] %>" y="<%= segment[:y] %>"
+                    width="<%= stack[:width] %>" height="<%= segment[:height] %>"></rect>
+            <% end %>
+          </g>
+        <% end %>
+      </svg>
+      <div class="seo-plot__dates">
+        <% presenter.distribution_dates.each do |label| %><span><%= label %></span><% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <ul class="seo-moves__legend seo-dist__legend" aria-label="Filter tracked searches by band">
+    <% presenter.band_items.each do |item| %>
+      <li>
+        <% linked = item.count.positive? || item.current %>
+        <%= content_tag(linked ? :a : :div,
+              href: (item.url if linked),
+              "aria-current": ("true" if item.current),
+              data: ({ tm_frame: "_top" } if linked),
+              class: class_names("seo-moves__item", "seo-band--#{item.key}",
+                                 "seo-moves__item--zero" => item.count.zero?,
+                                 "seo-moves__item--current" => item.current)) do %>
+          <span class="seo-moves__label"><span class="seo-moves__swatch" aria-hidden="true"></span><%= item.label %></span>
+          <span class="seo-moves__n"><%= presenter.number(item.count) %></span>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+
+  <%= dash_card_footer do %>
+    Each day counts every search at its latest reading as of that day. Click a band to show only those searches below.
+  <% end %>
+<% end %>

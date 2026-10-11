@@ -1,0 +1,89 @@
+<%# The right side of the filter dialog, in whichever of its three states the
+    box above it puts it: the help, the search across every dimension, or one
+    dimension's values. It is one frame so the dialog can swap it as somebody
+    types without touching the rail or the filters already in the box. %>
+<% destination = local_assigns[:destination] %>
+<% carried = local_assigns.fetch(:carried, {}) %>
+<% collect = local_assigns.fetch(:collect, false) %>
+<% typed = term.to_s.strip %>
+<%= dash_frame_tag AhoyDashboard::FilterValuesController::FRAME, class: "fm-results" do %>
+  <% if dimension %>
+    <% shown = values.first(AhoyDashboard::FilterValuesController::LIMIT) %>
+    <% largest = shown.map(&:last).max.to_f %>
+    <div class="d-flex justify-content-between gap-3 small text-body-tertiary px-2 pt-1 pb-2">
+      <span>
+        <b class="fm-results__name"><%= dimension.filter_label %></b> values.
+        <%= live ? "Pick as many as you like." : "Pick one to filter by it." %>
+      </span>
+      <span class="text-nowrap font-tabular">
+        <% if values.size > shown.size %>
+          Showing the top <%= shown.size %>
+        <% elsif shown.any? %>
+          <%= pluralize(shown.size, "value") %>
+        <% end %>
+      </span>
+    </div>
+
+    <div role="group" aria-label="<%= dimension.filter_label %> values">
+      <% if live && typed.present? && shown.none? { |value, _| value == typed } %>
+        <%= render "ahoy_dashboard/filter_values/row", dimension: dimension, value: typed, typed: true,
+              live: live, destination: destination, carried: carried %>
+      <% end %>
+
+      <% shown.each do |value, visitors| %>
+        <%= render "ahoy_dashboard/filter_values/row", dimension: dimension, value: value, visitors: visitors,
+              largest: largest, live: live, destination: destination, carried: carried %>
+      <% end %>
+    </div>
+
+    <% if shown.empty? %>
+      <% if typed.present? %>
+        <%= dash_empty "No #{dimension.filter_label.downcase.pluralize} match “#{typed}”",
+              hint: (live ? "Use it anyway with the row above, or change how it matches to contains." : "Try a shorter search, or a wider date range."),
+              compact: true %>
+      <% else %>
+        <%= dash_empty "No #{dimension.filter_label.downcase.pluralize} in this range",
+              hint: "Type a value to use it anyway, or try a wider date range.", compact: true %>
+      <% end %>
+    <% end %>
+  <% elsif typed.length < AhoyDashboard::FacetSearchQuery::MINIMUM_TERM %>
+    <div class="p-3 text-body-secondary fm-tips">
+      <h3 class="h6 text-body-emphasis mb-3">Pick a dimension, or just start typing</h3>
+      <p>Typing searches every value at once, so you can find a page, a country or a referrer without knowing where it lives.</p>
+      <% if collect %>
+        <p>Every value you pick goes into the form as a filter. Pick a dimension on the left to see all of its values.</p>
+      <% else %>
+        <p>Values you pick in one dimension match any of them:</p>
+        <p><%= dash_badge "Country is US or Canada", tone: :kind %></p>
+        <p>Filters on different dimensions all have to match:</p>
+        <p><%= dash_badge "Country is US", tone: :kind %> <span class="small text-body-tertiary mx-1">and</span> <%= dash_badge "Browser is Chrome", tone: :kind %></p>
+      <% end %>
+      <p>Type a dimension and a colon, like <kbd>country:</kbd>, to jump straight to its values.</p>
+    </div>
+  <% elsif groups.empty? %>
+    <%= dash_empty "No matches for “#{typed}”", hint: "Try a shorter search, or a wider date range.", compact: true %>
+  <% else %>
+    <% groups.each_with_index do |group, index| %>
+      <% heading = "tm-filter-found-#{index}" %>
+      <div class="mb-2" role="group" aria-labelledby="<%= heading %>">
+        <div class="d-flex align-items-center justify-content-between gap-2 px-2 pt-2 pb-1">
+          <span class="d-inline-flex align-items-center gap-2 small fw-semibold text-uppercase text-body-tertiary" id="<%= heading %>">
+            <%= dash_icon(dash_dimension_icon(group.dimension), size: 12) %>
+            <%= group.label %>
+          </span>
+          <% if live %>
+            <%= dash_button(group.more? ? "All #{group.label.downcase.pluralize}" : "Browse #{group.label.downcase.pluralize}",
+                  tone: :link, class: "py-0",
+                  data: { action: "dash--filter-modal#scopeTo", dimension: group.key, label: group.label }) %>
+          <% end %>
+        </div>
+
+        <% largest = group.values.map(&:visitors).max.to_f %>
+        <% group.values.each do |value| %>
+          <%= render "ahoy_dashboard/filter_values/row", dimension: group.dimension, value: value.label,
+                visitors: value.visitors, largest: largest, live: live, destination: destination, carried: carried %>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

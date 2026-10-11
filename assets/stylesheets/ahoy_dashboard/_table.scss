@@ -1,0 +1,62 @@
+
+
+@keyframes tm-form-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.tm-field > label,
+.tm-field > .form-label {
+  font-size: $font-size-md;
+  font-weight: 500;
+  color: var(--t2);
+  margin: 0;
+}
+
+.tm-field .form-control,
+.tm-field .form-select {
+  height: 32px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: $font-size-base;
+  color: var(--t1);
+  width: 100%;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.tm-field .form-control:hover,
+.tm-field .form-select:hover {
+  border-color: var(--border-strong);
+}
+
+.tm-field .form-control:focus,
+.tm-field .form-select:focus {
+  border-color: rgba(94, 106, 210, 0.6);
+  background: rgba(94, 106, 210, 0.05);
+  box-shadow: none;
+}
+
+.tm-field .form-control::placeholder {
+  color: var(--t3);
+}
+
+.tm-field .form-control.tm-mono {
+  font-family: var(--mono);
+  font-size: $font-size-md;
+}
+
+.tm-field .form-select {
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+@include dash-below(700px) {
+  .tm-f-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+

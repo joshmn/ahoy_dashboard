@@ -1,0 +1,202 @@
+<% content_for :title, "Keyword research" %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "keyword_research", site: @site } do %>
+  <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false, period: false %>
+
+  <% if @presenter.setup_notice %>
+    <%= dash_card class: "seo-notice-card" do %>
+      <%= dash_empty compact: true, **@presenter.setup_notice %>
+    <% end %>
+  <% else %>
+    <%= dash_unavailable_notice "Look up", @presenter.lookup_reason, fix: @presenter.lookup_fix %>
+  <% end %>
+
+  <div class="seo-inline-form">
+    <%= dash_form_with url: @presenter.lookup_path, method: :post, stack: false, class: "seo-inline-form__form" do |form| %>
+      <%= form.label :seed, "Phrase", class: "seo-inline-form__label" %>
+      <%= form.text_field :seed, value: @presenter.seed, class: "form-control-sm",
+            placeholder: "running shoes", autocomplete: "off", "aria-describedby": "seed-hint" %>
+      <%= form.label :country, "Place", class: "seo-inline-form__label" %>
+      <%= form.select :country, @presenter.country_options, { selected: @presenter.place_country },
+            class: "form-select-sm seo-inline-form__country" %>
+      <%= form.label :city, "City", class: "visually-hidden" %>
+      <%= form.text_field :city, value: @presenter.place_city, class: "form-control-sm",
+            placeholder: "Whole country", autocomplete: "off", title: "Google's name for it, like Chicago,Illinois,United States" %>
+      <%= form.label :language, "Language", class: "seo-inline-form__label" %>
+      <%= form.text_field :language, value: @presenter.language, class: "form-control-sm seo-inline-form__language",
+            mono: true, placeholder: "en", autocomplete: "off" %>
+      <% if @presenter.lookup_reason %>
+        <%= dash_unavailable "Look up", reason: @presenter.lookup_reason, type: "submit" %>
+      <% else %>
+        <%= form.submit "Look up", class: dash_button_class, name: nil %>
+      <% end %>
+    <% end %>
+    <% if @presenter.any? %>
+      <%= dash_button_to "Look up again", @presenter.refresh_path, method: :post, params: @presenter.picked,
+            reason: @presenter.lookup_reason, confirm: @presenter.refresh_confirm %>
+    <% end %>
+    <% if @presenter.lookups.many? %>
+      <%= dash_link_menu(id: "tm-seo-seed", label: @presenter.lookup_label, section: "Saved phrases",
+            items: @presenter.lookup_options) %>
+    <% end %>
+    <span class="seo-inline-form__hint" id="seed-hint"><%= @presenter.lookup_hint %></span>
+  </div>
+
+  <% if !@presenter.any? %>
+    <% unless @presenter.setup_notice %>
+      <%= dash_card do %>
+        <%= dash_empty title: "No keyword ideas yet", hint: @presenter.ideas_hint %>
+      <% end %>
+    <% end %>
+  <% else %>
+    <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
+
+    <%= dash_card class: "mt-3" do %>
+      <% ideas_title = capture do %><span title="<%= @presenter.seed %>"><%= @presenter.easy_only? ? "Easy wins" : "Ideas" %> for <%= @presenter.seed %></span><% end %>
+      <%= dash_card_header ideas_title, title_class: "seo-hd-label" do %>
+        <% if @presenter.easy_only? %>
+          <%= dash_button "Show all ideas", @presenter.all_path, tone: :link, class: "flex-none", data: { tm_frame: "_top" } %>
+        <% else %>
+          <span class="g-hint flex-none">Most searched first</span>
+        <% end %>
+        <% if @presenter.rows.any? %>
+          <%= seo_csv(@presenter, "ideas") %>
+        <% end %>
+      <% end %>
+
+      <%= dash_table label: "Keyword ideas", cols: "minmax(0, 1.8fr) 132px 56px 72px 60px 104px 88px" do %>
+        <thead>
+          <tr>
+            <th scope="col">Search</th>
+            <th scope="col" class="num">Volume</th>
+            <th scope="col" class="num">KD</th>
+            <th scope="col" class="num">CPC</th>
+            <th scope="col" class="text-center">Intent</th>
+            <th scope="col" class="num">Your position</th>
+            <th scope="col"><span class="visually-hidden">Track</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @presenter.rows.each do |row| %>
+            <tr>
+              <td>
+                <div class="t-main seo-cell">
+                  <%= seo_seeded(row.query, @presenter.seed) %>
+                  <% if @presenter.easy?(row) %><%= dash_badge "Easy win", tone: :success %><% end %>
+                </div>
+              </td>
+              <td>
+                <div class="seo-figure">
+                  <%= tag.span(class: "seo-meter", **seo_bar(@presenter.volume_share(row))) %>
+                  <span class="seo-figure__num"><%= @presenter.volume_value(row) %></span>
+                </div>
+              </td>
+              <td class="num">
+                <% if row.difficulty %>
+                  <%= dash_badge row.difficulty, tone: @presenter.difficulty_tone(row) %>
+                <% else %>
+                  <span class="nil">&mdash;</span>
+                <% end %>
+              </td>
+              <td class="num t2"><%= @presenter.cpc_value(row) %></td>
+              <td>
+                <div class="seo-t-mid">
+                  <% if row.intent.present? %>
+                    <%= dash_badge @presenter.intent_letter(row.intent), tone: @presenter.intent_tone(row.intent), class: "seo-intent", title: row.intent.capitalize, "aria-hidden": "true" %>
+                    <span class="visually-hidden"><%= row.intent.capitalize %></span>
+                  <% else %>
+                    <span class="nil">&mdash;</span>
+                  <% end %>
+                </div>
+              </td>
+              <% position = @presenter.position_label(row) %>
+              <td class="num <%= row.tracked? ? "seo-pos" : "t2" %>">
+                <% if position %>
+                  <%= position %>
+                <% else %>
+                  <span class="nil">&mdash;</span>
+                <% end %>
+              </td>
+              <td class="text-end"><%= seo_track_link(row.query) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+
+      <%= dash_card_footer class: "seo-legend" do %>
+        <span>Intent: I informational, N navigational, C commercial, T transactional.</span>
+        <span>Shown means Google has shown you for it, but it is not tracked.</span>
+        <span><%= @presenter.difficulty_warning %></span>
+      <% end %>
+    <% end %>
+
+    <% if @presenter.questions.any? || @presenter.clusters? %>
+      <div class="row g-3 mt-0">
+        <% if @presenter.questions.any? %>
+          <div class="<%= class_names("col-12", "col-xl-7" => @presenter.clusters?) %>">
+            <%= dash_card class: "h-100" do %>
+              <%= dash_card_header "Questions" do %>
+                <span class="g-hint">Ideas asked as a question</span>
+                <%= seo_csv(@presenter, "questions") %>
+              <% end %>
+
+              <%= dash_table label: "Questions", cols: "minmax(0, 1fr) 84px 88px" do %>
+                <thead>
+                  <tr>
+                    <th scope="col">Question</th>
+                    <th scope="col" class="num">Volume</th>
+                    <th scope="col"><span class="visually-hidden">Track</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% @presenter.questions.first(14).each do |row| %>
+                    <tr>
+                      <td><div class="t-main"><%= seo_label(row.query) %></div></td>
+                      <td class="num"><%= @presenter.volume_value(row) %></td>
+                      <td class="text-end"><%= seo_track_link(row.query) %></td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+
+        <% if @presenter.clusters? %>
+          <div class="<%= class_names("col-12", "col-xl-5" => @presenter.questions.any?) %>">
+            <%= dash_card class: "h-100" do %>
+              <%= dash_card_header "Clusters" do %>
+                <span class="g-hint">Grouped by the words after the phrase</span>
+                <%= seo_csv(@presenter, "clusters") %>
+              <% end %>
+
+              <%= dash_table label: "Clusters", cols: "minmax(0, 1fr) 56px 132px" do %>
+                <thead>
+                  <tr>
+                    <th scope="col">Cluster</th>
+                    <th scope="col" class="num">Ideas</th>
+                    <th scope="col" class="num">Volume</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% @presenter.clusters.each do |cluster| %>
+                    <tr>
+                      <td><div class="t-main"><%= seo_label(cluster.name) %></div></td>
+                      <td class="num t2"><%= @presenter.number(cluster.terms) %></td>
+                      <td>
+                        <div class="seo-figure">
+                          <%= tag.span(class: "seo-meter", **seo_bar(@presenter.cluster_share(cluster))) %>
+                          <span class="seo-figure__num"><%= @presenter.number(cluster.volume) %></span>
+                        </div>
+                      </td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

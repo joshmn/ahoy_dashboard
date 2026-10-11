@@ -1,0 +1,135 @@
+<% editing = local_assigns.fetch(:editing, false) %>
+<%= dash_form_with stack: false, model: @form, scope: :serp_keyword, url: url, method: method, class: "kw-form",
+      data: { controller: "dash--keyword-form",
+              action: "change->dash--keyword-form#refresh input->dash--keyword-form#refresh",
+              "dash--keyword-form-costs-value": plan.costs.to_json,
+              "dash--keyword-form-durations-value": plan.durations.to_json,
+              "dash--keyword-form-month-value": AhoyDashboard::Settings::KeywordPlanPresenter::MONTH.to_i,
+              "dash--keyword-form-remaining-value": (plan.remaining if plan.capped?) } do |form| %>
+  <div class="kw-main">
+    <% unless plan.tracking_on? %>
+      <%= dash_notice "Rank tracking is off.",
+            detail: "Turn it on under Settings, Features. Keywords you add now are saved, and nothing is checked until then." %>
+    <% end %>
+
+    <%= dash_card element: :section do %>
+      <div class="d-flex flex-column gap-3 p-3">
+        <%= form.error_summary unlinked: [ :engine ] %>
+
+        <%= form.text_field :query, label: "Keyword", hint: "Type it the way people search for it.",
+              class: "kw-q", autocomplete: "off", placeholder: "analytics dashboard",
+              autofocus: !editing && @form.query.blank?,
+              data: { "dash--keyword-form-target": "query" } %>
+
+        <% if plan.suggestions.any? %>
+          <div class="kw-sugg">
+            <p class="small text-body-tertiary mb-0" id="kw-sugg-hint">Popular in Search Console and not tracked yet</p>
+            <div class="kw-chips" role="list" aria-describedby="kw-sugg-hint">
+              <% plan.suggestions.each do |candidate| %>
+                <%= link_to new_settings_serp_keyword_path(query: candidate.query, return_to: return_path),
+                      class: "kw-chip", role: "listitem",
+                      title: "#{number_with_delimiter(candidate.impressions)} #{'impression'.pluralize(candidate.impressions)} in the last #{AhoyDashboard::Serp::ImportCandidatesQuery::DEFAULT_DAYS} days",
+                      data: { action: "dash--keyword-form#suggest", "dash--keyword-form-query-param": candidate.query,
+                              tm_frame: "_top" } do %>
+                  <span class="kw-chip-t"><%= candidate.query %></span>
+                <% end %>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <%= dash_card element: :section, aria: { labelledby: "kw-how-title" } do %>
+      <div class="d-flex flex-column gap-3 p-3">
+        <h2 class="fs-6 fw-semibold mb-0" id="kw-how-title">Where and how to search</h2>
+        <%= render "ahoy_dashboard/settings/serp_keywords/search_settings", form: form, plan: plan, scope: "serp_keyword" %>
+      </div>
+    <% end %>
+
+    <%= dash_card element: :section do %>
+      <div class="d-flex flex-column gap-3 p-3">
+        <% if @sites.any? %>
+          <%= form.check_boxes :site_ids, @sites, ->(site) { site.id.to_s }, :name, label: "Sites to look for",
+                hint: "Every site is read from the same search, so extra sites cost nothing.",
+                detail: ->(site) { site.domain }, id: form.field_id(:site_ids) %>
+        <% else %>
+          <% sites_hint = capture do %>
+            Add a site to see where it ranks. You can save the keyword now and attach one later.
+            <%= dash_link "Add site", new_settings_serp_site_path, data: { tm_frame: "_top" } %>
+          <% end %>
+          <%= form.fieldset :site_ids, label: "Sites to look for", hint: sites_hint, id: form.field_id(:site_ids) do %><% end %>
+        <% end %>
+
+        <%= render "ahoy_dashboard/settings/serp_keywords/tags_field", form: form, scope: "serp_keyword" %>
+
+        <% if editing %>
+          <%= form.fieldset :enabled, label: "Checking" do %>
+            <%= form.switch :enabled, label: "Keep checking this keyword", hint: "Turn it off to pause. Past rankings are kept." %>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+
+    <%= form.hidden_field :engine %>
+    <% if return_path %>
+      <%= hidden_field_tag :return_to, return_path, id: nil %>
+    <% end %>
+  </div>
+
+  <%= dash_card element: :aside, class: "kw-sum", aria: { labelledby: "kw-sum-title" } do %>
+    <h2 class="kw-sum-hd" id="kw-sum-title">What gets checked</h2>
+
+    <dl class="kw-facts">
+      <div>
+        <dt>Keyword</dt>
+        <dd class="<%= "nil" if @form.query.blank? %>" data-dash--keyword-form-target="queryOut"><%= @form.query.presence || "Not typed yet" %></dd>
+      </div>
+      <div>
+        <dt>From</dt>
+        <dd class="<%= "nil" if plan.places.empty? %>" data-dash--keyword-form-target="where"><%= plan.where_label.presence || "No place picked" %></dd>
+      </div>
+      <div>
+        <dt>Device</dt>
+        <dd data-dash--keyword-form-target="device"><%= plan.device_label %></dd>
+      </div>
+      <div>
+        <dt>Checked</dt>
+        <dd data-dash--keyword-form-target="often"><%= plan.often_label %></dd>
+      </div>
+    </dl>
+
+    <div class="kw-cost" aria-live="polite">
+      <% if plan.free? %>
+        <p class="kw-big"><b>Free</b></p>
+        <p class="kw-cost-hint">
+          About <span data-dash--keyword-form-target="checks"><%= number_with_delimiter(plan.monthly_checks) %> <%= "check".pluralize(plan.monthly_checks) %></span>
+          a month, free while results are samples.
+          <%= link_to "Choose a search provider", settings_serp_providers_path, data: { tm_frame: "_top" } %>
+        </p>
+      <% else %>
+        <p class="kw-big">
+          <b data-dash--keyword-form-target="monthly"><%= number_with_delimiter(plan.monthly) %></b>
+          <span data-dash--keyword-form-target="monthlyNoun"><%= "search".pluralize(plan.monthly) %> a month</span>
+        </p>
+        <p class="kw-cost-hint">
+          Through <%= plan.provider_label %>. Each check is
+          <span data-dash--keyword-form-target="perCheck"><%= number_with_delimiter(plan.per_check) %> <%= "search".pluralize(plan.per_check) %></span>.
+        </p>
+        <% if plan.capped? %>
+          <p class="kw-cost-hint">
+            Your cap is <%= number_with_delimiter(plan.cap) %> a month, and <%= number_with_delimiter(plan.remaining) %> are left.
+          </p>
+          <p class="kw-over" data-dash--keyword-form-target="over" <%= "hidden" unless plan.over_cap? %>>
+            That is more than what is left of your cap this month.
+          </p>
+        <% end %>
+      <% end %>
+    </div>
+
+    <div class="kw-acts">
+      <%= form.submit submit_label, class: dash_button_class(tone: :primary, size: :md) %>
+      <%= dash_button "Cancel", return_path || settings_serp_keywords_path, tone: :link, size: :md %>
+    </div>
+  <% end %>
+<% end %>

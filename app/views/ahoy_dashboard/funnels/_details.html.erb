@@ -1,0 +1,49 @@
+<%# The whole funnel, drawn the way the design draws one: a numbered step, its
+    count and its share of the top, then a full width bar under it, and between
+    every pair the line that says how many carried on and how many did not. A
+    funnel is the one card whose shape is the answer, so this is not the .m-list
+    the other dialogs use. %>
+<div class="modal-body fn-body">
+  <% if presenter.empty? %>
+    <%= dash_empty "Nobody reached the first step", compact: true,
+          hint: query.filters.any? ? "Try a wider date range, or drop one of the filters." : "Try a wider date range." %>
+  <% else %>
+    <% previous_row = nil %>
+    <% presenter.rows.each do |row| %>
+      <% if previous_row %>
+        <div class="fn-drop">
+          <%= dash_icon(:chevron_down, size: 11) %>
+          <span class="fn-keep"><%= presenter.rate(row.continue_rate) %> continue</span>
+          <span>&middot;</span>
+          <b>&minus;<%= row.values["dropoff_rate"] %></b>
+          <span><%= row.dropoff_label %></span>
+        </div>
+      <% end %>
+
+      <div class="fn-step">
+        <span class="fn-n" aria-hidden="true"><%= row.position %></span>
+        <span class="fn-t">
+          <span class="fn-lbl"><%= row.name %></span>
+        </span>
+        <span class="fn-cnt"><%= row.values["visitors"] %></span>
+        <span class="fn-pct"><%= row.values["conversion_rate"] %></span>
+        <span class="progress fn-barw"
+              role="progressbar"
+              aria-label="<%= row.name %>, share of everyone who entered"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="<%= (row.share * 100).round(1) %>">
+          <span class="progress-bar fn-bar" style="width: <%= [ (row.share * 100).round(1), 1.5 ].max %>%"></span>
+        </span>
+      </div>
+
+      <% previous_row = row %>
+    <% end %>
+
+    <div class="fn-sum">
+      <%= dash_icon(:filter, size: 13, class_name: "gi") %>
+      <span><%= presenter.summary_line %></span>
+    </div>
+  <% end %>
+
+</div>

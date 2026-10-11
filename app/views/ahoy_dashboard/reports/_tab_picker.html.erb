@@ -1,0 +1,23 @@
+<%# scope names the surface, because the card and the dialog draw the same picker
+    at the same time and an id may only be in the document once. extra is what
+    that surface has to carry on every link it builds: nothing on the card, and
+    the details view on the dialog. %>
+<% scope = local_assigns.fetch(:scope, "card") %>
+<% extra = local_assigns.fetch(:extra, {}) %>
+<% picker_id = "tm-#{scope}-#{report.key}-views" %>
+<% holding = tabs.any? { |card_tab| card_tab.key == tab.key } %>
+<% picker_label = holding ? tab.label : "More" %>
+
+<%# The overflow sits in the tab strip, so it is a tab. The design draws three
+    tabs and needs no overflow; eight do not fit beside a title at any width, and
+    a control that opens the rest of them still has to read as one of them rather
+    than as a button parked on the end of the row. %>
+<%= dash_menu id: picker_id, label: picker_label, toggle: :tab, chevron: true, pressed: holding, align: :end,
+      aria_label: "#{picker_label} views for #{report.title.downcase}", panel_class: "tm-scroll" do %>
+  <%= dash_menu_header "Break down by" %>
+
+  <% tabs.each do |card_tab| %>
+    <%= dash_menu_item card_tab.label, report_path(report.key, query.to_query.merge(tab: card_tab.key).merge(extra)),
+          current: card_tab.key == tab.key %>
+  <% end %>
+<% end %>

@@ -1,0 +1,71 @@
+{
+  "stylesheet": {
+    "compiler": "sass-embedded 1.105.1, bootstrap 5.3.8",
+    "inputs": {
+      "Rakefile": "f0aafa050a95a4007c12b5e84871652cd02ce2191d9e1cf3046967d419fdf8f1",
+      "assets/stylesheets/ahoy_dashboard/_base.scss": "0c1cb65808bb1474dc0547e515ee6c435d52cfac24261fb2ed78e61b9bf50052",
+      "assets/stylesheets/ahoy_dashboard/_chat.scss": "d51db9a39d358ba0e6baf18b5f0ed4ede61b4028e56608a78866dd79bb1ee35b",
+      "assets/stylesheets/ahoy_dashboard/_chip.scss": "951fe77755cbd143e07525445ae8fa5bf5ceb3a4a3362b5a907384fd6e564a59",
+      "assets/stylesheets/ahoy_dashboard/_chrome.scss": "62c982334633a2d9073ed05987ac8cb45ed1f23df78f47410e323811a734bcea",
+      "assets/stylesheets/ahoy_dashboard/_components.scss": "92fe85d4a8f887caf084c362b2295b19b471cce9c7411a83c6d60563ac04cec7",
+      "assets/stylesheets/ahoy_dashboard/_dashboard.scss": "01ffec7dbe545bed00f317a0941ad9f7da2e2073351102e7ce0e46af5444c3a1",
+      "assets/stylesheets/ahoy_dashboard/_dock.scss": "8096933876f8cd944eecb805ba463566a47815b55b2f794a04e5b8187d362fea",
+      "assets/stylesheets/ahoy_dashboard/_filter_modal.scss": "ecf9f839519b25c1ff1d63fa8c0b4e8e27984f309adb3cbebd320fb91aa3ef7b",
+      "assets/stylesheets/ahoy_dashboard/_fonts.scss": "cf19bbc39da7586264587b5471ecd27c5756d8a78b4c5eb90c48df950494809d",
+      "assets/stylesheets/ahoy_dashboard/_mock.scss": "d0de1a4b47a7b9b58dab61a2a2011d23acf84b544bfcbdfef2ea1c35573f9920",
+      "assets/stylesheets/ahoy_dashboard/_overlay.scss": "4b93d6f69b9a45a5aa49ba4ad68e7cd8a80fc3e23c2db27a2692f05f79a67e22",
+      "assets/stylesheets/ahoy_dashboard/_polish.scss": "3ad80b796888ce3976d0466481410e5c6b169629456c4101040cd8054b95c3f9",
+      "assets/stylesheets/ahoy_dashboard/_polish_app.scss": "7a510f28e7cea32095d5a834af7a1fdb1bb133b7afb091b8cf3b9ddf78a82589",
+      "assets/stylesheets/ahoy_dashboard/_polish_dashboard.scss": "1de00ec37683975b9d506a0f5aceb12545ef114d751339ccd786223234f82545",
+      "assets/stylesheets/ahoy_dashboard/_polish_seo.scss": "06bc161fe336a9c94c64366b0bab1d712902758f127b539e3f4da7498c0ead56",
+      "assets/stylesheets/ahoy_dashboard/_popover.scss": "444ebfb6e3fedb76ab0003b1f88ffbd1a4c2d6f7b02cf301e54792d1993eb35d",
+      "assets/stylesheets/ahoy_dashboard/_settings.scss": "45cdcfaecd543774639f97fa3449a98dc2ded7e7fcb75d2cf746a67d90ca4803",
+      "assets/stylesheets/ahoy_dashboard/_table.scss": "e78946ef33962bf48778c0b378d3f1b9106a9a67d1304f0a8b809043e8fa4452",
+      "assets/stylesheets/ahoy_dashboard/_tokens.scss": "a80899147e893f8bf5180e0950ed5812ed8b24dbcd5b0ac72cb46cbd85a2eea0",
+      "assets/stylesheets/ahoy_dashboard.scss": "2d243c976b0565e4bf5949eabb71d40bdca03a9b95d89b1da7b6abc1090bead5"
+    },
+    "outputs": {
+      "assets/builds/ahoy_dashboard.css": "6d180a0949c062e2b6d98331f9cafd1d16aab6bb3fcad610d607ff46dfab72e6"
+    }
+  },
+  "javascript": {
+    "compiler": "esbuild 0.28.2",
+    "inputs": {
+      "Rakefile": "f0aafa050a95a4007c12b5e84871652cd02ce2191d9e1cf3046967d419fdf8f1",
+      "assets/javascript/controllers/ask_controller.js": "50c8e1c2029db75cc2177151c0c69573ac4a027f1623bfaef82edfcb473901a0",
+      "assets/javascript/controllers/chart_controller.js": "27314d4f7af0c58d8f01a0ff887bd0e1963748c3a6519c5923ed634d869b2ea7",
+      "assets/javascript/controllers/chat_ask_controller.js": "3b66e93215d1ada289d0e8ba43205bcc9c99fd4ca77cedd13e701008f076006e",
+      "assets/javascript/controllers/chat_stream_controller.js": "d30683dc85f187b0e6c043db884cac82112f9a384351c722ad8d3b2d8d2999ef",
+      "assets/javascript/controllers/check_all_controller.js": "e56b0ee66eb0e364bc1c8e49e0c9cee2017ad41b90b6aca3dc9d83147617bfa7",
+      "assets/javascript/controllers/clipboard_controller.js": "c8790886670abce32f8d344f3b8058c30b975b4679694dc2e221651f25739e2c",
+      "assets/javascript/controllers/filter_controller.js": "b69ed3d23b5eeb98192d37563cf11683390b812fba73c928fc05a3e9ccde57bf",
+      "assets/javascript/controllers/filter_modal_controller.js": "05f5fe4a4da204f436b843d43a0effda6517b6cedb6ed5261a78aa3114499f44",
+      "assets/javascript/controllers/filters_controller.js": "8fb8f31a86c59d8514acb113846fe8abe272533cbd5ac2936c82f24775d4e7e1",
+      "assets/javascript/controllers/journey_controller.js": "256a9a51d9aa8e6e73bd7d231d7de31b04c9b031803e45b1392799929128591d",
+      "assets/javascript/controllers/keyword_form_controller.js": "139f52966a205b78bc470ed5682e01de8485b45a1a5797ef28b4c1b0c28cd516",
+      "assets/javascript/controllers/keyword_list_controller.js": "018b4dccc32c86b4a01a275c08fb67c62a32c2094f4316fed7f251ebf4d671b5",
+      "assets/javascript/controllers/menu_controller.js": "dacb624025e7ad26891b90b7564fed31530ead8aa63c483a181b493b36ea7d67",
+      "assets/javascript/controllers/metric_controller.js": "81097c09d286bdfaf6764083a4c735ea80ccd4caeb98d90eaced5fca9117bacc",
+      "assets/javascript/controllers/modal_controller.js": "467f59daeb49261345a3e800884e419421742661c9ef6dae009e721fafa9cd34",
+      "assets/javascript/controllers/palette_controller.js": "0b27b14462d565eec7a02bbadbc803de0b71c69b51ccf5b09c664cdf21e884df",
+      "assets/javascript/controllers/pattern_preview_controller.js": "2c5c20b509c3f443ec0e7b0e8195fbbcd829dd77970378767cd974d489d1d57e",
+      "assets/javascript/controllers/picker_controller.js": "543990a6cd8ed57502375e2254f367bf3f9c2edcfd8cc61089b756d63821214b",
+      "assets/javascript/controllers/place_picker_controller.js": "123da188db8fefecbb51bf08a5ae998dd6e99e8ddfaa3a212c5aa46c8b9726d9",
+      "assets/javascript/controllers/realtime_controller.js": "fdb7218e67b7366addfa60f6b58e6b545210c22c1e003c7ed9d5973d59acae96",
+      "assets/javascript/controllers/spark_controller.js": "e9a0996a04d63cf43e6c67fb08b100a702fb582f1f82c5e269f37d545d43804f",
+      "assets/javascript/controllers/tabs_controller.js": "86bfe4c080ab89e43bf8b022cd698c45e7c9e93b67f466b48ffd15e9906b7842",
+      "assets/javascript/controllers/tag_field_controller.js": "525d161b91dcf30074d0e4d1c3decf9b15e11e401e22030f80779ab6bd4c59e6",
+      "assets/javascript/controllers/toast_controller.js": "b6f837b0eec2006b49c0f4ebb10b86e7ebee99cedc1fe5253f029e17bc319c75",
+      "assets/javascript/index.js": "ae553143be813edb7f4ac010d5c7a668e7ccfd01880e6fefa29b5e8e3b03fb44",
+      "assets/javascript/runtime/confirm.js": "f630e2ce46fbf8e8178363269777a05f5c612db117693050f905da5a9a26a0f8",
+      "assets/javascript/runtime/controllers.js": "b507f12dfe9f689f7975633329173c3fa3cd612088a97f1e58ea6c58faa67924",
+      "assets/javascript/runtime/frame_queue.js": "35bf956f64dbb642339fe50a508e2cb803fdd9f06cb33045b99642f94f1e588d",
+      "assets/javascript/runtime/frames.js": "a794a89b40b03482316bcedfda2a8f05837a537b28ea83aac63bd65ff08ecaaa",
+      "assets/javascript/runtime/path.js": "12536fcc2ebcead526f9b46a67657ed35fe74ee84feef24d9b61e034d69d7dcd"
+    },
+    "outputs": {
+      "assets/builds/ahoy_dashboard.js": "14144b59c015af32db5bbbfe8c27167e342e4ebeb9554072f7e9cb90cf7f680f",
+      "assets/builds/ahoy_dashboard.js.map": "1ddd5d379a8189e13c64381d0298032b8b1670309c8808689b320f96188a33ed"
+    }
+  }
+}

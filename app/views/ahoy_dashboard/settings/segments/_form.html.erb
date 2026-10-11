@@ -1,0 +1,13 @@
+<%= dash_form_with model: @form, scope: :segment, url: url, method: method, card: true do |form| %>
+  <%= form.error_summary unlinked: [ :filters ] %>
+
+  <%= form.grid do %>
+    <%= form.text_field :name, label: "Name", hint: "Shown in the filter dialog.",
+          autocomplete: "off", placeholder: "Organic blog readers" %>
+  <% end %>
+
+  <%= render "ahoy_dashboard/settings/shared/filters_field",
+        form: form, source: @form, prefix: "segment", errors: @form.errors[:filters] %>
+
+  <%= form.actions submit_label, cancel: settings_segments_path %>
+<% end %>

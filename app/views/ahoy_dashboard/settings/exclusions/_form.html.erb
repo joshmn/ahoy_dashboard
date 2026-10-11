@@ -1,0 +1,16 @@
+<%= dash_form_with model: @form, scope: :exclusion, url: url, method: method, card: true do |form| %>
+  <%= form.error_summary unlinked: [ :filters ] %>
+
+  <%= form.grid do %>
+    <%= form.text_field :name, label: "Name", hint: "So you can tell your exclusions apart.",
+          autocomplete: "off", placeholder: "Data center traffic" %>
+  <% end %>
+
+  <%= render "ahoy_dashboard/settings/shared/filters_field",
+        form: form, source: @form, prefix: "exclusion", errors: @form.errors[:filters],
+        preview_url: settings_exclusions_preview_path, preview: @preview %>
+
+  <%= form.switch :enabled, label: "On", hint: "Switch it off to keep the rule without hiding anything." %>
+
+  <%= form.actions submit_label, cancel: settings_exclusions_path %>
+<% end %>

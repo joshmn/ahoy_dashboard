@@ -1,0 +1,74 @@
+<%= dash_card element: :section, class: "journey", "aria-label": presenter.title do %>
+  <%= dash_card_header presenter.title, element: :header do %>
+
+<%# The trail, and how much of the entry is left. With nothing picked it says
+    what the columns are for instead, because a bar with one hint in it reads
+    better than a bar with nothing. %>
+    <div class="j-crumb">
+      <% if presenter.any_chain? %>
+        <% if presenter.elided? %>
+          <span class="ja" aria-hidden="true">&hellip;</span>
+        <% end %>
+
+        <% presenter.crumbs.each_with_index do |crumb, index| %>
+          <% if index.positive? || presenter.elided? %>
+            <%= dash_icon(:chevron_right, size: 11, class_name: "ja jrot") %>
+          <% end %>
+          <%= link_to crumb[:label], crumb[:path],
+                class: class_names("jc", "jc jx" => crumb[:exit]),
+                title: "Step back to here" %>
+        <% end %>
+
+        <span class="jr">
+          <b><%= presenter.number(presenter.last_count) %></b> <%= "visitor".pluralize(presenter.last_count.to_i) %><%
+            %><% if presenter.chain.size > 1 && presenter.kept_percent %> &middot; <%= presenter.kept_percent %> of step 1<% end %>
+        </span>
+
+        <%= dash_button "Start over", presenter.reset_path, tone: :link, class: "ms-2" %>
+      <% else %>
+        <span class="g-hint">Each column shows where those visitors went next</span>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="j-cols" data-controller="dash--journey">
+    <%= render partial: "ahoy_dashboard/journeys/column", collection: presenter.columns, as: :column,
+          locals: { presenter: presenter } %>
+
+    <% if presenter.ended? %>
+<%# The walk is over, so the last thing on the row is a number rather than
+    another list. %>
+      <div class="j-col j-endc">
+        <div class="j-col-hd">
+          <div class="j-step">End</div>
+          <div class="j-of">Journey complete</div>
+        </div>
+        <div class="j-end">
+          <%= dash_icon(:exit, size: 18) %>
+          <b><%= presenter.number(presenter.ended) %></b>
+          <span><%= "visitor".pluralize(presenter.ended.to_i) %> left the site here</span>
+          <% if presenter.ended_percent && presenter.entry_label %>
+            <span class="je-sub">
+              <%= presenter.ended_percent %> of visitors who viewed
+              <span class="jm"><%= presenter.entry_label %></span>
+            </span>
+          <% end %>
+        </div>
+      </div>
+    <% elsif presenter.capped? %>
+      <div class="j-ghost">
+        <div class="gh">
+          <%= dash_icon(:back, size: 16) %>
+          <span>Journeys are traced up to <%= AhoyDashboard::JourneyQuery::COLUMNS %> steps. Step back to explore another branch.</span>
+        </div>
+      </div>
+    <% elsif !presenter.any_chain? %>
+      <div class="j-ghost j-ghost--prompt">
+        <div class="gh">
+          <%= dash_icon(:enter, size: 16) %>
+          <span>Pick a page to see where visitors went next</span>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>

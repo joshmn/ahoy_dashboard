@@ -1,0 +1,19 @@
+<% content_for :title, "Edit a segment" %>
+<% content_for :dash_settings_section, "segments" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Edit #{@segment.name}",
+          lede: "Changes apply everywhere this segment is used." %>
+
+    <% unless @segment.readable? %>
+      <%= dash_notice "This one is not being applied.", tone: :warning,
+            detail: "It filters on a property the dashboard can no longer read, so it is switched off in the filter dialog." %>
+    <% end %>
+
+    <%= dash_card do %>
+      <%= render "ahoy_dashboard/settings/segments/form",
+            url: settings_segment_path(@segment), method: :patch, submit_label: "Save changes" %>
+    <% end %>
+  </section>
+</div>

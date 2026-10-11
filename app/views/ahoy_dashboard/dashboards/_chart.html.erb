@@ -1,0 +1,19 @@
+<% chart_data = @presenter.chart_data %>
+<% chart_options = (@presenter.chart_options || {}).symbolize_keys %>
+
+<%# One card. The controller sits on it rather than on the canvas so the export
+    button in the stat row is inside its scope; the runtime resolves an action
+    by walking up to the nearest element declaring that controller. %>
+<%= dash_card element: :section, class: "chart-card",
+      "aria-label": "Traffic over time",
+      data: dash_chart_data(chart_data, chart_options) do %>
+  <%= render "ahoy_dashboard/dashboards/stats" %>
+
+  <div class="chart-wrap" data-dash--chart-target="canvas">
+    <% if chart_data.blank? %>
+      <%= dash_empty fill: true,
+            title: "No visits in this range",
+            hint: query.filters.any? ? "Try a wider date range, or drop one of the filters." : "Try a wider date range." %>
+    <% end %>
+  </div>
+<% end %>

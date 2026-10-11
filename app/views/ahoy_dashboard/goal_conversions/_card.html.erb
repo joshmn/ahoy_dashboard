@@ -1,0 +1,59 @@
+<%# Full width under the journey, which is where the design puts it. The row is
+    a grid rather than a flex list because it carries three numbers in fixed
+    columns, and the bar sits inside the name cell rather than behind the whole
+    row so it stops short of them. %>
+<%= dash_card element: :section, class: "goals", "aria-labelledby": "tm-goals-title" do %>
+  <%= dash_card_header presenter.title, id: "tm-goals-title", element: :header do %>
+    <% if presenter.any_goals? %>
+      <span class="g-hint"><%= presenter.hint %></span>
+    <% end %>
+  <% end %>
+
+  <% if presenter.any_goals? %>
+    <div class="g-head">
+      <span>Goal</span>
+      <% presenter.columns.each do |column| %>
+        <span><%= column[:label] %></span>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if presenter.empty? %>
+    <% if presenter.any_goals? %>
+      <%= dash_empty "No conversions in this range", compact: true,
+            hint: query.filters.any? ? "Try a wider date range, or drop one of the filters." : "Try a wider date range." %>
+    <% else %>
+<%# Nothing is wrong here, there is just nothing named yet, so the empty state is
+    the way to name one rather than a suggestion to widen the range. %>
+      <%= dash_empty compact: true, **AhoyDashboard::SetupNotice.call(:goal, url: new_settings_goal_path) %>
+    <% end %>
+  <% else %>
+    <div class="g-list">
+      <% presenter.rows.each_with_index do |row, index| %>
+        <%= link_to root_path(row.filter_params),
+              class: class_names("g-row", "pinned" => row.filtered?),
+              title: row.filtered? ? "Remove filter" : "Filter by #{row.label}",
+              "aria-current": (row.filtered? ? "true" : nil),
+              data: { tm_frame: "_top" } do %>
+          <span class="g-name">
+            <%= dash_bar_tag(row.share, inset: 0) %>
+            <%= dash_icon(:target, size: 13, class_name: "gi") %>
+            <span class="nm"><%= row.label %></span>
+            <% if row.revenue %>
+              <span class="g-rev" title="Revenue totalled from the events' own properties">
+                <%= row.revenue %>
+              </span>
+            <% end %>
+            <% if row.filtered? %>
+              <span class="rx"><%= dash_icon(:close, size: 12) %></span>
+            <% end %>
+          </span>
+
+          <span class="g-num"><%= row.uniques %></span>
+          <span class="g-num t2"><%= row.total %></span>
+          <span class="g-num cr"><%= row.rate %></span>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

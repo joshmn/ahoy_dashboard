@@ -1,0 +1,62 @@
+<% content_for :dash_settings_section, "alert_rules" %>
+<% content_for :title, "Alerts" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Alerts",
+          lede: "Rules start switched off. Turn on the ones you want and adjust their thresholds.",
+          actions: dash_button("View alerts", seo_alert_path, data: { tm_frame: "_top" }) %>
+
+    <% @groups.each_with_index do |(group, rules), index| %>
+      <%= dash_card class: ("mt-3" if index.positive?) do %>
+        <%= dash_card_header group %>
+        <%= dash_table label: "#{group} alert rules", cols: "minmax(240px, 1.7fr) minmax(0, 1.3fr) 80px 60px 124px 110px", class: "al-rules" do %>
+          <thead>
+            <tr>
+              <th scope="col">Rule</th>
+              <th scope="col">Fires when</th>
+              <th scope="col">Severity</th>
+              <th scope="col" class="num">Fired</th>
+              <th scope="col" class="ps-3">Last fired</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rules.each do |rule| %>
+              <% waiting = rule.waiting_on %>
+              <tr>
+                <td>
+                  <%= link_to rule.name, edit_settings_alert_rule_path(rule), class: "al-name" %>
+                  <div class="al-watch"><%= rule.watches %></div>
+                  <% if waiting %>
+                    <div class="al-watch">Needs <%= waiting.label %>, which isn't installed.</div>
+                  <% end %>
+                  <% if rule.group == :traffic && !@traffic_history %>
+                    <div class="al-watch">Needs 28 days of visits</div>
+                  <% end %>
+                </td>
+                <td class="al-cond"><%= rule.condition %></td>
+                <td>
+                  <%= dash_badge rule.severity.capitalize, tone: seo_badge_for(rule.severity == "high" ? "high" : (rule.severity == "medium" ? "medium" : "low")) %>
+                </td>
+                <td class="num t2"><%= rule.fired_count %></td>
+                <td class="t-when ps-3">
+                  <%= dash_ago(rule.last_fired_at) %>
+                </td>
+                <td class="row-actions row-actions-visible">
+                  <% if waiting %>
+                    <%= dash_badge waiting.badge %>
+                  <% else %>
+                    <%= dash_badge rule.enabled ? "On" : "Off", tone: rule.enabled ? :success : :neutral %>
+                  <% end %>
+                  <%= dash_button "Edit", edit_settings_alert_rule_path(rule),
+                        aria: { label: "Edit #{rule.name}" } %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        <% end %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

@@ -1,0 +1,14 @@
+<%= dash_form_with model: @form, scope: :annotation, url: url, method: method, card: true do |form| %>
+  <%= form.error_summary unlinked: [ :kind ] %>
+
+  <%= form.grid do %>
+    <%= form.text_field :label, label: "What happened", autocomplete: "off", placeholder: "v2.5.0 deploy" %>
+
+    <%= form.datetime_local_field :happened_at, label: "When",
+          hint: "In #{AhoyDashboard::Settings::Display.time_zone_label}, the dashboard's time zone." %>
+  <% end %>
+
+  <%= form.segmented :kind, AhoyDashboard::Annotation::KINDS, label: "Type" %>
+
+  <%= form.actions submit_label, cancel: settings_annotations_path %>
+<% end %>

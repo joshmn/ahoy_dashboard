@@ -1,0 +1,182 @@
+<% content_for :title, "SEO" %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "seo", site: @site } do %>
+  <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false %>
+
+  <% if @presenter.search_console? %>
+    <% search_console = @presenter.search_console %>
+
+    <%= dash_card element: :section, class: "seo-chart-card", "aria-label": "Google search",
+          data: dash_chart_data(search_console.chart_data, search_console.chart_options).merge("dash--chart-height-value": 180) do %>
+      <%= dash_card_header "Google search" do %>
+        <%= dash_button "Performance", @presenter.performance_path, tone: :link, icon_end: :chevron_right,
+              data: { tm_frame: "_top" } %>
+      <% end %>
+
+      <%= dash_tiles label: "Search Console figures", ruled: true do %>
+        <% search_console.tiles.each do |tile| %>
+          <%= dash_tile tile.label, tile.display,
+                delta: tile.delta&.merge(title: search_console.comparison_title) %>
+        <% end %>
+      <% end %>
+
+      <div class="chart-wrap" data-dash--chart-target="canvas"></div>
+    <% end %>
+
+    <div class="row g-3 mt-0">
+      <div class="col-12 col-xl-6">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "Top queries" do %>
+            <%= dash_button "All queries", @presenter.performance_path, tone: :link, icon_end: :chevron_right,
+                  data: { tm_frame: "_top" } %>
+          <% end %>
+
+          <% if @presenter.top_queries.any? %>
+            <%= dash_table label: "Top queries", cols: "minmax(0, 1fr) 72px 96px 74px", compact: true do %>
+              <thead>
+                <tr>
+                  <th scope="col">Query</th>
+                  <th scope="col" class="num">Clicks</th>
+                  <th scope="col" class="num">Impressions</th>
+                  <th scope="col" class="num">Position</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @presenter.top_queries.each do |row| %>
+                  <tr>
+                    <td>
+                      <div class="t-main">
+                        <% if row.label.blank? %>
+                          <span class="nil"><%= AhoyDashboard::SearchConsole::ANONYMIZED_QUERY %></span>
+                        <% else %>
+                          <%= link_to search_console.keyword_path(row.label), class: "seo-link min-w-0", data: { tm_frame: "_top" } do %>
+                            <%= seo_label(row.label) %>
+                          <% end %>
+                        <% end %>
+                      </div>
+                    </td>
+                    <td class="num"><%= search_console.number(row.clicks) %></td>
+                    <td class="num t2"><%= search_console.number(row.impressions) %></td>
+                    <td class="num t2"><%= search_console.place(row.position) %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            <% end %>
+          <% else %>
+            <%= dash_empty compact: true, title: "No queries in this range",
+                  hint: "Google has not reported any searches for these dates." %>
+          <% end %>
+        <% end %>
+      </div>
+
+      <div class="col-12 col-xl-6">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "Best opportunities" do %>
+            <%= dash_button "All opportunities", @presenter.opportunities_path, tone: :link, icon_end: :chevron_right,
+                  data: { tm_frame: "_top" } %>
+          <% end %>
+
+          <% if @presenter.opportunities.any? %>
+            <%= dash_table label: "Best opportunities", cols: "minmax(0, 1fr) 74px 96px", compact: true do %>
+              <thead>
+                <tr>
+                  <th scope="col">Query</th>
+                  <th scope="col" class="num">Position</th>
+                  <th scope="col" class="num">Extra clicks</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @presenter.opportunities.each do |row| %>
+                  <tr>
+                    <td><div class="t-main"><%= seo_label(row.query) %></div></td>
+                    <td class="num t2"><%= row.position %></td>
+                    <td class="num"><%= @presenter.number(row.upside) %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            <% end %>
+            <%= dash_card_footer do %>Extra clicks if each search moved up to third place.<% end %>
+          <% else %>
+            <%= dash_empty compact: true, title: "Nothing stands out yet",
+                  hint: "Opportunities show up once searches have enough impressions to judge." %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% elsif !@presenter.search_console_installed? %>
+    <%= dash_card element: :section, "aria-label": "Google search" do %>
+      <%= dash_card_header "Google search" do %>
+        <%= dash_badge @presenter.search_console_state.badge, tone: :warning %>
+      <% end %>
+      <div class="p-3">
+        <%= render "ahoy_dashboard/shared/feature_state", state: @presenter.search_console_state %>
+      </div>
+    <% end %>
+  <% elsif !@presenter.setup? || @presenter.connected? %>
+    <%= dash_card do %>
+      <%= dash_card_header "Google search" %>
+      <%= dash_empty **@presenter.search_console_empty %>
+    <% end %>
+  <% end %>
+
+  <% if !@presenter.rankings_installed? %>
+    <%= dash_card element: :section, class: "mt-3", "aria-label": "Rank tracking" do %>
+      <%= dash_card_header "Rank tracking" do %>
+        <%= dash_badge @presenter.rankings_state.badge, tone: :warning %>
+      <% end %>
+      <div class="p-3">
+        <%= render "ahoy_dashboard/shared/feature_state", state: @presenter.rankings_state %>
+      </div>
+    <% end %>
+  <% elsif @presenter.rankings? %>
+    <%= dash_card class: "mt-3" do %>
+      <% rank_title = capture do %>Rank tracking<% if @presenter.sample_rankings? %> <%= dash_badge "Sample data", tone: :warning, title: "No search provider is set up yet, so these numbers are made up." %><% end %><% end %>
+      <%= dash_card_header rank_title, title_class: "d-flex align-items-center gap-2" do %>
+        <%= dash_button "Rankings", @presenter.rankings_page_path, tone: :link, icon_end: :chevron_right,
+              data: { tm_frame: "_top" } %>
+      <% end %>
+
+      <% if @presenter.rankings.any? %>
+        <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.rank_tiles, bare: true %>
+      <% else %>
+        <%= dash_empty compact: true, title: "No readings in this range",
+              hint: "Try a longer date range, or run a check from Rankings." %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if @presenter.setup? %>
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "Set up" do %>
+        <span class="g-hint"><%= @presenter.steps_done %> of <%= @presenter.steps.size %> done</span>
+      <% end %>
+
+      <ol class="seo-steps">
+        <% @presenter.steps.each_with_index do |step, index| %>
+          <li class="<%= class_names("seo-step", "seo-step--done" => step.done?) %>">
+            <span class="seo-step__mark" aria-hidden="true">
+              <% if step.done? %><%= dash_icon(:check, size: 12) %><% else %><%= index + 1 %><% end %>
+            </span>
+            <span class="seo-step__text">
+              <span class="seo-step__label"><%= step.label %></span>
+              <span class="seo-step__hint"><%= step.hint %></span>
+              <% unless step.installed? %>
+                <span class="seo-step__hint"><%= step.state.detail %></span>
+                <span class="seo-step__hint"><%= safe_join(step.state.commands.map { |command| tag.code(command) }, tag.br) %></span>
+              <% end %>
+            </span>
+            <% if step.done? %>
+              <%= dash_badge "Done", tone: :success %>
+            <% elsif !step.installed? %>
+              <%= dash_badge step.state.badge, tone: :warning %>
+            <% else %>
+              <%= dash_button step.action, step.url,
+                    tone: (step == @presenter.steps.find { |candidate| candidate.installed? && !candidate.done? } ? :primary : :secondary),
+                    data: { tm_frame: "_top" } %>
+            <% end %>
+          </li>
+        <% end %>
+      </ol>
+    <% end %>
+  <% end %>
+<% end %>

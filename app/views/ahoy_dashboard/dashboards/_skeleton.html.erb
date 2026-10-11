@@ -1,0 +1,11 @@
+<%= dash_card element: :section, class: "dash-panel-skeleton #{local_assigns[:modifier]}", "aria-label": "Loading #{title}" do %>
+  <div class="p-3">
+    <span class="visually-hidden" role="status">Loading <%= title %></span>
+    <div class="placeholder-glow" aria-hidden="true">
+      <span class="placeholder col-5 rounded"></span>
+      <% 5.times do %>
+        <div class="mt-3"><span class="placeholder col-10 rounded"></span></div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

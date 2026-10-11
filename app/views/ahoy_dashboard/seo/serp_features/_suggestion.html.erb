@@ -1,0 +1,8 @@
+<% tracked = seo_tracked?(suggestion.text) %>
+<%= link_to seo_track_path(suggestion.text), class: "seo-chip", title: (tracked ? "See rankings" : "Track this search"),
+      data: { tm_frame: "_top" } do %>
+  <span class="nm"><%= suggestion.text %></span>
+  <% if suggestion.times > 1 %><span class="seo-chip__n"><%= suggestion.times %></span><% end %>
+  <%= dash_icon(tracked ? :check : :plus, size: 11) %>
+  <span class="visually-hidden"><%= tracked ? ", tracked" : ", track it" %></span>
+<% end %>

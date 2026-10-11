@@ -1,0 +1,71 @@
+<%# One column: what people did next, given everything picked to its left. The
+    row of them scrolls sideways rather than folding, so a six step journey is
+    read by scrolling rather than by columns disappearing behind a rail. %>
+<section class="j-col" aria-labelledby="<%= column.id %>">
+  <div class="j-col-hd">
+    <div class="j-step" id="<%= column.id %>"><%= column.step_label %></div>
+    <div class="j-of">
+      <% if column.heading %>
+        <%= column.heading %>
+      <% else %>
+        after <span class="jm"><%= column.after %></span>
+      <% end %>
+    </div>
+  </div>
+
+<%# A plain GET, so the search works with the JavaScript off and the result is a
+    URL somebody can keep. The other columns' terms ride along as hidden fields in
+    index order: the terms travel as one list, and a gap would shift every term
+    after it into the wrong column. %>
+  <%= form_with url: presenter.form_path, method: :get, class: "tm-journey__find" do %>
+    <%= render "ahoy_dashboard/shared/query_fields" %>
+
+    <% presenter.chain_fields.each do |step| %>
+      <%= hidden_field_tag "steps[]", step, id: nil %>
+    <% end %>
+
+    <% presenter.search_slots(column.index).each do |slot, term| %>
+      <% if slot == column.index %>
+        <label class="visually-hidden" for="<%= column.search_id %>">
+          Find in step <%= column.index + 1 %>
+        </label>
+        <input class="form-control form-control-sm"
+               id="<%= column.search_id %>"
+               type="search"
+               name="<%= AhoyDashboard::JourneyPresenter::SEARCH_NAME %>"
+               value="<%= term %>"
+               placeholder="Find a page"
+               autocomplete="off">
+      <% else %>
+        <%= hidden_field_tag AhoyDashboard::JourneyPresenter::SEARCH_NAME, term, id: nil %>
+      <% end %>
+    <% end %>
+
+    <button type="submit" class="visually-hidden">Find</button>
+  <% end %>
+
+  <% if column.empty? %>
+    <%= dash_empty column.empty_title, hint: column.empty_hint, compact: true %>
+  <% else %>
+    <div class="p-list j-list tm-scroll">
+      <% column.rows.each_with_index do |row, index| %>
+        <%= link_to row.path,
+              class: class_names("data-row", "exit" => row.exit?, "pinned" => row.chosen?),
+              title: row.title,
+              "aria-current": (row.chosen? ? "true" : nil) do %>
+          <%= dash_bar_tag(row.share) %>
+          <span class="<%= class_names("rn", "rn mono" => !row.exit?) %>">
+            <% if row.exit? %>
+              <span class="lc xlc" aria-hidden="true"><%= dash_icon(:exit, size: 10) %></span>
+            <% end %>
+            <%= dash_row_label(row.label, split: !row.exit?) %>
+          </span>
+          <% if row.percent %>
+            <span class="pct"><%= row.percent %></span>
+          <% end %>
+          <span class="cnt" title="<%= row.exact %>"><%= row.count %></span>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+</section>

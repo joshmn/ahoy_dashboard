@@ -1,0 +1,142 @@
+<% content_for :title, "Opportunities" %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "opportunities", site: @site } do %>
+  <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false %>
+
+  <% if !@presenter.any? %>
+    <%= dash_card do %>
+      <%= dash_empty **@presenter.search_console_empty %>
+    <% end %>
+  <% else %>
+    <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "Worth the most" do %>
+        <span class="g-hint">Biggest upside first</span>
+        <%= seo_track_form("opp-track") %>
+        <%= seo_csv(@presenter, "worth_most") %>
+      <% end %>
+
+      <%= dash_table label: "Opportunities", cols: "66px minmax(200px, 1.8fr) 60px 92px 68px 60px 64px 128px minmax(0, 1fr)",
+            data: { controller: "dash--check-all" } do %>
+        <thead>
+          <tr>
+            <th scope="col"><%= seo_track_all("opp-track") %></th>
+            <th scope="col">Search</th>
+            <th scope="col" class="num">Clicks</th>
+            <th scope="col" class="num">Impressions</th>
+            <th scope="col" class="num">Position</th>
+            <th scope="col" class="num">CTR</th>
+            <th scope="col" class="num">Upside</th>
+            <th scope="col">Band</th>
+            <th scope="col">Landing page</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @presenter.listed.each_with_index do |row, index| %>
+            <tr>
+              <td><%= seo_track_box(row.query, form: "opp-track", index: index) %></td>
+              <td><div class="t-main"><%= seo_link(row.query, @presenter.search_path(row.query)) %></div></td>
+              <td class="num"><%= @presenter.number(row.clicks) %></td>
+              <td class="num t2"><%= @presenter.number(row.impressions) %></td>
+              <td class="num"><%= row.position %></td>
+              <td class="num t2"><%= @presenter.percent(row.ctr, places: 1) %></td>
+              <td class="num"><%= @presenter.number(row.upside) %></td>
+              <td><%= dash_badge row.band, tone: @presenter.band_tone(row) %></td>
+              <td><%= seo_page_link(@presenter.path_of(row.page)) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+
+      <%= dash_card_footer do %><%= @presenter.upside_note %><% end %>
+      <%= render "ahoy_dashboard/seo/shared/data_note", last_date: @presenter.totals.last_date, slice: @presenter.slice %>
+    <% end %>
+
+    <div class="row g-3 mt-0">
+      <div class="col-12 col-xl-6">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "Striking distance" do %>
+            <span class="g-hint">Positions 11 to 20</span>
+            <% if @presenter.striking.any? %>
+              <%= seo_track_form("striking-track") %>
+              <%= seo_csv(@presenter, "striking") %>
+            <% end %>
+          <% end %>
+
+          <% if @presenter.striking.any? %>
+            <%= dash_table label: "Striking distance", cols: "66px minmax(0, 1.6fr) 76px 100px 80px",
+                  data: { controller: "dash--check-all" } do %>
+              <thead>
+                <tr>
+                  <th scope="col"><%= seo_track_all("striking-track") %></th>
+                  <th scope="col">Search</th>
+                  <th scope="col" class="num">Position</th>
+                  <th scope="col" class="num">Impressions</th>
+                  <th scope="col" class="num">Upside</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @presenter.striking.each_with_index do |row, index| %>
+                  <tr>
+                    <td><%= seo_track_box(row.query, form: "striking-track", index: index) %></td>
+                    <td><div class="t-main"><%= seo_link(row.query, @presenter.search_path(row.query)) %></div></td>
+                    <td class="num"><%= row.position %></td>
+                    <td class="num t2"><%= @presenter.number(row.impressions) %></td>
+                    <td class="num"><%= @presenter.number(row.upside) %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            <% end %>
+            <%= dash_card_footer do %><%= @presenter.impressions_note %><% end %>
+          <% else %>
+            <%= dash_empty compact: true, title: "Nothing in striking distance",
+                  hint: "Every search with enough impressions is either on page one or past twenty." %>
+          <% end %>
+        <% end %>
+      </div>
+
+      <div class="col-12 col-xl-6">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "Below expected clicks" do %>
+            <span class="g-hint">Biggest shortfall first</span>
+            <% if @presenter.under_performing.any? %>
+              <%= seo_track_form("under-track") %>
+              <%= seo_csv(@presenter, "under_performing") %>
+            <% end %>
+          <% end %>
+
+          <% if @presenter.under_performing.any? %>
+            <%= dash_table label: "Below expected clicks", cols: "66px minmax(0, 1.6fr) 76px 72px 84px",
+                  data: { controller: "dash--check-all" } do %>
+              <thead>
+                <tr>
+                  <th scope="col"><%= seo_track_all("under-track") %></th>
+                  <th scope="col">Search</th>
+                  <th scope="col" class="num">Position</th>
+                  <th scope="col" class="num">Clicks</th>
+                  <th scope="col" class="num">Expected</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @presenter.under_performing.each_with_index do |row, index| %>
+                  <tr>
+                    <td><%= seo_track_box(row.query, form: "under-track", index: index) %></td>
+                    <td><div class="t-main"><%= seo_link(row.query, @presenter.search_path(row.query)) %></div></td>
+                    <td class="num"><%= row.position %></td>
+                    <td class="num"><%= @presenter.number(row.clicks) %></td>
+                    <td class="num t2"><%= @presenter.number(row.expected) %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            <% end %>
+            <%= dash_card_footer do %><%= @presenter.under_note %><% end %>
+          <% else %>
+            <%= dash_empty compact: true, title: "Nothing below expected",
+                  hint: "Every search is getting about the clicks its position usually gets." %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% end %>

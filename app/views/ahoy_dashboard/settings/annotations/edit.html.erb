@@ -1,0 +1,14 @@
+<% content_for :title, "Edit an annotation" %>
+<% content_for :dash_settings_section, "annotations" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Edit #{@record.label}",
+          lede: "Changing the time moves the note on the chart." %>
+
+    <%= dash_card do %>
+      <%= render "ahoy_dashboard/settings/annotations/form",
+            url: settings_annotation_path(@record), method: :patch, submit_label: "Save changes" %>
+    <% end %>
+  </section>
+</div>

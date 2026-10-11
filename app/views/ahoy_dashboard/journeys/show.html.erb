@@ -1,0 +1,11 @@
+<% content_for :title, @presenter.title %>
+
+<%# The dashboard shares the card partial for its initial response. Picking a
+    step navigates this frame either way, embedded or standalone. %>
+<%= dash_page_head title: @presenter.title,
+      lede: "Where visitors went after any page they viewed.",
+      actions: dash_button("Back to dashboard", root_path(query.to_query), data: { tm_frame: "_top" }) %>
+
+<%= dash_frame_tag "dash_journey" do %>
+  <%= render "ahoy_dashboard/journeys/card", presenter: @presenter %>
+<% end %>

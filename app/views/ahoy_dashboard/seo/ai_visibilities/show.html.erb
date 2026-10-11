@@ -1,0 +1,185 @@
+<% content_for :title, "AI visibility" %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "ai_visibility" } do %>
+  <% controls = capture do %>
+    <%= dash_button_to("Run now", @presenter.run_path,
+          reason: @presenter.run_reason,
+          method: :post, confirm: @presenter.run_confirm) %>
+    <%= dash_link_menu(id: "tm-seo-assistant", label: @presenter.assistant_label, section: "Assistant",
+          items: @presenter.assistant_options) %>
+  <% end %>
+  <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false, controls: controls %>
+
+  <% if @presenter.setup_notice %>
+    <%= dash_card class: "seo-notice-card" do %>
+      <%= dash_empty compact: true, **@presenter.setup_notice %>
+    <% end %>
+  <% else %>
+    <%= dash_unavailable_notice "Run now", @presenter.run_reason, fix: @presenter.run_fix %>
+  <% end %>
+
+  <% if @presenter.skipped_note %>
+    <%= dash_notice "A run was skipped.", tone: :warning, class: "mb-3",
+          detail: @presenter.skipped_note,
+          action: dash_button("AI visibility settings", @presenter.settings_path, data: { tm_frame: "_top" }) %>
+  <% end %>
+
+  <% if !@presenter.any? %>
+    <% unless @presenter.setup_notice %>
+      <%= dash_card do %>
+        <%= dash_empty(**@presenter.empty_state) %>
+      <% end %>
+    <% end %>
+  <% else %>
+    <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "Mention rate over time" do %>
+        <span class="g-hint">Share of each day's answers that mention you</span>
+      <% end %>
+
+      <% if @presenter.charted? %>
+        <% lines = @presenter.lines %>
+        <div class="chart-wrap seo-plot">
+          <div class="seo-plot__frame">
+            <svg viewBox="0 0 640 <%= @presenter.plot_height %>" preserveAspectRatio="none" role="img"
+                 aria-label="Mention rate by assistant and model, <%= @presenter.first_date %> to <%= @presenter.last_date %>">
+              <% lines.each do |line| %>
+                <path d="<%= line.path %>" fill="none" vector-effect="non-scaling-stroke"
+                      style="stroke: <%= line.color %>; stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round<%= "; stroke-dasharray: #{line.dash}" if line.dash %>"></path>
+              <% end %>
+            </svg>
+          </div>
+          <div class="seo-plot__dates">
+            <span><%= @presenter.first_date %></span>
+            <span><%= @presenter.last_date %></span>
+          </div>
+        </div>
+        <ul class="list-inline px-3 pb-3 mb-0 small">
+          <% lines.each do |line| %>
+            <li class="list-inline-item me-3">
+              <svg width="18" height="4" aria-hidden="true" focusable="false"><line x1="0" y1="2" x2="18" y2="2" style="stroke: <%= line.color %>; stroke-width: 2.5<%= "; stroke-dasharray: #{line.dash}" if line.dash %>"></line></svg>
+              <%= line.label %>, <%= @presenter.percent(line.latest.rate) %> on <%= @presenter.on_label(line.latest.on) %>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="mb-0 px-3 py-3 text-body-secondary">The chart starts once there are answers on three different days.</p>
+      <% end %>
+    <% end %>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "By assistant and model" do %>
+        <%= seo_csv(@presenter, "assistants") %>
+      <% end %>
+
+      <%= dash_table label: "By assistant and model", cols: "minmax(0, 0.8fr) minmax(0, 1fr) 80px 96px 80px 120px" do %>
+        <thead>
+          <tr>
+            <th scope="col">Assistant</th>
+            <th scope="col">Model</th>
+            <th scope="col" class="num">Answers</th>
+            <th scope="col" class="num">Mentioned</th>
+            <th scope="col" class="num">Cited</th>
+            <th scope="col" class="num">Average position</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @presenter.by_assistant.each do |row| %>
+            <tr>
+              <td><div class="t-main"><b><%= row.label %></b></div></td>
+              <td><div class="t-mono text-break"><%= row.model %></div></td>
+              <td class="num"><%= @presenter.number(row.answers) %></td>
+              <td class="num"><%= @presenter.number(row.mentioned) %> <span class="t2">(<%= @presenter.percent(row.mention_rate) %>)</span></td>
+              <td class="num"><%= @presenter.number(row.cited) %> <span class="t2">(<%= @presenter.percent(row.citation_rate) %>)</span></td>
+              <td class="num"><%= @presenter.position_of(row) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+      <%= dash_card_footer do %>Average position is where your domain sits in the answer's sources, counted over answers that cite you.<% end %>
+    <% end %>
+
+    <div class="row g-3 mt-0">
+      <div class="col-12 col-xl-6">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "Prompts you don't show up in" do %>
+            <% if @presenter.missing_prompts.any? %>
+              <%= seo_csv(@presenter, "missing_prompts") %>
+            <% end %>
+          <% end %>
+
+          <% if @presenter.missing_prompts.any? %>
+            <%= dash_table label: "Prompts you don't show up in", cols: "minmax(0, 1fr) 88px 110px", compact: true do %>
+              <thead>
+                <tr>
+                  <th scope="col">Prompt</th>
+                  <th scope="col" class="num">Models</th>
+                  <th scope="col">Last asked</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @presenter.missing_prompts.each do |row| %>
+                  <tr>
+                    <td><div class="t-main text-break"><%= link_to row.prompt.text, @presenter.prompt_path(row.prompt), class: "seo-link", data: { tm_frame: "_top" } %></div></td>
+                    <td class="num"><%= row.asked %></td>
+                    <td class="small text-body-secondary"><%= @presenter.asked_label(row.last_asked_at) %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            <% end %>
+            <%= dash_card_footer do %>No model's latest answer in this range mentions you. Models is how many were asked.<% end %>
+          <% else %>
+            <%= dash_empty compact: true, title: "You show up in every prompt",
+                  hint: "At least one model's latest answer mentions you for each prompt asked in this range." %>
+          <% end %>
+        <% end %>
+      </div>
+
+      <div class="col-12 col-xl-6">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "Who gets cited instead" do %>
+            <% if @presenter.cited_instead.any? %>
+              <%= seo_csv(@presenter, "cited_instead") %>
+            <% end %>
+          <% end %>
+
+          <% if @presenter.cited_instead.any? %>
+            <%= dash_table label: "Who gets cited instead", cols: "minmax(0, 1fr) 80px 72px", compact: true do %>
+              <thead>
+                <tr>
+                  <th scope="col">Domain</th>
+                  <th scope="col" class="num">Answers</th>
+                  <th scope="col" class="num">Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @presenter.cited_instead.each do |row| %>
+                  <tr>
+                    <td><div class="t-main"><%= seo_site_link(row.domain) %></div></td>
+                    <td class="num"><%= @presenter.number(row.answers) %></td>
+                    <td class="num t2"><%= @presenter.percent(row.share) %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            <% end %>
+          <% else %>
+            <%= dash_empty compact: true, title: "No other sites cited",
+                  hint: "None of the answers in this range cite another site." %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "Every prompt" %>
+      <div class="p-list">
+        <% @presenter.all_prompts.each do |prompt| %>
+          <div class="data-row">
+            <div class="rn text-break"><%= link_to prompt.text, @presenter.prompt_path(prompt), class: "seo-link", data: { tm_frame: "_top" } %></div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

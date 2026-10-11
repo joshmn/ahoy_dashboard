@@ -1,0 +1,64 @@
+<% content_for :title, "Cannibalization" %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "cannibalization", site: @site } do %>
+  <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false %>
+
+  <% if !@presenter.any? %>
+    <%= dash_card do %>
+      <%= dash_empty **@presenter.search_console_empty(title: "No competing pages in this range", hint: @presenter.withholding_note) %>
+    <% end %>
+  <% else %>
+    <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
+
+<%# One card per search rather than one table, so the tick-all box and the boxes
+    it drives sit in different cards. The scope is the whole list under it. %>
+    <div data-controller="dash--check-all">
+    <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 mt-3">
+      <span class="g-hint">Tick the searches you want to follow, then track them together.</span>
+      <%= seo_track_all("cannibal-track", label: "Select every search") %>
+      <%= seo_track_form("cannibal-track") %>
+      <%= seo_csv(@presenter, "pages") %>
+    </div>
+
+    <% @presenter.rows.each_with_index do |row, index| %>
+      <%= dash_card class: "mt-3" do %>
+        <%= dash_card_header link_to(row.query, @presenter.search_path(row.query), class: "seo-link", title: row.query, data: { tm_frame: "_top" }),
+              title_class: "seo-hd-label" do %>
+          <%= seo_track_box(row.query, form: "cannibal-track", index: index) %>
+          <%= dash_badge @presenter.severity_label(row.severity), tone: @presenter.severity_tone(row.severity) %>
+          <span class="g-hint"><%= @presenter.number(row.clicks) %> clicks, <%= row.contenders %> pages</span>
+        <% end %>
+
+        <%= dash_table label: "Pages ranking for this search", cols: "minmax(0, 2fr) 72px 100px 76px 64px 108px" do %>
+          <thead>
+            <tr>
+              <th scope="col">Page</th>
+              <th scope="col" class="num">Clicks</th>
+              <th scope="col" class="num">Impressions</th>
+              <th scope="col" class="num">Position</th>
+              <th scope="col" class="num">Days</th>
+              <th scope="col">Standing</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% row.pages.each do |page| %>
+              <tr>
+                <td><div class="t-main"><%= seo_page_link(page.path) %></div></td>
+                <td class="num"><%= @presenter.number(page.clicks) %></td>
+                <td class="num t2"><%= @presenter.number(page.impressions) %></td>
+                <td class="num"><%= page.position %></td>
+                <td class="num t2"><%= page.days %></td>
+                <td>
+                  <%= dash_badge @presenter.standing_label(row, page), tone: @presenter.standing_tone(row, page) %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        <% end %>
+
+        <%= dash_card_footer do %><%= @presenter.diagnosis(row) %>.<% end %>
+      <% end %>
+    <% end %>
+    </div>
+  <% end %>
+<% end %>

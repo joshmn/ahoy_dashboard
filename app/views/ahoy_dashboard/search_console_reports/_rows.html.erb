@@ -1,0 +1,80 @@
+<% queries = presenter.queries? %>
+
+<% unless presenter.rows? %>
+  <% if presenter.term.present? %>
+    <%= dash_empty compact: true,
+          title: "Nothing matches \"#{presenter.term}\"",
+          hint: "Try a shorter search, or clear the filter." %>
+  <% elsif presenter.connected? %>
+    <%= dash_empty compact: true,
+          title: queries ? "No queries in this range" : "No pages in this range",
+          hint: "Google reports two to three days late. Try a longer date range." %>
+  <% else %>
+    <%= dash_empty compact: true, **presenter.setup_notice %>
+  <% end %>
+<% else %>
+  <%= dash_table label: queries ? "Queries" : "Pages",
+        cols: queries ? "66px minmax(0, 1fr) 80px 104px 68px 74px 96px" : "minmax(0, 1fr) 80px 104px 68px 74px",
+        data: ({ controller: "dash--check-all" } if queries) do %>
+    <thead>
+      <tr>
+        <% if queries %><th scope="col"><%= seo_track_all("sc-track") %></th><% end %>
+        <th scope="col"><%= queries ? "Query" : "Page" %></th>
+        <th scope="col" class="num">Clicks</th>
+        <th scope="col" class="num">Impressions</th>
+        <th scope="col" class="num">CTR</th>
+        <th scope="col" class="num">Position</th>
+        <% if queries %><th scope="col" class="num">Trend</th><% end %>
+      </tr>
+    </thead>
+    <tbody>
+      <% presenter.rows.each_with_index do |row, index| %>
+        <tr>
+          <% if queries %>
+            <td><%= seo_track_box(row.label, form: "sc-track", index: index) if row.label.present? %></td>
+          <% end %>
+<%# A query opens its own history, which is a different table again. A page has
+    no series of its own stored, so it stays put. %>
+          <td>
+            <div class="t-main sc-label">
+              <% if queries && row.label.blank? %>
+                <span class="nil"><%= AhoyDashboard::SearchConsole::ANONYMIZED_QUERY %></span>
+              <% elsif queries %>
+                <%= link_to presenter.keyword_details_path(row.label),
+                      class: "seo-link min-w-0",
+                      "aria-haspopup": "dialog",
+                      data: {
+                        tm_frame: AhoyDashboard::SearchConsoleKeywordPresenter::DETAILS_FRAME,
+                        action: "dash--modal#open",
+                        "dash--modal-key-param": "keyword"
+                      } do %>
+                  <%= seo_label(row.label) %>
+                <% end %>
+              <% else %>
+                <%= seo_page_link(seo_url_path(row.label)) %>
+              <% end %>
+            </div>
+          </td>
+
+          <td class="num"><b><%= presenter.number(row.clicks) %></b></td>
+          <td class="num t2"><%= presenter.number(row.impressions) %></td>
+          <td class="num t2"><%= presenter.percentage(row.ctr) %></td>
+          <td class="num t2"><%= presenter.place(row.position) %></td>
+
+          <% if queries %>
+            <td class="num">
+              <% if presenter.trend?(row) %>
+                <svg class="sc-spark" viewBox="0 0 90 22" height="22" preserveAspectRatio="none"
+                     aria-hidden="true" focusable="false"
+                     data-controller="dash--spark"
+                     data-dash--spark-width-value="90"
+                     data-dash--spark-height-value="22"
+                     data-dash--spark-values-value="<%= row.trend.to_json %>"></svg>
+              <% end %>
+            </td>
+          <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  <% end %>
+<% end %>

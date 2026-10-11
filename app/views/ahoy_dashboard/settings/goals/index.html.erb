@@ -1,0 +1,94 @@
+<% content_for :title, "Goals" %>
+<% content_for :dash_settings_section, "goals" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Goals",
+          lede: "The conversions you care about. New goals count past data too.",
+          actions: capture {
+            dash_button "New goal", new_settings_goal_path, tone: :primary, icon: :plus
+          } %>
+
+    <%= dash_card do %>
+      <% if @goals.any? %>
+        <%= dash_card_header "#{@goals.size} #{"goal".pluralize(@goals.size)}" do %>
+          <span class="g-hint"><%= @presenter&.range_label || query.range_label %></span>
+        <% end %>
+
+        <%= dash_table label: "Goals", cols: "minmax(0, 1.15fr) 104px minmax(0, 1fr) 96px 64px 56px 64px" do %>
+          <thead>
+            <tr>
+              <th scope="col">Goal</th>
+              <th scope="col">Type</th>
+              <th scope="col">Matches</th>
+              <th scope="col" class="num">Conversions</th>
+              <th scope="col" class="num">Rate</th>
+              <th scope="col"><span class="visually-hidden">Order</span></th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @goals.each_with_index do |goal, index| %>
+              <% if @confirming == goal.id.to_s %>
+                <% message = capture do %>Delete <b><%= goal.name %></b>? Past conversions stay in your stats.<% end %>
+                <%= dash_table_confirm message, span: 7, cancel: settings_goals_path do %>
+                  <%= dash_button_to "Delete", settings_goal_path(goal), method: :delete, tone: :danger %>
+                <% end %>
+              <% else %>
+                <% row = @conversions[goal.name] %>
+                <tr>
+                  <td>
+                    <div class="t-main">
+                      <b><%= goal.name %></b>
+                      <% if goal.revenue? %>
+                        <%= dash_badge goal.currency, tone: :kind, title: "Revenue from the event's properties" %>
+                      <% end %>
+                    </div>
+                  </td>
+
+                  <td>
+                    <%= dash_badge goal.pageview? ? "Pageview" : "Custom event", tone: :kind %>
+                  </td>
+
+                  <td>
+                    <div class="t-mono"><%= goal.pageview? ? goal.path_pattern : goal.event_name %></div>
+                    <% if goal.property_key.present? %>
+                      <div class="t-mono"><%= goal.property_key %>: <%= goal.property_value %></div>
+                    <% end %>
+                  </td>
+
+                  <td class="num"><%= row ? dash_number(row.metrics["visitors"]) : "0" %></td>
+                  <td class="num t2">
+                    <%= AhoyDashboard::Metric.find("conversion_rate").format(row&.metrics&.dig("conversion_rate").to_f) %>
+                  </td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button_to :chevron_up, settings_goal_path(goal),
+                          label: "Move #{goal.name} up the list",
+                          method: :patch, params: { goal: { nudge: "up" } },
+                          disabled: index.zero? %>
+                    <%= dash_icon_button_to :chevron_down, settings_goal_path(goal),
+                          label: "Move #{goal.name} down the list",
+                          method: :patch, params: { goal: { nudge: "down" } },
+                          disabled: index == @goals.size - 1 %>
+                  </td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button :gear, label: "Edit #{goal.name}",
+                          url: edit_settings_goal_path(goal), title: "Edit" %>
+                    <%= dash_icon_button :close, label: "Delete #{goal.name}",
+                          url: settings_goals_path(confirm: goal.id), tone: :danger, title: "Delete" %>
+                  </td>
+                </tr>
+              <% end %>
+            <% end %>
+          </tbody>
+        <% end %>
+      <% else %>
+        <%= dash_empty title: "No goals yet",
+              hint: "Count a signup, a purchase or a visit to a key page.",
+              action: { label: "New goal", url: new_settings_goal_path } %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

@@ -1,0 +1,70 @@
+<% content_for :title, "Annotations" %>
+<% content_for :dash_settings_section, "annotations" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Annotations",
+          lede: "Mark deploys, campaigns and anything else worth remembering on the chart. Times are in #{AhoyDashboard::Settings::Display.time_zone_label}.",
+          actions: capture {
+            dash_button "New annotation", new_settings_annotation_path, tone: :primary, icon: :plus
+          } %>
+
+    <%= dash_card do %>
+      <% if @records.any? %>
+        <%= dash_card_header "#{@records.size} #{"annotation".pluralize(@records.size)}" do %>
+          <span class="g-hint">Newest first</span>
+        <% end %>
+
+        <%= dash_table label: "Annotations", cols: "150px minmax(0, 1fr) 104px 64px" do %>
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">Annotation</th>
+              <th scope="col">Type</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @records.each_with_index do |note, index| %>
+              <% if @confirming == note.id.to_s %>
+                <% message = capture do %>Delete <b><%= note.label %></b>? It comes off the chart.<% end %>
+                <%= dash_table_confirm message, span: 4, cancel: settings_annotations_path do %>
+                  <%= dash_button_to "Delete", settings_annotation_path(note), method: :delete, tone: :danger %>
+                <% end %>
+              <% else %>
+                <tr>
+                  <td class="t-when">
+                    <%= AhoyDashboard::Settings::Display.short_date(note.local_time) %>,
+                    <%= note.local_time.strftime("%-l:%M %p") %>
+                  </td>
+
+                  <td>
+                    <span class="t-main">
+                      <%= dash_icon(:filter, size: 13, class_name: "gi") %>
+                      <b><%= note.label %></b>
+                    </span>
+                  </td>
+
+                  <td>
+                    <%= dash_badge note.kind_label, tone: note.kind == "deploy" ? :kind : :neutral %>
+                  </td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button :gear, label: "Edit #{note.label}",
+                          url: edit_settings_annotation_path(note), title: "Edit" %>
+                    <%= dash_icon_button :close, label: "Delete #{note.label}",
+                          url: settings_annotations_path(confirm: note.id), tone: :danger, title: "Delete" %>
+                  </td>
+                </tr>
+              <% end %>
+            <% end %>
+          </tbody>
+        <% end %>
+      <% else %>
+        <%= dash_empty title: "Nothing marked yet",
+              hint: "Add your next deploy or campaign so you know what caused a change.",
+              action: { label: "New annotation", url: new_settings_annotation_path } %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

@@ -1,0 +1,44 @@
+<%# The place picker, drawn as the command menu.
+
+    One per form rather than one per place row: it is a dialog, and which row it
+    fills in is whichever row's button was pressed. The controller binds its own
+    document listener for those buttons, the same way the value picker does, so
+    a row anywhere on the form can reach it. %>
+<div class="cmdk"
+     id="tm-places"
+     hidden
+     data-controller="dash--place-picker"
+     data-dash--place-picker-url-value="<%= settings_places_path %>"
+     data-dash--place-picker-target="panel">
+  <div class="cmdk-bg" data-action="click->dash--place-picker#close"></div>
+
+  <div class="cmdk-panel" role="dialog" aria-modal="true" aria-labelledby="tm-places-title">
+    <div class="cmdk-in">
+      <%= dash_icon(:search, size: 15) %>
+      <label class="visually-hidden" for="tm-places-input" id="tm-places-title">
+        Search for a place to search from
+      </label>
+      <input type="text"
+             id="tm-places-input"
+             placeholder="Pick a country&hellip;"
+             autocomplete="off"
+             spellcheck="false"
+             data-dash--place-picker-target="input"
+             data-action="input->dash--place-picker#search">
+      <kbd>esc</kbd>
+    </div>
+
+    <div class="cmdk-list" role="listbox" data-dash--place-picker-target="list">
+      <%= render "ahoy_dashboard/settings/places/panel",
+            parent: nil, term: "",
+            result: AhoyDashboard::Places::SearchQuery::Result.new(places: [], more: false) %>
+    </div>
+
+    <div class="cmdk-ft">
+      <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> navigate</span>
+      <span><kbd>&crarr;</kbd> pick</span>
+      <span><kbd>&rarr;</kbd> open</span>
+      <span data-dash--place-picker-target="back" hidden><kbd>&larr;</kbd> back</span>
+    </div>
+  </div>
+</div>

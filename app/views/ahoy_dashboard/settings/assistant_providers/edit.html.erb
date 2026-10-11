@@ -1,0 +1,71 @@
+<% content_for :title, "Set up provider" %>
+<% content_for :dash_settings_section, "assistant_providers" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Set up #{@form.reader[:label]}",
+          lede: @form.lede %>
+
+    <%= dash_card do %>
+      <% if @removing %>
+        <%= render "ahoy_dashboard/settings/shared/remove_secret", secret: @removing,
+              url: settings_assistant_provider_secret_path(@name, @removing.key),
+              cancel: edit_settings_assistant_provider_path(@name) %>
+      <% end %>
+
+      <%= dash_form_with model: @form, scope: :assistant_provider,
+            url: settings_assistant_provider_path(@name), method: :patch,
+            card: true do |form| %>
+        <%= form.error_summary unlinked: [ :name ] %>
+
+        <% if @secret %>
+          <%= form.password_field :api_key, label: "API key", mono: true, hint: @secret.hint,
+                id: "assistant_provider_credentials_api_key", name: "assistant_provider[credentials][api_key]",
+                value: nil, autocomplete: "off",
+                append: (if @secret.stored?
+                           dash_button "Remove", edit_settings_assistant_provider_path(@name, remove: @secret.key, anchor: "remove-secret"),
+                             size: :md, aria: { label: "Remove the stored #{@secret.label}" }
+                         end) %>
+        <% end %>
+
+        <% model_hint = capture do %>
+          <% if @form.default_model.present? %>
+            Leave it blank to use <span class="font-monospace"><%= @form.default_model %></span>.
+          <% else %>
+            The model name as the local server lists it.
+          <% end %>
+        <% end %>
+        <%= form.text_field :model, label: "Model", mono: true, hint: model_hint,
+              autocomplete: "off", placeholder: @form.default_model,
+              list: (@form.suggested_models.any? ? "assistant_provider_model_options" : nil) %>
+        <% if @form.suggested_models.any? %>
+          <datalist id="assistant_provider_model_options">
+            <% @form.suggested_models.each do |model| %>
+              <option value="<%= model %>"></option>
+            <% end %>
+          </datalist>
+        <% end %>
+
+        <%= form.number_field :temperature, label: "Temperature", optional: true, mono: true,
+              min: 0, max: AhoyDashboard::AssistantProviderForm::MAX_TEMPERATURE, step: 0.05,
+              hint: "Lower keeps answers steadier. Leave it blank to send none and use the model's own. #{@form.temperature_hint}" %>
+
+        <%= form.number_field :max_tokens, label: "Output limit", optional: true, mono: true,
+              min: 1, max: AhoyDashboard::AssistantProviderForm::MAX_OUTPUT, step: 1, suffix: "tokens",
+              placeholder: @form.default_output,
+              hint: "The most one answer can run to, thinking included. Leave it blank for #{number_with_delimiter(@form.default_output)}." %>
+
+        <%= form.text_field :api_base, label: "Endpoint", optional: true, mono: true,
+              hint: safe_join([ @form.reader[:endpoint_hint], " Usually ends in ", tag.span("/v1", class: "font-monospace"), "." ]),
+              autocomplete: "off", placeholder: @form.reader[:api_base] %>
+
+        <%= form.fieldset :active, label: "Use this one" do %>
+          <%= form.switch :active, label: "Answer with #{@form.reader[:label]}",
+                hint: "Only one provider is active at a time." %>
+        <% end %>
+
+        <%= form.actions "Save provider", cancel: settings_assistant_providers_path %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

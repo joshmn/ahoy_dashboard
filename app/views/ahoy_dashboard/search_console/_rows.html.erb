@@ -1,0 +1,13 @@
+<%# A disconnect revokes the token, it does not delete history, so rows already
+    pulled still show. Only an account with nothing stored reads as unconnected. %>
+<% if presenter.unconfigured? %>
+  <%= render "ahoy_dashboard/search_console/unconnected" %>
+<% elsif presenter.empty? %>
+  <%= dash_empty title: "Nothing back from Google for this range",
+        hint: presenter.lag_note %>
+<% else %>
+  <div class="p-list d-flex flex-column">
+    <%= render partial: "ahoy_dashboard/search_console/line", collection: presenter.rows, as: :row,
+          locals: { presenter: presenter, form: presenter.track_form_id } %>
+  </div>
+<% end %>

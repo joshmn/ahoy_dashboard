@@ -1,0 +1,35 @@
+<% preview = AhoyDashboard::Settings::PagePatternPreview.new(paths: @paths, patterns: @form.pattern_list) %>
+<%= dash_form_with model: @form, scope: :page_group, url: url, method: method, card: true,
+      data: { controller: "dash--pattern-preview", "dash--pattern-preview-paths-value": @paths.to_json } do |form| %>
+  <%= form.error_summary %>
+
+  <%= form.grid do %>
+    <%= form.text_field :name, label: "Group name", autocomplete: "off", placeholder: "Blog" %>
+
+    <%= form.text_field :patterns, label: "Path pattern", mono: true,
+          hint: "Use * at the end to match a whole section. Separate patterns with commas.",
+          autocomplete: "off", placeholder: "/blog/*, /changelog/*",
+          data: { "dash--pattern-preview-target": "input", action: "input->dash--pattern-preview#refresh" } %>
+  <% end %>
+
+  <section class="grp-preview" aria-labelledby="grp-preview-title">
+    <div class="grp-preview-hd">
+      <h2 id="grp-preview-title">Pages it groups</h2>
+      <p class="small text-body-tertiary mb-0" aria-live="polite" data-dash--pattern-preview-target="summary"><%= preview.summary %></p>
+    </div>
+
+    <ul class="grp-list" data-dash--pattern-preview-target="list"><%= dash_pattern_rows(preview.shown) %><% if preview.more.positive? %><li class="grp-more"><%= dash_button "and #{number_with_delimiter(preview.more)} more", tone: :link, class: "grp-more-open", "aria-haspopup": "dialog", data: { action: "dash--modal#open", "dash--modal-key-param": AhoyDashboard::Settings::PagePatternPreview::MODAL_KEY } %></li><% end %></ul>
+  </section>
+
+  <%# A sibling of the list rather than a row in it: the whole set can run to a
+      hundred paths, which is a dialog, not a box that grows under the field. %>
+  <%= dash_dialog key: AhoyDashboard::Settings::PagePatternPreview::MODAL_KEY, title: preview.modal_title,
+        close_label: "Close the list of pages", fit: true, narrow: true,
+        title_data: { "dash--pattern-preview-target": "allTitle" } do %>
+    <%= dash_dialog_body do %>
+      <ul class="grp-list grp-list-all" data-dash--pattern-preview-target="all"><%= dash_pattern_rows(preview.matches) %></ul>
+    <% end %>
+  <% end %>
+
+  <%= form.actions submit_label, cancel: settings_page_groups_path %>
+<% end %>

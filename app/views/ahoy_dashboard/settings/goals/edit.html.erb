@@ -1,0 +1,14 @@
+<% content_for :title, "Edit a goal" %>
+<% content_for :dash_settings_section, "goals" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Edit #{@goal.name}",
+          lede: "Changes apply to the whole history, not just from now on." %>
+
+    <%= dash_card do %>
+      <%= render "ahoy_dashboard/settings/goals/form",
+            url: settings_goal_path(@goal), method: :patch, submit_label: "Save changes" %>
+    <% end %>
+  </section>
+</div>

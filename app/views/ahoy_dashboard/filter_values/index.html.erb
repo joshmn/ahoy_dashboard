@@ -1,0 +1,43 @@
+<%# The filter dialog as a page, for the Filter button with the JavaScript off
+    or opened in a tab of its own. Every value here is a link that applies it. %>
+<% content_for :title, @dimension ? "Filter by #{@dimension.filter_label.downcase}" : "Filter" %>
+<% returning = @destination.present? ? { return: @destination } : {} %>
+<% base = query.to_query.merge(dash_carried_params(@carried)).merge(returning) %>
+
+<%= dash_page_head title: (@dimension ? "Filter by #{@dimension.filter_label.downcase}" : "Filter") %>
+
+<%= dash_card padded: true do %>
+  <%= form_with url: filter_values_path, method: :get, class: "mb-3" do %>
+    <% base.except(:filters).each do |name, value| %>
+      <%= hidden_field_tag name, value, id: nil %>
+    <% end %>
+    <% query.filters.to_param.each do |entry| %>
+      <% entry.each do |key, value| %>
+        <%= hidden_field_tag "filters[][#{key}]", value, id: nil %>
+      <% end %>
+    <% end %>
+    <%= hidden_field_tag :dimension, @dimension.key, id: nil if @dimension %>
+    <% searching = @dimension ? "Search #{@dimension.filter_label.downcase.pluralize}" : "Search every value" %>
+    <%= dash_input_group size: :md do %>
+      <%= dash_search_field :q, @term, label: searching, id: "tm-filter-page-input", size: :md,
+            placeholder: searching, spellcheck: false %>
+      <%= dash_button "Search", type: "submit", size: :md %>
+    <% end %>
+  <% end %>
+
+  <div class="d-md-flex border rounded-3 fm-body fm-body--page">
+    <nav class="flex-shrink-0 p-2 fm-rail" aria-label="Dimensions">
+      <%= render "ahoy_dashboard/filter_values/rail", base: base.except(:filters).merge(filters: query.filters.to_param.presence),
+            destination: @destination, carried: @carried, collect: false, current: @dimension&.key %>
+    </nav>
+
+    <div class="flex-grow-1 min-w-0 p-2 m-list fm-main">
+      <%= render "ahoy_dashboard/filter_values/panel", dimension: @dimension, values: @values, groups: @groups,
+            term: @term, live: false, collect: false, destination: @destination, carried: @carried %>
+    </div>
+  </div>
+
+  <p class="mt-3 mb-0">
+    <%= link_to "Back without filtering", dash_destination_path(@destination, query.to_query.merge(@carried)) %>
+  </p>
+<% end %>

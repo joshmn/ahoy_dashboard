@@ -1,0 +1,42 @@
+<%= dash_form_with model: @form, scope: :funnel, url: url, method: method, card: true do |form| %>
+  <button type="submit" class="visually-hidden" tabindex="-1" aria-hidden="true"></button>
+
+  <%= form.error_summary unlinked: [ :goal_ids ] %>
+
+  <%= form.grid do %>
+    <%= form.text_field :name, label: "Name", hint: "Shown on the report.",
+          autocomplete: "off", placeholder: "Signed up" %>
+  <% end %>
+
+  <%= form.fieldset :goal_ids, label: "Steps", class: "fs-steps",
+        hint: "People have to reach the steps in this order, in one visit." do %>
+    <% @form.slots.each_with_index do |goal_id, index| %>
+      <div class="fs-row">
+        <span class="fn-n" aria-hidden="true"><%= index + 1 %></span>
+
+        <label class="visually-hidden" for="funnel_step_<%= index + 1 %>">Step <%= index + 1 %></label>
+        <%= form.select :goal_ids,
+              options_for_select(goals.map { |goal| [ goal.name, goal.id ] }, goal_id),
+              { include_blank: "Choose a goal" },
+              name: "funnel[goal_ids][]",
+              id: "funnel_step_#{index + 1}",
+              "aria-describedby": "funnel_goal_ids_hint" %>
+
+        <% if goal_id.present? %>
+          <%= dash_icon_button :close, label: "Delete step #{index + 1}", tone: :danger,
+                type: "submit", name: "funnel[remove]", value: index, formnovalidate: true,
+                title: "Delete this step" %>
+        <% else %>
+          <span aria-hidden="true"></span>
+        <% end %>
+      </div>
+    <% end %>
+
+    <div class="fs-add">
+      <%= dash_button "Add a step", icon: :plus,
+            type: "submit", name: "funnel[add]", value: 1, formnovalidate: true %>
+    </div>
+  <% end %>
+
+  <%= form.actions submit_label, cancel: settings_funnels_path %>
+<% end %>

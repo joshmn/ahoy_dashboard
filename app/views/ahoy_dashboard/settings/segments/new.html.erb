@@ -1,0 +1,14 @@
+<% content_for :title, "New segment" %>
+<% content_for :dash_settings_section, "segments" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "New segment",
+          lede: "Pick the filters and give them a name." %>
+
+    <%= dash_card do %>
+      <%= render "ahoy_dashboard/settings/segments/form",
+            url: settings_segments_path, method: :post, submit_label: "Create segment" %>
+    <% end %>
+  </section>
+</div>

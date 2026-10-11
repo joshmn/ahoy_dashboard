@@ -1,0 +1,14 @@
+<%= dash_frame_tag AhoyDashboard::Settings::Exclusions::PreviewsController::FRAME, rendered: true,
+      class: "fx-preview-frame", "aria-live": "polite", data: { "dash--filters-target": "preview" } do %>
+  <p class="fx-preview-text">
+    <% if form.entries.none? %>
+      Add a filter to see what this would hide.
+    <% elsif !form.usable? %>
+      Exit page and page group can't be used here, so there's nothing to count yet.
+    <% elsif count.nil? %>
+      None of these filters can be read, so this wouldn't hide anything.
+    <% else %>
+      This would hide <b><%= number_with_delimiter(count) %> <%= "visit".pluralize(count) %></b> in the last 30 days.
+    <% end %>
+  </p>
+<% end %>

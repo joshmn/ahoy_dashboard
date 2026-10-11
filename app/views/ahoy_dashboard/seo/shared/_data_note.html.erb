@@ -1,0 +1,5 @@
+<% through = seo_date(local_assigns[:last_date]) %>
+<% slice = local_assigns[:slice] %>
+<%= dash_card_footer class: "sc-data-note" do %>
+  <% if through %>Data runs through <%= through %>. <% end %><% if slice&.any? %>Showing <%= slice.label %> only. Days pulled before the dashboard stored device and country are left out.<% else %>Clicks and impressions are Google's totals for the property.<% end %> Google reports two to three days late, and query and page rows add up to less than these totals because Google leaves out rare searches.
+<% end %>

@@ -1,0 +1,15 @@
+<%# The link has to name _top: the pill is rendered inside a frame, which would
+    otherwise load the whole realtime page into the header. %>
+<%= link_to realtime_path,
+      class: "live",
+      title: "Who is here now",
+      "aria-current": ("page" if current_page?(realtime_path)),
+      data: {
+        tm_frame: "_top",
+        controller: "dash--realtime",
+        "dash--realtime-url-value": realtime_path(format: :json)
+      } do %>
+  <span class="live-dot" aria-hidden="true"></span>
+  <span class="live-num" data-dash--realtime-target="count"><%= dash_number(visitors.to_i) %></span>
+  <span class="live-lbl">live</span>
+<% end %>

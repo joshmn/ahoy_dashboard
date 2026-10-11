@@ -1,0 +1,37 @@
+<%= dash_card class: "mt-3" do %>
+  <%= dash_card_header "Where it landed" %>
+
+  <% if presenter.any_pages? %>
+    <%= dash_table label: "#{presenter.keyword} by page", cols: "minmax(0, 1fr) 80px 104px 72px 76px" do %>
+      <thead>
+        <tr>
+          <th scope="col">Page</th>
+          <th scope="col" class="num">Clicks</th>
+          <th scope="col" class="num">Impressions</th>
+          <th scope="col" class="num">CTR</th>
+          <th scope="col" class="num">Position</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% presenter.landings.each do |landing| %>
+          <tr>
+            <td>
+              <div class="t-main">
+                <%= seo_page_link(seo_url_path(landing.page)) %>
+              </div>
+            </td>
+            <td class="num"><%= landing.clicks %></td>
+            <td class="num t2"><%= landing.impressions %></td>
+            <td class="num t2"><%= landing.ctr %></td>
+            <td class="num t2"><%= landing.position %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    <% end %>
+    <%= dash_card_footer do %><%= presenter.pages_note %><% end %>
+  <% else %>
+    <%= dash_empty compact: true,
+          title: "No landing pages in this range",
+          hint: "Google holds back the most data at the page level, so a query with clicks can still have no pages here." %>
+  <% end %>
+<% end %>

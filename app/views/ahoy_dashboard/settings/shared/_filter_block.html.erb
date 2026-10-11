@@ -1,0 +1,33 @@
+<% blocks = local_assigns.fetch(:blocks, false) %>
+<% number = local_assigns[:number] %>
+<% name = number ? "Set #{number + 1}" : "New set" %>
+
+<div class="fx-block" data-dash--filters-target="block">
+  <% if blocks %>
+    <div class="fx-or" aria-hidden="true">or</div>
+  <% end %>
+
+  <section class="fx-set" aria-label="<%= blocks ? name : "Filters" %>" data-fx-set>
+    <% if blocks %>
+      <div class="fx-set__head">
+        <b data-fx-set-name><%= name %></b> matches all of these
+        <%= dash_button "Remove set", tone: :link, type: "submit", name: "#{prefix}[remove]", value: "set:#{number}",
+              formnovalidate: true, "aria-label": "Remove #{name.downcase}",
+              data: { action: "dash--filters#removeSet", fx_set_remove: "" } %>
+      </div>
+    <% end %>
+
+    <div class="fx-rows" data-dash--filters-target="blockRows">
+      <% rows.each do |row| %>
+        <%= render "ahoy_dashboard/settings/shared/filter_row", prefix: prefix, row: row, blocks: blocks %>
+      <% end %>
+    </div>
+
+    <div class="fx-add">
+      <%= dash_button "Add a filter", icon: :plus, tone: :link,
+            "aria-haspopup": "dialog",
+            "aria-label": blocks ? "Add a filter to #{name.downcase}" : "Add a filter",
+            data: { action: "dash--filters#andIn", tm_filter: "", fx_add: "" } %>
+    </div>
+  </section>
+</div>

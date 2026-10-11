@@ -1,0 +1,20 @@
+<aside class="ask-panel"
+       id="dash-ask"
+       aria-labelledby="dash-ask-title"
+       <%= "hidden" unless panel.open? %>
+       data-dash--ask-target="panel"
+       data-action="keydown->dash--ask#key">
+  <%= dash_dialog_header "Ask about this page", id: "dash-ask-title", close_action: "dash--ask#close" %>
+
+  <%= dash_frame_tag AhoyDashboard::AsksController::FRAME, rendered: panel.open? || !ask_installed? do %>
+    <% if !ask_installed? %>
+      <div class="p-3">
+        <%= render "ahoy_dashboard/shared/feature_state", state: AhoyDashboard::FeatureState.for(:assistant) %>
+      </div>
+    <% elsif panel.open? %>
+      <%= render "ahoy_dashboard/asks/panel", panel: panel %>
+    <% else %>
+      <%= dash_empty "Opening", compact: true, role: "status" %>
+    <% end %>
+  <% end %>
+</aside>

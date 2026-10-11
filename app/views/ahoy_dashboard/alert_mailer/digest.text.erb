@@ -1,0 +1,29 @@
+<%= @digest.headline %>, <%= @digest.period_heading %>
+<%= @digest.summary %>
+<% if @digest.invented? -%>
+
+<%= @digest.invented_note %>
+<% end -%>
+<% @digest.waiting_notes.each do |note| -%>
+
+<%= note %>
+<% end -%>
+<% @digest.groups.each do |group| -%>
+
+<%= group.label %>
+<% group.rows.each do |row| -%>
+
+<%= row.headline %>
+<%= row.detail %> <%= row.rule %>, <%= row.at %>.
+<% end -%>
+<% end -%>
+<% if @digest.more? -%>
+
+<%= @digest.more_label %> The rest are in the dashboard.
+<% end -%>
+
+Open alerts: <%= @links[:alerts] %>
+See rankings: <%= @links[:rankings] %>
+
+<%= @digest.footer %>
+Change or turn off rules: <%= @links[:rules] %>

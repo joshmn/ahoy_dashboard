@@ -1,0 +1,171 @@
+<% content_for :title, "Backlinks" %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "backlinks", site: @site } do %>
+  <% controls = dash_button_to("Sync now", @presenter.sync_path,
+                               reason: @presenter.sync_reason,
+                               method: :post,
+                               confirm: "Sync backlinks now? This is a paid request.") %>
+  <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false, controls: controls %>
+
+  <% if @presenter.setup_notice %>
+    <%= dash_card class: "seo-notice-card" do %>
+      <%= dash_empty compact: true, **@presenter.setup_notice %>
+    <% end %>
+  <% else %>
+    <%= dash_unavailable_notice "Sync now", @presenter.sync_reason, fix: @presenter.sync_fix %>
+  <% end %>
+
+  <% if !@presenter.any? %>
+    <% unless @presenter.setup_notice %>
+      <%= dash_card do %>
+        <%= dash_empty title: "No backlinks synced yet", hint: @presenter.empty_hint %>
+      <% end %>
+    <% end %>
+  <% else %>
+    <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "Referring domains" do %>
+        <span class="g-hint"><%= @presenter.synced_note %></span>
+      <% end %>
+      <%= render "ahoy_dashboard/seo/shared/plot", points: @presenter.series,
+            label: "Referring domains over the range", height: 110 %>
+      <%= dash_card_footer do %>Counted by domain. A site that links to you many times still counts once.<% end %>
+    <% end %>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "Sites linking to you" do %>
+        <span class="g-hint"><%= @presenter.domains_hint %></span>
+        <% if @presenter.domains.any? %>
+          <%= seo_csv(@presenter, "domains") %>
+        <% end %>
+      <% end %>
+
+      <%= dash_table label: "Sites linking to you", cols: "minmax(0, 1.6fr) 88px 68px #{"104px " if @presenter.kinds?}120px 96px" do %>
+        <thead>
+          <tr>
+            <th scope="col">Domain</th>
+            <th scope="col" class="num">Authority</th>
+            <th scope="col" class="num">Links</th>
+            <% if @presenter.kinds? %><th scope="col">Kind</th><% end %>
+            <th scope="col" class="ps-3">First seen</th>
+            <th scope="col">Follow</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @presenter.domains.each do |domain| %>
+            <tr>
+              <td><div class="t-main"><%= seo_site_link(domain.domain) %></div></td>
+              <td class="num"><%= @presenter.authority_of(domain) %></td>
+              <td class="num t2"><%= domain.links %></td>
+              <% if @presenter.kinds? %>
+                <td class="small text-body-secondary"><%= @presenter.kind_label(domain) %></td>
+              <% end %>
+              <td class="small text-body-secondary ps-3"><%= @presenter.first_seen(domain) %></td>
+              <td>
+                <% if domain.nofollow? %>
+                  <%= dash_badge "Nofollow" %>
+                <% else %>
+                  <%= dash_badge "Follow", tone: :success %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+
+      <% if @presenter.authority_known? %>
+        <%= dash_card_footer do %><%= @presenter.authority_warning %><% end %>
+      <% end %>
+    <% end %>
+
+    <div class="row g-3 mt-0">
+      <div class="col-12 col-xl-4">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "Anchor text" do %>
+            <% if @presenter.anchors.any? %>
+              <%= seo_csv(@presenter, "anchors") %>
+            <% end %>
+          <% end %>
+          <% if @presenter.anchors.any? %>
+            <%= dash_table label: "Anchor text", cols: "minmax(0, 1fr) 48px 56px", compact: true do %>
+              <thead>
+                <tr>
+                  <th scope="col">Anchor</th>
+                  <th scope="col" class="num">Sites</th>
+                  <th scope="col" class="num">Links</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @presenter.anchors.each do |anchor| %>
+                  <tr>
+                    <td><div class="t-main"><%= seo_label(anchor.text) %></div></td>
+                    <td class="num t2"><%= @presenter.number(anchor.domains) %></td>
+                    <td class="num"><%= @presenter.number(anchor.links) %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            <% end %>
+          <% else %>
+            <%= dash_empty compact: true, title: "No anchor text",
+                  hint: "The provider did not return anchor text." %>
+          <% end %>
+        <% end %>
+      </div>
+
+      <div class="col-12 col-xl-4">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "New and lost" do %>
+            <span class="g-hint"><%= @presenter.changes_hint %></span>
+            <% if @presenter.gained.any? || @presenter.lost.any? %>
+              <%= seo_csv(@presenter, "changes") %>
+            <% end %>
+          <% end %>
+          <% if @presenter.gained.any? || @presenter.lost.any? %>
+            <div class="p-list">
+              <% @presenter.gained.each do |domain| %>
+                <div class="data-row">
+                  <div class="rn mono"><%= seo_site_link(domain.domain) %></div>
+                  <%= dash_badge "New", tone: :success %>
+                </div>
+              <% end %>
+              <% @presenter.lost.each do |domain| %>
+                <div class="data-row">
+                  <div class="rn mono"><%= seo_site_link(domain.domain) %></div>
+                  <%= dash_badge "Lost", tone: :danger %>
+                </div>
+              <% end %>
+            </div>
+          <% else %>
+            <%= dash_empty compact: true, title: "No changes",
+                  hint: "No site started or stopped linking to you in this range." %>
+          <% end %>
+        <% end %>
+      </div>
+
+      <div class="col-12 col-xl-4">
+        <%= dash_card class: "h-100" do %>
+          <%= dash_card_header "Nofollow only" do %>
+            <span class="g-hint"><%= @presenter.nofollow_hint %></span>
+            <% if @presenter.nofollow.any? %>
+              <%= seo_csv(@presenter, "nofollow") %>
+            <% end %>
+          <% end %>
+          <% if @presenter.nofollow.any? %>
+            <div class="p-list">
+              <% @presenter.nofollow.each do |domain| %>
+                <div class="data-row">
+                  <div class="rn mono"><%= seo_site_link(domain.domain) %></div>
+                  <span class="g-num t2"><%= @presenter.authority_of(domain) %></span>
+                </div>
+              <% end %>
+            </div>
+          <% else %>
+            <%= dash_empty compact: true, title: "All followed",
+                  hint: "Every site linking to you passes authority." %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% end %>

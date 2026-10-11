@@ -1,0 +1,67 @@
+<%# A form's filters, built the way the dashboard's are: the same filter dialog
+    over the same values, collected into compact rows, and on an exclusion into
+    sets.
+
+    It was three selects in a row before, which asked somebody to know a
+    dimension's name and spell one of its values from memory. A row's values are
+    one text box, one per line, so a list can be pasted in whole and the form
+    still works from a keyboard and with the JavaScript off. %>
+<% preview_url = local_assigns[:preview_url] %>
+<% blocks = source.blocks? %>
+<% sets = source.filter_blocks %>
+<% sets = [ [] ] if sets.empty? %>
+<% lede_id = "#{prefix}_filters_lede" %>
+<% described = [ (lede_id if blocks), ("#{prefix}_filters_error" if errors.any?) ].compact.join(" ").presence %>
+<% blank = ->(dimension, number) { AhoyDashboard::FilterEntries::Row.new(key: "__key#{number}__", dimension: dimension, operator: "is", values: [], members: []) } %>
+
+<%= form.fieldset :filters, label: "Filters",
+      data: { controller: "dash--filters",
+              action: "dash--filter-modal:apply->dash--filters#collect",
+              "dash--filters-prefix-value": prefix,
+              "dash--filters-blocks-value": blocks,
+              "dash--filters-preview-url-value": preview_url }.compact do %>
+  <div class="fx" data-dash--filters-target="rows" <% if described %>aria-describedby="<%= described %>"<% end %>>
+    <% if blocks %>
+      <p class="fx-lede" id="<%= lede_id %>">A visit is hidden when it matches every filter in any one set.</p>
+    <% end %>
+
+    <% sets.each_with_index do |set, number| %>
+      <%= render "ahoy_dashboard/settings/shared/filter_block",
+            prefix: prefix, rows: set, number: number, blocks: blocks %>
+    <% end %>
+  </div>
+
+  <% if blocks %>
+    <%= dash_button "Add another set", icon: :plus, id: "#{prefix}-filter-button", class: "fx-new-set",
+          "aria-haspopup": "dialog", data: { action: "dash--filters#newSet", tm_filter: "" } %>
+  <% end %>
+
+<%# The templates the controller stamps out for a row or a set added after the
+    page loaded. Server-rendered so a new row and an old one cannot drift, and
+    inert until they are cloned. %>
+  <% AhoyDashboard::Dimension.filterable.each_with_index do |dimension, number| %>
+    <template data-dash--filters-target="rowTemplate" data-dimension="<%= dimension.key %>">
+      <%= render "ahoy_dashboard/settings/shared/filter_row",
+            prefix: prefix, row: blank.call(dimension.key, number), blocks: blocks %>
+    </template>
+  <% end %>
+  <template data-dash--filters-target="rowTemplate" data-dimension="">
+    <%= render "ahoy_dashboard/settings/shared/filter_row",
+          prefix: prefix, row: blank.call("__dimension__", nil), label: "__label__", lower: "__lower__",
+          blocks: blocks %>
+  </template>
+  <template data-dash--filters-target="blockTemplate">
+    <%= render "ahoy_dashboard/settings/shared/filter_block",
+          prefix: prefix, rows: [], number: nil, blocks: blocks %>
+  </template>
+
+  <%= render "ahoy_dashboard/shared/filter_modal", collect: true %>
+
+  <% if preview_url %>
+    <div class="fx-foot">
+      <%= render "ahoy_dashboard/settings/exclusions/preview", form: source, count: local_assigns[:preview] %>
+      <%= dash_button "Check what this hides", type: "submit", formaction: preview_url, formmethod: "get",
+            formnovalidate: true, data: { action: "dash--filters#preview" } %>
+    </div>
+  <% end %>
+<% end %>

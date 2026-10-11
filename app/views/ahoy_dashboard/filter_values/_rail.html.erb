@@ -1,0 +1,28 @@
+<%# The left side of the filter dialog: saved segments first, then every
+    dimension under its own group's heading. Each dimension is a real link to
+    its values, which the dialog intercepts to scope the box instead. %>
+<% destination = local_assigns[:destination] %>
+<% carried = local_assigns.fetch(:carried, {}) %>
+<% collect = local_assigns.fetch(:collect, false) %>
+<% base = local_assigns.fetch(:base) %>
+<% current = local_assigns[:current] %>
+
+<% unless collect %>
+  <%= render "ahoy_dashboard/dashboards/filter_segments", destination: destination, carried: carried %>
+<% end %>
+
+<% dash_grouped_dimensions.each_with_index do |(group, candidates), index| %>
+  <% heading = "tm-filter-rail-#{index}" %>
+  <section class="mb-3" aria-labelledby="<%= heading %>">
+    <h3 class="fm-rail__heading small fw-semibold text-uppercase text-body-tertiary px-2 mb-1" id="<%= heading %>"><%= group %></h3>
+    <%= dash_nav_list do %>
+      <% candidates.each do |candidate| %>
+        <%= dash_nav_item candidate.filter_label, filter_values_path(base.merge(dimension: candidate.key)),
+              icon: dash_dimension_icon(candidate), class: "fm-rail__link",
+              current: ("page" if candidate.key == current),
+              count: dash_badge("", tone: :kind, pill: true, data: { fm_count: "" }, hidden: true),
+              data: { action: "dash--filter-modal#scopeTo", dimension: candidate.key, label: candidate.filter_label } %>
+      <% end %>
+    <% end %>
+  </section>
+<% end %>

@@ -1,0 +1,56 @@
+<% stacks = seo_stacks(spend.days, keys: AhoyDashboard::Serp::SpendPresenter::BAND_KEYS) %>
+
+<%= dash_card element: :section, class: "mb-3 spend", "aria-labelledby": "tm-spend-title" do %>
+  <%= dash_card_header "This month's spend", id: "tm-spend-title" do %>
+    <span class="g-hint"><%= spend.label %></span>
+  <% end %>
+
+  <div class="spend__head">
+    <p class="spend__used"><%= spend.used_line %></p>
+
+    <% if spend.capped? %>
+      <%= dash_meter spend.share, label: spend.meter_label, tone: spend.warning? ? :warning : :neutral %>
+    <% end %>
+
+    <p class="spend__note"><%= spend.forecast_line %></p>
+
+    <% if spend.warning? %>
+      <%= dash_notice spend.warning_title, detail: spend.warning_detail, tone: :warning, class: "mb-0",
+            action: dash_button("Search provider", settings_serp_providers_path, data: { tm_frame: "_top" }) %>
+    <% end %>
+  </div>
+
+  <% if stacks.any? %>
+    <div class="seo-dist__plot">
+      <svg viewBox="0 0 <%= AhoyDashboard::SeoHelper::PLOT_WIDTH %> <%= AhoyDashboard::SeoHelper::PLOT_HEIGHT %>"
+           preserveAspectRatio="none" role="img" aria-label="<%= spend.chart_label %>">
+        <% stacks.each do |stack| %>
+          <g>
+            <title><%= spend.day_title(stack[:day]) %></title>
+            <% stack[:segments].each do |segment| %>
+              <rect class="seo-dist__seg spend-band--<%= segment[:key] %>" x="<%= stack[:x] %>" y="<%= segment[:y] %>"
+                    width="<%= stack[:width] %>" height="<%= segment[:height] %>"></rect>
+            <% end %>
+          </g>
+        <% end %>
+      </svg>
+      <div class="seo-plot__dates">
+        <% spend.dates.each do |label| %><span><%= label %></span><% end %>
+      </div>
+    </div>
+
+    <ul class="spend__legend" aria-label="What the units went on">
+      <% spend.legend.each do |item| %>
+        <li class="spend__item spend-band--<%= item[:key] %>">
+          <span class="spend__swatch" aria-hidden="true"></span>
+          <span class="spend__label"><%= item[:label] %></span>
+          <span class="spend__n"><%= spend.number(item[:units]) %></span>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <%= dash_card_footer do %>
+    <%= spend.footer %>
+  <% end %>
+<% end %>

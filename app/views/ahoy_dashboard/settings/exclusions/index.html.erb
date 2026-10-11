@@ -1,0 +1,78 @@
+<% content_for :title, "Excluded traffic" %>
+<% content_for :dash_settings_section, "exclusions" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Excluded traffic",
+          lede: "Visits that match any of these are left out of every number on the dashboard, the emails and the alerts. " \
+                "There's a switch on the dashboard to show them again when you want to look.",
+          actions: capture {
+            dash_button "New exclusion", new_settings_exclusion_path, tone: :primary, icon: :plus
+          } %>
+
+    <%= dash_card do %>
+      <% if @exclusions.any? %>
+        <%= dash_card_header "#{@exclusions.size} #{"exclusion".pluralize(@exclusions.size)}" %>
+
+        <%= dash_table label: "Exclusions", cols: "minmax(0, .8fr) minmax(0, 1.5fr) 150px 96px 92px" do %>
+          <thead>
+            <tr>
+              <th scope="col">Exclusion</th>
+              <th scope="col">Rule</th>
+              <th scope="col">Hid</th>
+              <th scope="col">State</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @exclusions.each_with_index do |exclusion, index| %>
+              <% if @confirming == exclusion.id.to_s %>
+                <% message = capture do %>Delete <b><%= exclusion.name %></b>? The visits it hides will count again.<% end %>
+                <%= dash_table_confirm message, span: 5, cancel: settings_exclusions_path do %>
+                  <%= dash_button_to "Delete", settings_exclusion_path(exclusion), method: :delete, tone: :danger %>
+                <% end %>
+              <% else %>
+                <tr>
+                  <td>
+                    <span class="t-main">
+                      <%= dash_icon(:filter, size: 13, class_name: "gi") %>
+                      <b><%= exclusion.name %></b>
+                    </span>
+                  </td>
+
+                  <td class="t-when"><%= exclusion.rule %></td>
+
+                  <td class="t-when"><%= exclusion.readable? ? exclusion.count_label : "Nothing counted" %></td>
+
+                  <td>
+                    <% if exclusion.readable? %>
+                      <%= dash_button_to exclusion.state_label, settings_exclusion_state_path(exclusion),
+                            method: :patch, params: { enabled: exclusion.enabled ? "0" : "1" },
+                            tone: exclusion.enabled ? :primary : :secondary,
+                            "aria-label": exclusion.switch_label, title: exclusion.switch_label %>
+                    <% else %>
+                      <%= dash_badge exclusion.state_label, tone: :danger %>
+                    <% end %>
+                  </td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button :gear, label: "Edit #{exclusion.name}",
+                          url: edit_settings_exclusion_path(exclusion), title: "Edit" %>
+                    <%= dash_icon_button :close, label: "Delete #{exclusion.name}",
+                          url: settings_exclusions_path(confirm: exclusion.id), tone: :danger, title: "Delete" %>
+                  </td>
+                </tr>
+              <% end %>
+            <% end %>
+          </tbody>
+        <% end %>
+      <% else %>
+        <%= dash_empty title: "Nothing is excluded yet",
+              hint: "An exclusion hides traffic you don't want counted, like bots coming from a data center. " \
+                    "The quickest way to make one is from the dashboard: filter down to the traffic, say a network " \
+                    "or an IP address, then open Filter and pick \"Hide traffic like this...\".",
+              action: { label: "New exclusion", url: new_settings_exclusion_path } %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

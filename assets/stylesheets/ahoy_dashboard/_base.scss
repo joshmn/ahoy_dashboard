@@ -1,0 +1,195 @@
+// Reset, page furniture and the typographic rules that are not any one
+// component's business.
+
+// A custom element is inline until told otherwise, and every frame here wraps a
+// block. On the card grid the frame itself carries .col and its card carries
+// h-100, so the frame is the grid item rather than something inside it.
+tm-frame {
+  display: block;
+}
+
+// The design builds every row, tab, chip and pill as a <button>, and its reset
+// gives a button `color: inherit`. This port builds them as links, because they
+// are real navigations that have to survive the JavaScript being off, so links
+// need the same reset. Without it Bootstrap's $link-color tints every row on
+// every card, and none of the design's colours land.
+//
+// The handful of links that are meant to read as links say so themselves:
+// .txt-btn, .jc and the prose links below all set their own colour.
+a,
+a:hover,
+a:focus {
+  color: inherit;
+  text-decoration: none;
+}
+
+html,
+body {
+  background: var(--bg);
+}
+
+html {
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+body {
+  font-feature-settings: "cv01", "cv03", "cv04";
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  min-height: 100vh;
+}
+
+// The palette holds the page open while a dialog is up.
+body.tm-lock {
+  overflow: hidden;
+}
+
+::selection {
+  background: rgba(94, 106, 210, 0.38);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  border: 3px solid var(--bg);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(94, 106, 210, 0.65);
+  outline-offset: 2px;
+}
+
+kbd {
+  font: 500 $font-size-xs/1 var(--mono);
+  color: var(--t3);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 2.5px 5px;
+}
+
+svg text {
+  font-family: var(--font);
+}
+
+// .form-text is a paragraph, so it carries a paragraph's bottom margin and the
+// hint floats away from the control it belongs to.
+.form-text {
+  margin-bottom: 0.25rem;
+}
+
+.tm-eyebrow,
+.dropdown-header,
+.table > thead th {
+  color: var(--bs-secondary-color);
+  font-weight: 600;
+  font-size: $font-size-xs;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+// A URL is arbitrarily long and the numbers beside it are not, so the label
+// column takes what is left rather than pushing them off the card.
+.tm-cell-wide {
+  max-width: 0;
+  width: 100%;
+}
+
+// ---------- dense scroll ----------
+.tm-scroll {
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.tm-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.tm-scroll::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: var(--bs-border-color);
+}
+
+.tm-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--bs-secondary-color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001s !important;
+    transition-duration: 0.001s !important;
+  }
+}
+
+h1, h2, h3, h4, h5,
+.h1, .h2, .h3, .h4, .h5 {
+  letter-spacing: -0.01em;
+}
+
+// Bootstrap gives every heading a bottom margin and the design's own reset zeroed
+// it. In a header row that centres what is in it, that margin lifts the title
+// half its height above the tabs sitting beside it.
+.pq-hd h2,
+.sec-hd h1 {
+  margin: 0;
+}
+
+// The design's text buttons hold text and nothing else. Ours hold an icon beside
+// the text, and an icon here is a block level <svg>, so each one broke its own
+// line and dropped the glyph underneath the words: the pager, the way into
+// Explore and the CSV link in every dialog foot.
+a.txt-btn,
+button.txt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+// Anything that is not the dashboard needs air under the sticky header. The
+// dashboard has none on purpose: its toolbar is a second bar and butts up
+// against the first.
+.tm-page {
+  padding-top: 24px;
+}
+
+// ---------- long values ----------
+// A path is long in the middle and different at the end. Ellipsised from the
+// right, five facility guides in a row read as the same truncated string, and
+// the .md and .txt mirrors of a page are indistinguishable from the page. Split
+// in two the head takes what room there is and the tail always shows, so the
+// part that says which row this is survives.
+.nm--split {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.nm--split .nm__head {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.nm--split .nm__tail {
+  flex: none;
+  white-space: nowrap;
+}

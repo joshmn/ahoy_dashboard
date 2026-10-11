@@ -1,0 +1,21 @@
+<% picks = local_assigns[:picks].presence || AhoyDashboard::ChatDecorator::PICKS %>
+
+<div class="chat-blank">
+  <span class="chat-blank__mark" aria-hidden="true"><%= dash_icon(:chat, size: 16) %></span>
+  <p class="chat-blank__title"><%= local_assigns.fetch(:title, "Ask a question about your data") %></p>
+  <p class="chat-blank__hint">
+    <%= local_assigns.fetch(:hint, "Pick one of these, or type your own.") %>
+  </p>
+
+  <% available = AhoyDashboard::Assistant.available? %>
+  <div class="chat-blank__picks">
+    <% picks.each do |question| %>
+      <button type="button" class="chat-pick"
+              <%= "disabled" unless available %>
+              data-action="dash--chat-ask#suggest"
+              data-dash--chat-ask-question-param="<%= question %>">
+        <%= question %>
+      </button>
+    <% end %>
+  </div>
+</div>

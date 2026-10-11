@@ -1,0 +1,49 @@
+<%# The picker, drawn as the command menu.
+
+    One of these per form, rendered once beside the fields rather than once per
+    field, because it is a dialog and the field that opened it is whichever one
+    was clicked. The controller sits on this element and binds its own document
+    listener for the openers, the same way the filter dialog does, so a field
+    anywhere on the page can reach it without being inside it.
+
+    scope decides which facets are on offer: a segment's value can be any
+    filterable dimension, a goal's can be an event name, a page path or a
+    property key. %>
+<% scope = local_assigns.fetch(:scope, AhoyDashboard::PickerFacet::FILTER) %>
+
+<div class="cmdk"
+     id="tm-picker"
+     hidden
+     data-controller="dash--picker"
+     data-dash--picker-url-value="<%= picker_path(scope: scope) %>"
+     data-dash--picker-target="panel">
+  <div class="cmdk-bg" data-action="click->dash--picker#close"></div>
+
+  <div class="cmdk-panel" role="dialog" aria-modal="true" aria-labelledby="tm-picker-title">
+    <div class="cmdk-in">
+      <%= dash_icon(:search, size: 15) %>
+      <label class="visually-hidden" for="tm-picker-input" id="tm-picker-title">
+        Search values to fill in this field
+      </label>
+      <input type="text"
+             id="tm-picker-input"
+             placeholder="Pick a facet&hellip;"
+             autocomplete="off"
+             spellcheck="false"
+             data-dash--picker-target="input"
+             data-action="input->dash--picker#search">
+      <kbd>esc</kbd>
+    </div>
+
+    <div class="cmdk-list" role="listbox" data-dash--picker-target="list">
+      <%= render "ahoy_dashboard/pickers/panel",
+            scope: scope, facet: nil, options: [], term: "" %>
+    </div>
+
+    <div class="cmdk-ft">
+      <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> navigate</span>
+      <span><kbd>&crarr;</kbd> select</span>
+      <span data-dash--picker-target="back" hidden><kbd>&larr;</kbd> back</span>
+    </div>
+  </div>
+</div>

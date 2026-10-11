@@ -1,0 +1,129 @@
+<% content_for :title, "Alerts" %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "alerts", site: @site } do %>
+  <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false,
+        controls: dash_button_to("Check now", @presenter.run_path, reason: @presenter.run_reason, method: :post) %>
+
+  <% if (notice = @presenter.notice) %>
+    <%= dash_card class: "seo-notice-card" do %>
+      <%= dash_empty compact: true, **notice %>
+    <% end %>
+  <% end %>
+
+  <% if (sample = @presenter.sample_notice) %>
+    <%= dash_notice sample[:title], tone: :warning, class: "mb-3", id: "tm-alerts-sample",
+          detail: sample[:detail],
+          action: dash_button("Choose provider", @presenter.providers_path, data: { tm_frame: "_top" }) %>
+  <% end %>
+
+  <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
+
+  <%= dash_card class: "mt-3" do %>
+    <%= dash_card_header "Recent alerts" do %>
+      <span class="g-hint">Newest first</span>
+      <% if @presenter.events.any? %>
+        <%= seo_csv(@presenter, "recent") %>
+      <% end %>
+    <% end %>
+
+    <% if @presenter.events.any? %>
+      <% sent = @presenter.deliverable? %>
+      <%= dash_table label: "Recent alerts", cols: "120px 92px minmax(0, 1.4fr) minmax(0, 1.5fr) minmax(0, 0.8fr)#{" 88px" if sent}" do %>
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">Severity</th>
+            <th scope="col">What happened</th>
+            <th scope="col">Detail</th>
+            <th scope="col">Rule</th>
+            <% if sent %>
+              <th scope="col">Sent</th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody>
+          <% @presenter.events.each do |event| %>
+            <tr>
+              <td class="small text-body-secondary"><%= @presenter.when_label(event.fired_at) %></td>
+              <td><%= dash_badge event.severity.capitalize, tone: @presenter.severity_tone(event.severity.to_sym) %></td>
+              <td>
+                <div class="t-main"><%= seo_label(event.headline) %></div>
+                <% if @presenter.sample_data?(event) %>
+                  <%= dash_badge "Sample", tone: :warning, title: "Came from sample data, so it is made up" %>
+                <% end %>
+              </td>
+              <td class="text-body-secondary"><%= event.detail %></td>
+              <td class="small text-body-secondary"><%= seo_label(event.rule.name) %></td>
+              <% if sent %>
+                <td>
+                  <% if event.delivered? %>
+                    <%= dash_badge "Sent", tone: :success %>
+                  <% elsif event.delivery_error.present? %>
+                    <%= dash_badge "Failed", tone: :danger, title: event.delivery_error %>
+                  <% else %>
+                    <%= dash_badge "Not sent" %>
+                  <% end %>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+
+      <% if @presenter.paged? %>
+        <%= dash_pager @presenter.page_label, label: "Pages of alerts",
+              previous: @presenter.previous_page_path, following: @presenter.next_page_path %>
+      <% end %>
+
+      <%= dash_card_footer do %><%= @presenter.subject_note %><% end %>
+    <% else %>
+      <%= dash_empty compact: true, title: "No alerts in this range",
+            hint: @presenter.enabled? && @presenter.rules.any?(&:enabled) ? "Nothing crossed a rule's threshold." : "Alerts show here once a rule is on and something crosses its threshold." %>
+    <% end %>
+  <% end %>
+
+  <% live = @presenter.rules.select(&:enabled) %>
+  <%= dash_card class: "mt-3" do %>
+    <%= dash_card_header "Rules that are on" do %>
+      <span class="g-hint"><%= live.size %> of <%= @presenter.rules.size %></span>
+      <%= seo_csv(@presenter, "rules") if live.any? %>
+      <%= dash_button "Manage rules", @presenter.rules_path, tone: :link, data: { tm_frame: "_top" } %>
+    <% end %>
+
+    <% if live.any? %>
+      <%= dash_table label: "Rules that are on", cols: "minmax(0, 1fr) minmax(0, 1.6fr) 64px 120px" do %>
+        <thead>
+          <tr>
+            <th scope="col">Rule</th>
+            <th scope="col">Fires when</th>
+            <th scope="col" class="num">Fired</th>
+            <th scope="col" class="ps-3">Last fired</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% live.each do |rule| %>
+            <tr>
+              <td>
+                <div class="t-main">
+                  <%= link_to @presenter.edit_rule_path(rule), class: "seo-link min-w-0", data: { tm_frame: "_top" } do %>
+                    <%= seo_label(rule.name) %>
+                  <% end %>
+                </div>
+              </td>
+              <td class="text-body-secondary"><%= @presenter.condition_for(rule) %></td>
+              <td class="num t2"><%= rule.fired_count %></td>
+              <td class="small text-body-secondary ps-3"><%= @presenter.when_label(rule.last_fired_at) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+    <% elsif @presenter.rules.any? %>
+      <%= dash_empty compact: true, title: "No rules are on",
+            hint: "Every rule starts off. Turn on the ones you want and set their thresholds.",
+            action: ({ label: "Turn one on", url: @presenter.rules_path, data: { tm_frame: "_top" } } unless notice) %>
+    <% else %>
+      <%= dash_empty compact: true, title: "No rules yet",
+            action: ({ label: "Set up rules", url: @presenter.rules_path, data: { tm_frame: "_top" } } unless notice) %>
+    <% end %>
+  <% end %>
+<% end %>

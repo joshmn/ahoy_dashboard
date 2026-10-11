@@ -1,0 +1,68 @@
+<h1 class="visually-hidden">Analytics for <%= AhoyDashboard.host || request.host %></h1>
+<%= render "ahoy_dashboard/dashboards/bar", deferred: true %>
+
+<noscript>
+  <p><%= link_to "Load the complete dashboard", root_path(query.to_query.merge(loading: "complete")) %></p>
+</noscript>
+
+<%= dash_frame_tag "dash_summary", src: dashboard_summary_path(query.to_query), data: { tm_priority: "high" } do %>
+  <%= render "ahoy_dashboard/dashboards/skeleton", title: "traffic over time", modifier: "dash-panel-skeleton--summary" %>
+<% end %>
+
+<% if @presenter.pinned? %>
+  <%= dash_frame_tag AhoyDashboard::PinnedQuestionsController::FRAME, src: pinned_questions_path(query.to_query),
+        loading: "lazy", data: { tm_after: "dash_summary" } do %>
+    <%= render "ahoy_dashboard/dashboards/skeleton", title: "pinned questions", modifier: "dash-panel-skeleton--compact" %>
+  <% end %>
+<% end %>
+
+<section class="grid row" id="panels" aria-label="Reports">
+  <% @presenter.grid_reports.each do |report| %>
+    <div class="col-6 panel-col">
+      <%= dash_frame_tag "report_#{report.key}", src: report_path(report.key, query.to_query),
+            loading: "lazy", data: { tm_after: "dash_summary" } do %>
+        <%= render "ahoy_dashboard/dashboards/skeleton", title: report.title, modifier: "dash-panel-skeleton--report" %>
+      <% end %>
+    </div>
+  <% end %>
+  <div class="col-6 panel-col">
+    <%= dash_frame_tag AhoyDashboard::SearchConsolePresenter::FRAME, src: search_console_path(query.to_query),
+          loading: "lazy", data: { tm_after: "dash_summary" } do %>
+      <%= render "ahoy_dashboard/dashboards/skeleton", title: AhoyDashboard::SearchConsolePresenter::TITLE %>
+    <% end %>
+  </div>
+  <% @presenter.funnels.each do |funnel| %>
+    <div class="col-6 panel-col">
+      <%= dash_frame_tag AhoyDashboard::FunnelPresenter.frame_id(funnel), src: funnel_path(funnel, query.to_query),
+            loading: "lazy", data: { tm_after: "dash_summary" } do %>
+        <%= render "ahoy_dashboard/dashboards/skeleton", title: funnel.name %>
+      <% end %>
+    </div>
+  <% end %>
+</section>
+
+<% if @presenter.more_funnels? %>
+  <div class="d-flex align-items-center justify-content-between mb-3" aria-label="More funnels">
+    <span class="text-body-secondary">Showing <%= @presenter.funnels.length %> of <%= @presenter.funnel_count %> funnels</span>
+    <%= dash_button "View all funnels", funnels_path(query.to_query), tone: :link %>
+  </div>
+<% end %>
+
+<%= dash_frame_tag "dash_journey", src: journey_path(query.to_query), loading: "lazy", data: { tm_after: "dash_summary" } do %>
+  <%= render "ahoy_dashboard/dashboards/skeleton", title: "page journey" %>
+<% end %>
+<%= dash_frame_tag AhoyDashboard::GoalConversionsPresenter::FRAME, src: goal_conversions_path(query.to_query),
+      loading: "lazy", data: { tm_after: "dash_summary" } do %>
+  <%= render "ahoy_dashboard/dashboards/skeleton", title: "goal conversions" %>
+<% end %>
+
+<div>
+  <%= render partial: "ahoy_dashboard/dashboards/report_dialog", collection: @presenter.grid_reports, as: :report %>
+  <% search_title = AhoyDashboard::SearchConsolePresenter::TITLE %>
+  <%= dash_dialog key: "search_console", title: search_title, close_label: "Close the #{search_title.downcase} details" do %>
+    <%= dash_frame_tag AhoyDashboard::SearchConsolePresenter::DETAILS_FRAME do %>
+      <%= dash_empty "Loading the full list", compact: true, role: "status" %>
+    <% end %>
+  <% end %>
+  <%= render partial: "ahoy_dashboard/funnels/modal", collection: @presenter.funnels, as: :funnel %>
+</div>

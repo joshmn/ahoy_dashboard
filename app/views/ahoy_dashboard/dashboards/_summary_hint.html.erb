@@ -1,0 +1,12 @@
+<% if @presenter.computed_at || query.hidden_visits.positive? %>
+  <div class="d-flex align-items-center flex-wrap gap-2 mb-2 small text-body-secondary">
+    <% if @presenter.computed_at %>
+      <span id="dash-snapshot-freshness">Snapshot updated <%= time_tag(@presenter.computed_at, @presenter.computed_at_label) %></span>
+    <% end %>
+    <% if query.hidden_visits.positive? %>
+      <span><%= pluralize(query.hidden_visits, "visit") %> hidden</span>
+      <%= dash_button "Show them", root_path(query.internal_toggle_params), tone: :link, data: { tm_frame: "_top" } %>
+      <%= dash_button "Manage", settings_exclusions_path, tone: :link, "aria-label": "Manage exclusions", data: { tm_frame: "_top" } %>
+    <% end %>
+  </div>
+<% end %>

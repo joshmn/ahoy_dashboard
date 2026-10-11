@@ -1,0 +1,95 @@
+<% content_for :title, "Funnels" %>
+<% content_for :dash_settings_section, "funnels" %>
+
+<% ready = goals.size >= AhoyDashboard::Funnel::MINIMUM_STEPS %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Funnels",
+          lede: "Goals in order, and how many people make it through each step. The dashboard previews the first four; all are available from View all funnels.",
+          actions: safe_join([
+            dash_button("View all funnels", funnels_path(query.to_query), tone: :link),
+            (if ready
+              dash_button("New funnel", new_settings_funnel_path, tone: :primary, icon: :plus)
+            else
+              dash_button("Add a goal first", settings_goals_path, tone: :primary)
+            end)
+          ]) %>
+
+    <%= dash_card do %>
+      <% if @funnels.any? %>
+        <%= dash_card_header "#{@funnels.size} #{"funnel".pluralize(@funnels.size)}" %>
+
+        <%= dash_table label: "Funnels", cols: "minmax(0, .8fr) minmax(0, 1.6fr) 74px 56px 64px" do %>
+          <thead>
+            <tr>
+              <th scope="col">Funnel</th>
+              <th scope="col">Steps</th>
+              <th scope="col" class="num">Length</th>
+              <th scope="col"><span class="visually-hidden">Order</span></th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @funnels.each_with_index do |funnel, index| %>
+              <% if @confirming == funnel.id.to_s %>
+                <% message = capture do %>Delete <b><%= funnel.name %></b>? The goals stay.<% end %>
+                <%= dash_table_confirm message, span: 5, cancel: settings_funnels_path do %>
+                  <%= dash_button_to "Delete", settings_funnel_path(funnel), method: :delete, tone: :danger %>
+                <% end %>
+              <% else %>
+                <tr>
+                  <td>
+                    <span class="t-main">
+                      <%= dash_icon(:filter, size: 13, class_name: "gi") %>
+                      <b><%= funnel.name %></b>
+                    </span>
+                  </td>
+
+                  <td>
+                    <span class="mchips">
+                      <% funnel.step_names.each_with_index do |name, step| %>
+                        <span class="mchip">
+                          <span class="mis"><%= step + 1 %></span>
+                          <span class="mv"><%= name %></span>
+                        </span>
+                      <% end %>
+                    </span>
+                  </td>
+
+                  <td class="num t2"><%= funnel.funnel_steps.size %></td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button_to :chevron_up, settings_funnel_path(funnel),
+                          label: "Move #{funnel.name} up the list",
+                          method: :patch, params: { funnel: { nudge: "up" } },
+                          disabled: index.zero? %>
+                    <%= dash_icon_button_to :chevron_down, settings_funnel_path(funnel),
+                          label: "Move #{funnel.name} down the list",
+                          method: :patch, params: { funnel: { nudge: "down" } },
+                          disabled: index == @funnels.size - 1 %>
+                  </td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button :gear, label: "Edit #{funnel.name}",
+                          url: edit_settings_funnel_path(funnel), title: "Edit" %>
+                    <%= dash_icon_button :close, label: "Delete #{funnel.name}",
+                          url: settings_funnels_path(confirm: funnel.id), tone: :danger, title: "Delete" %>
+                  </td>
+                </tr>
+              <% end %>
+            <% end %>
+          </tbody>
+        <% end %>
+      <% elsif ready %>
+        <%= dash_empty title: "No funnels yet",
+              hint: "Put two or more goals in order to see where people drop off.",
+              action: { label: "New funnel", url: new_settings_funnel_path } %>
+      <% else %>
+        <%= dash_empty title: "No funnels yet",
+              hint: "A funnel needs at least two goals.",
+              action: { label: "Add a goal first", url: settings_goals_path } %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

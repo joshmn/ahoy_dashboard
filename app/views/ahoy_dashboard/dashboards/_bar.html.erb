@@ -1,0 +1,80 @@
+<%# The date range goes up into the header, where the mock puts it, because it
+    says which slice of time the whole screen is describing rather than narrowing
+    what is in it. Everything that narrows stays down here on the bar. %>
+<% content_for :dash_header_controls do %>
+  <%= dash_link_menu(id: "tm-period",
+        icon: :cal,
+        label: query.period_label,
+        section: "Date range",
+        items: AhoyDashboard::Period::ALL.map { |period|
+          params = query.to_query.merge(period: period.key).except(:from, :to)
+          params = params.merge(from: query.range_from_field, to: query.range_to_field) if period.custom?
+
+          {
+            label: period.label,
+            url: root_path(params),
+            active: period.key == query.period.key
+          }
+        }) %>
+<% end %>
+
+<div class="toolbar">
+  <div class="container-xxl tb-in px-0">
+<%# The modal controller sits out here rather than on the menu, because a chip is
+    an opener too: clicking one reopens the form that made it. %>
+  <div class="d-flex flex-wrap align-items-center gap-1">
+    <%= render "ahoy_dashboard/dashboards/filter_menu" %>
+
+    <div class="chips">
+      <% remove_path = ->(index) { root_path(query.with(filters: query.filters.without(index).to_param).to_query) } %>
+      <% query.filters.groups.zip(query.filters.group_starts).each do |group, start| %>
+        <%= render "ahoy_dashboard/shared/filter_group", group: group, start: start, remove_path: remove_path %>
+      <% end %>
+
+      <% if query.defaulted? %>
+        <span class="d-inline-flex align-items-center gap-2 small text-body-secondary">
+          <span>Default filters</span>
+          <span class="vr"></span>
+          <%= link_to "Show everything", root_path(query.default_clear_params),
+                class: "link-secondary text-decoration-underline" %>
+        </span>
+      <% end %>
+    </div>
+  </div>
+
+  <% if !local_assigns[:deferred] && @presenter.computed_at %>
+    <span class="tb-hint" id="dash-snapshot-freshness">
+      Snapshot updated <%= time_tag(@presenter.computed_at, @presenter.computed_at_label) %>
+    </span>
+  <% end %>
+
+<%# Says what a row does, and only until a chip is on the bar saying it already
+    happened. %>
+  <div class="d-flex align-items-center gap-2 ms-auto">
+    <% if !local_assigns[:deferred] && query.hidden_visits.positive? %>
+      <span class="tb-hint"><%= pluralize(query.hidden_visits, "visit") %> hidden</span>
+      <%= dash_button "Show them", root_path(query.internal_toggle_params), tone: :link %>
+      <%= dash_button "Manage", settings_exclusions_path, tone: :link,
+            "aria-label": "Manage exclusions" %>
+    <% end %>
+
+    <% if query.filters.none? %>
+      <span class="tb-hint">Click any row to drill down</span>
+    <% else %>
+      <%= dash_button "Clear filters", root_path(query.with(filters: nil).to_query), tone: :link %>
+    <% end %>
+
+    <% if remembered_view? %>
+      <%= dash_button_to "Reset view", view_path, method: :delete, tone: :link,
+            title: "Showing your last view. Reset to the last 30 days with no filters." %>
+    <% end %>
+  </div>
+
+  </div>
+</div>
+
+<% if query.period.custom? %>
+  <%= render "ahoy_dashboard/shared/range_fields",
+        url: root_path,
+        clear_path: root_path(query.with(period: AhoyDashboard::Period::DEFAULT_KEY).to_query) %>
+<% end %>

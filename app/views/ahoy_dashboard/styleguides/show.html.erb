@@ -1,0 +1,193 @@
+<% content_for :title, "Styleguide" %>
+
+<%= dash_page_head title: "Styleguide",
+      kicker: "Development only",
+      lede: "Every component in the kit, rendered with the options it takes.",
+      actions: safe_join([ dash_button("Secondary"), dash_button("Primary", tone: :primary) ], " ") %>
+
+<div class="d-flex flex-column gap-3 mb-5">
+  <%= dash_card element: :section, "aria-labelledby": "sg-buttons" do %>
+    <%= dash_card_header "Buttons", id: "sg-buttons" %>
+    <div class="p-3 d-flex flex-wrap align-items-center gap-2">
+      <%= dash_button "Primary", tone: :primary %>
+      <%= dash_button "Secondary" %>
+      <%= dash_button "Delete", tone: :danger %>
+      <%= dash_button "Link", tone: :link %>
+      <%= dash_button "Add", icon: :plus %>
+      <%= dash_button "Next", icon_end: :chevron_right %>
+      <%= dash_button "Medium", size: :md %>
+      <%= dash_icon_button :gear, label: "Settings" %>
+      <%= dash_toggle_icon_button off: :expand, on: :collapse, label: "Full screen" %>
+      <%= dash_unavailable "Check now", reason: "Choose a search provider first." %>
+    </div>
+  <% end %>
+
+  <%= dash_card element: :section, "aria-labelledby": "sg-badges" do %>
+    <%= dash_card_header "Badges and deltas", id: "sg-badges" %>
+    <div class="p-3 d-flex flex-wrap align-items-center gap-2">
+      <% %i[neutral kind success warning danger].each do |tone| %>
+        <%= dash_badge tone.to_s.capitalize, tone: tone %>
+      <% end %>
+      <%= dash_badge "Pill", tone: :kind, pill: true %>
+      <%= dash_delta text: "12%", tone: :good, direction: "up" %>
+      <%= dash_delta text: "4%", tone: :bad, direction: "down" %>
+      <%= dash_delta text: "New", tone: :neutral %>
+    </div>
+  <% end %>
+
+  <section class="d-flex flex-column gap-2" aria-labelledby="sg-notices">
+    <h2 class="h6 m-0" id="sg-notices">Notices</h2>
+    <%= dash_notice "Heads up.", detail: "A primary notice says something worth knowing." %>
+    <%= dash_notice "These are sample results.", detail: "A warning notice points at something to fix.", tone: :warning,
+          action: dash_button("Choose provider") %>
+    <%= dash_notice "That did not work.", detail: "A danger notice is announced right away.", tone: :danger %>
+    <%= dash_unavailable_notice "Check now", "Choose a search provider first.",
+          fix: { label: "Search provider", url: "#" } %>
+  </section>
+
+  <%= dash_card element: :section, "aria-labelledby": "sg-empty" do %>
+    <%= dash_card_header "Empty states", id: "sg-empty" %>
+    <%= dash_empty "Nothing here yet", hint: "Say what fills this space and how to get there.",
+          action: { label: "Add one", url: "#sg-empty" }, secondary: { label: "Learn more", url: "#sg-empty" } %>
+    <%= dash_empty "Compact, for inside a card", hint: "No button.", compact: true %>
+  <% end %>
+
+  <%= dash_card element: :section, "aria-labelledby": "sg-cards" do %>
+    <%= dash_card_header "Card with tabs", id: "sg-cards" do %>
+      <%= dash_tabs [ { label: "First", url: "#sg-cards", current: true }, { label: "Second", url: "#sg-cards" } ],
+            label: "Example views" %>
+    <% end %>
+    <div class="p-3">
+      <p class="m-0">Card bodies hold anything. Headers carry a title and, on the right, tabs or actions.</p>
+    </div>
+    <%= dash_card_footer do %>
+      A footer for notes and a <a href="#sg-cards">link</a>.
+    <% end %>
+  <% end %>
+
+  <%= dash_card element: :section, "aria-labelledby": "sg-tables" do %>
+    <%= dash_card_header "Table", id: "sg-tables" %>
+    <%= dash_table label: "Example rows", cols: "minmax(160px,1fr) 90px 110px 80px" do %>
+      <thead>
+        <tr><th scope="col">Name</th><th scope="col" class="num">Visitors</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Signed up</td>
+          <td class="num">1,204</td>
+          <td><%= dash_badge "Active", tone: :success %></td>
+          <td class="row-actions"><%= dash_icon_button :close, label: "Delete Signed up" %></td>
+        </tr>
+        <tr>
+          <td>Read the pricing page</td>
+          <td class="num">318</td>
+          <td><%= dash_badge "Paused" %></td>
+          <td class="row-actions"><%= dash_icon_button :close, label: "Delete Read the pricing page" %></td>
+        </tr>
+        <%= dash_table_confirm "Delete Read the pricing page? Its history goes with it.", span: 4 do %>
+          <%= dash_button "Delete", tone: :danger %>
+          <%= dash_button "Cancel", tone: :link %>
+        <% end %>
+      </tbody>
+    <% end %>
+  <% end %>
+
+  <%= dash_card element: :section, "aria-labelledby": "sg-tiles" do %>
+    <%= dash_card_header "Tiles", id: "sg-tiles" %>
+    <%= dash_tiles label: "Example figures" do %>
+      <%= dash_tile "Visitors", "867", delta: { text: "12%", tone: :good, direction: "up" } %>
+      <%= dash_tile "Bounce rate", "41%", delta: { text: "3%", tone: :bad, direction: "up" } %>
+      <%= dash_tile "Pages", "1.5k", note: "across 204 visits" %>
+      <%= dash_tile "Ranking", "10", note: "of 15 tracked", note_tone: :warning %>
+    <% end %>
+  <% end %>
+
+  <%= dash_card element: :section, "aria-labelledby": "sg-meters" do %>
+    <%= dash_card_header "Meters", id: "sg-meters" %>
+    <div class="d-flex flex-column gap-2 p-3">
+      <%= dash_meter 0.34, label: "170 of 500 units used, 34% of the monthly cap" %>
+      <%= dash_meter 0.82, label: "410 of 500 units used, 82% of the monthly cap", tone: :warning %>
+      <%= dash_meter 1.0, label: "500 of 500 units used, the cap is spent", tone: :danger %>
+    </div>
+  <% end %>
+
+  <%= dash_card element: :section, "aria-labelledby": "sg-forms" do %>
+    <%= dash_card_header "Form", id: "sg-forms" %>
+    <%= dash_form_with scope: :styleguide, url: styleguide_path, method: :get, card: true do |form| %>
+      <%= form.grid do %>
+        <%= form.text_field :name, label: "Name", hint: "Shown on the report.", placeholder: "Signed up", wrapper: { class: "col-md-6" } %>
+        <%= form.text_field :path, label: "Path", optional: true, mono: true, placeholder: "/pricing", wrapper: { class: "col-md-6" } %>
+      <% end %>
+      <%= form.select :kind, [ [ "Custom event", "event" ], [ "Pageview", "page" ] ], {}, label: "Type" %>
+      <%= form.number_field :limit, label: "Monthly cap", suffix: "searches", optional: true %>
+      <%= form.segmented :cadence, [ [ "daily", "Daily" ], [ "weekly", "Weekly" ] ], label: "How often" %>
+      <%= form.radio_group :device, [ [ "desktop", "Desktop" ], [ "mobile", "Mobile" ] ], label: "Device" %>
+      <%= form.switch :subdomains, label: "Count subdomains as this site", hint: "When on, blog.example.com counts." %>
+      <%= form.check :notify, label: "Email me when it changes" %>
+      <%= form.actions "Save", cancel: "#sg-forms" %>
+    <% end %>
+  <% end %>
+
+  <%= dash_card element: :section, "aria-labelledby": "sg-choices" do %>
+    <%= dash_card_header "Segmented links and search", id: "sg-choices" %>
+    <div class="p-3 d-flex flex-wrap align-items-center gap-3">
+      <%= dash_segmented [ { label: "Keywords", url: "#sg-choices", current: true }, { label: "Sites", url: "#sg-choices" } ],
+            label: "Example sections" %>
+      <div><%= dash_search_field :q, nil, label: "Find a page", id: "sg-search", placeholder: "Find a page" %></div>
+    </div>
+    <div class="px-3 pb-3">
+      <%= dash_page_tabs dash_segmented([ { label: "Keywords", url: "#sg-choices", current: true },
+                                          { label: "Sites", url: "#sg-choices" } ], label: "Example tabs"),
+            actions: dash_button("Check all", "#sg-choices"), class: "m-0" %>
+    </div>
+  <% end %>
+
+  <%= dash_card element: :section, "aria-labelledby": "sg-menus" do %>
+    <%= dash_card_header "Menus and dialogs", id: "sg-menus" %>
+    <div class="p-3 d-flex flex-wrap align-items-center gap-2">
+      <%= dash_menu id: "sg-menu", label: "Last 30 days" do %>
+        <%= dash_menu_header "Range" %>
+        <%= dash_menu_item "Today", "#sg-menus" %>
+        <%= dash_menu_item "Last 30 days", "#sg-menus", current: true %>
+        <%= dash_menu_item "Compare", chevron: true %>
+        <%= dash_menu_item "Pages", meta: "Grouped by path", icon: :file %>
+        <%= dash_menu_item "Delete view", danger: true %>
+      <% end %>
+      <%= dash_link_menu id: "sg-link-menu", label: "Takedown Index", section: "Site",
+            items: [ { label: "Takedown Index", url: "#sg-menus", active: true }, { label: "Wired", url: "#sg-menus", note: "Rival" } ] %>
+      <%= dash_button "Open dialog", "aria-haspopup": "dialog",
+            data: { action: "dash--modal#open", "dash--modal-key-param": "styleguide" } %>
+    </div>
+  <% end %>
+
+  <%= dash_card element: :section, "aria-labelledby": "sg-disclosure" do %>
+    <%= dash_card_header "Disclosure and pager", id: "sg-disclosure" %>
+    <div class="p-3 d-flex flex-column gap-3">
+      <%= dash_disclosure "About this data" do %>
+        <p class="m-0">Folded text stays out of the way until somebody asks for it.</p>
+      <% end %>
+      <%= dash_disclosure "Show 4 more", less: "Show fewer", bar: true do %>
+        <p class="m-0">Four more rows.</p>
+      <% end %>
+      <%= dash_disclosure "Sync failed: token expired", tone: :danger do %>
+        <pre class="m-0">Google would not hand back an access token.</pre>
+      <% end %>
+      <%= dash_pager "Page 2 of 27", label: "Pages of examples", previous: "#sg-disclosure", following: "#sg-disclosure" %>
+    </div>
+  <% end %>
+
+  <%= dash_card_disclosure "Card that folds", hint: "One time setup" do %>
+    <div class="p-3">
+      <p class="m-0">The whole card opens and closes from its header.</p>
+    </div>
+  <% end %>
+</div>
+
+<%= dash_dialog key: "styleguide", title: "Example dialog", fit: true do %>
+  <div class="p-3">
+    <p class="m-0">Dialogs open from any button with the modal action and close on escape or the backdrop.</p>
+  </div>
+  <%= dash_dialog_footer "3 items" do %>
+    <%= dash_button "Done", tone: :primary, data: { action: "dash--modal#close" } %>
+  <% end %>
+<% end %>

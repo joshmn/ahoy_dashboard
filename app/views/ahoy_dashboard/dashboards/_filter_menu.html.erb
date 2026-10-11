@@ -1,0 +1,48 @@
+<%# The Filter button and the dialogs it and the chips open.
+
+    The button is a link to the filter dialog laid out as a page, which is where
+    it goes with the JavaScript off. With it on, the dialog opens over this page
+    instead.
+
+    The category dialogs are what a chip reopens to change how it matches or
+    what value it holds. They sit here rather than on the chips because one
+    dialog per category serves every chip in it.
+
+    Every dialog goes out at the end of the body rather than beside the button.
+    The toolbar is sticky with a z-index of its own, so anything fixed inside it
+    stacks inside it, and the site header painted over the top of the dialog
+    and its backdrop. %>
+<%# destination is which surface applying lands on. Absent means the dashboard,
+    which is what every caller but explore wants. carried is whatever that
+    surface holds that the query string does not, so a filter applied from a
+    composed question comes back to the same question. %>
+<% destination = local_assigns[:destination] %>
+<% carried = local_assigns.fetch(:carried, {}) %>
+<% returning = destination.present? ? { return: destination } : {} %>
+
+<%= dash_button "Filter", filter_values_path(query.to_query.merge(dash_carried_params(carried)).merge(returning)),
+      icon: :filter, id: "tm-filter-button", class: "tm-add", "aria-haspopup": "dialog",
+      "aria-keyshortcuts": "/", title: "Filter (/)", data: { tm_filter: "" } %>
+
+<% content_for :dash_dialogs do %>
+  <%= render "ahoy_dashboard/shared/filter_modal", destination: destination, carried: carried %>
+
+  <% AhoyDashboard::FilterCategory.for_filters(query.filters).each do |category| %>
+    <% frame = dash_filter_frame(category) %>
+    <%= dash_dialog key: category.key, id: "tm-filter-modal-#{category.key}", title: category.title,
+          close_label: "Close #{category.title.downcase}", fit: true, narrow: true do %>
+      <div class="modal-body tm-scroll">
+        <%= dash_frame_tag frame do %>
+          <div class="tm-filter-skeleton placeholder-glow" aria-hidden="true">
+            <span class="placeholder col-9 rounded"></span>
+            <% category.dimensions.each do %>
+              <span class="placeholder col-3 rounded"></span>
+              <span class="placeholder col-12 rounded py-3"></span>
+            <% end %>
+          </div>
+          <span class="visually-hidden">Loading <%= category.title.downcase %></span>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

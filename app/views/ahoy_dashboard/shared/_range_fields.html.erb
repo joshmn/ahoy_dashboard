@@ -1,0 +1,50 @@
+<%# The custom range's own fields. They sit out here rather than inside the
+    period menu on purpose: the menu controller claims the arrow keys for its own
+    list, and a date input needs them to step days.
+
+    url is the surface they apply to and clear_path is the way back to the
+    default range. carried is whatever that surface holds that the query string
+    does not, so setting a range on a composed question comes back to the same
+    question rather than to the dashboard's default breakdown. %>
+<% url = local_assigns.fetch(:url) %>
+<% clear_path = local_assigns.fetch(:clear_path) %>
+<% carried = local_assigns.fetch(:carried, {}) %>
+<% card = local_assigns.fetch(:card, true) %>
+
+<% fields = capture do %>
+  <%= form_with url: url, method: :get, class: "tm-range", html: { "aria-label": "Custom date range" } do %>
+    <%= render "ahoy_dashboard/shared/query_fields", except: [ :from, :to ] %>
+    <% carried.each do |name, value| %>
+      <%= hidden_field_tag name, value, id: nil %>
+    <% end %>
+
+    <span class="tm-range__bound">
+      <span class="tm-range__word" aria-hidden="true">From</span>
+      <%= dash_range_field "from", query.range_from_date, label: "Start date", id: "tm-range-from",
+            max: query.range_date_max, hide_label: true %>
+      <%= dash_range_field "from_time", query.range_from_time, label: "Start time, blank for the start of the day",
+            id: "tm-range-from-time", type: "time", required: false, hide_label: true, class: "tm-range__time" %>
+    </span>
+
+    <span class="tm-range__bound">
+      <span class="tm-range__word" aria-hidden="true">to</span>
+      <%= dash_range_field "to", query.range_to_date, label: "End date", id: "tm-range-to",
+            max: query.range_date_max, hide_label: true %>
+      <%= dash_range_field "to_time", query.range_to_time, label: "End time, blank for the end of the day",
+            id: "tm-range-to-time", type: "time", required: false, hide_label: true, class: "tm-range__time" %>
+    </span>
+
+    <span class="tm-range__actions">
+      <%= dash_button "Apply", type: "submit", tone: :primary %>
+      <%= dash_icon_button :close,
+            label: "Clear the custom range and go back to the last 30 days",
+            url: clear_path %>
+    </span>
+  <% end %>
+<% end %>
+
+<% if card %>
+  <%= dash_card padded: true, class: "py-2 mb-3" do %><%= fields %><% end %>
+<% else %>
+  <%= fields %>
+<% end %>

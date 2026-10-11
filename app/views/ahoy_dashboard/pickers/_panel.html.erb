@@ -1,0 +1,58 @@
+<%# Both steps of the picker.
+
+    The shell is the command menu and the rows are the dropdown menus', because
+    that is what these two steps already are: a list of dimensions, then one
+    dimension's values. .pop-hd is its back step and every row is a menu item.
+
+    Every row is a button carrying what it would write, not a link, because
+    picking here fills in a field rather than going anywhere. %>
+<%= dash_frame_tag AhoyDashboard::PickersController::FRAME do %>
+  <% if facet.nil? %>
+    <div class="pop-sc">
+      <% AhoyDashboard::PickerFacet.grouped(scope).each_with_index do |(group, facets), index| %>
+        <%= dash_menu_group group, id: "tm-picker-group-#{index}", first: index.zero? do %>
+          <% facets.each do |option| %>
+            <%= dash_menu_item option.label, icon: dash_picker_icon(option), note: option.hint, chevron: true,
+                  role: "option", "aria-selected": "false",
+                  data: { "dash--picker-target": "item", term: "#{group} #{option.label}".downcase,
+                          facet: option.key, action: "dash--picker#open" } %>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  <% else %>
+<%# The way back, which is the design's own menu head. %>
+    <div class="pop-hd">
+      <%= dash_icon_button :back,
+            label: "Back to all facets",
+            data: { facet: "", action: "dash--picker#open" } %>
+      <b><%= facet.label %></b>
+    </div>
+
+    <div class="pop-sc">
+      <% if options.empty? %>
+        <p class="pop-none">
+          <% if term.strip.present? %>
+            Nothing here matches &ldquo;<%= term.strip %>&rdquo;
+          <% else %>
+            Nothing here for this range yet
+          <% end %>
+        </p>
+      <% else %>
+        <% mono = facet.dimension? && dash_mono_dimension?(facet.dimension_key) %>
+        <% chip = facet.dimension? ? dash_chip_kind(facet.dimension_key) : nil %>
+        <% chip = nil unless chip.in?(%i[flag channel]) %>
+
+        <% options.each do |option| %>
+          <%= dash_menu_item note: (dash_number(option.visitors) if option.counted?),
+                role: "option", "aria-selected": "false",
+                data: { "dash--picker-target": "item", term: option.label.to_s.downcase, value: option.label,
+                        facet: facet.key, dimension: facet.dimension_key, action: "dash--picker#choose" } do %>
+            <%= dash_row_chip(chip, option.label) if chip %>
+            <span class="<%= class_names("nm", "mono" => mono) %>"><%= option.label %></span>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

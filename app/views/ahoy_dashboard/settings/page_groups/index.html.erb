@@ -1,0 +1,78 @@
+<% content_for :title, "Page groups" %>
+<% content_for :dash_settings_section, "page_groups" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Page groups",
+          lede: "Group paths like /blog/* into one row on the Pages card. The page journey still lists each path.",
+          actions: capture {
+            dash_button "New group", new_settings_page_group_path, tone: :primary, icon: :plus
+          } %>
+
+    <%= dash_card do %>
+      <% if @records.any? %>
+        <%= dash_card_header "#{@records.size} #{"rule".pluralize(@records.size)}" %>
+
+        <%= dash_table label: "Page groups", cols: "minmax(0, .8fr) minmax(0, 1fr) 56px 64px" do %>
+          <thead>
+            <tr>
+              <th scope="col">Group</th>
+              <th scope="col">Pattern</th>
+              <th scope="col"><span class="visually-hidden">Order</span></th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @records.each_with_index do |rule, index| %>
+              <% if @confirming == rule.id.to_s %>
+                <% message = capture do %>Delete <b><%= rule.name %></b>? Its pages show on their own again.<% end %>
+                <%= dash_table_confirm message, span: 4, cancel: settings_page_groups_path do %>
+                  <%= dash_button_to "Delete", settings_page_group_path(rule), method: :delete, tone: :danger %>
+                <% end %>
+              <% else %>
+                <tr>
+                  <td>
+                    <span class="t-main">
+                      <%= dash_icon(:layers, size: 13, class_name: "gi") %>
+                      <b><%= rule.name %></b>
+                    </span>
+                  </td>
+
+                  <td>
+                    <span class="mchips">
+                      <% rule.pattern_list.each do |pattern| %>
+                        <span class="mchip"><span class="mv mono-cv"><%= pattern %></span></span>
+                      <% end %>
+                    </span>
+                  </td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button_to :chevron_up, settings_page_group_path(rule),
+                          label: "Move #{rule.name} up the list",
+                          method: :patch, params: { page_group: { nudge: "up" } },
+                          disabled: index.zero? %>
+                    <%= dash_icon_button_to :chevron_down, settings_page_group_path(rule),
+                          label: "Move #{rule.name} down the list",
+                          method: :patch, params: { page_group: { nudge: "down" } },
+                          disabled: index == @records.size - 1 %>
+                  </td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button :gear, label: "Edit #{rule.name}",
+                          url: edit_settings_page_group_path(rule), title: "Edit" %>
+                    <%= dash_icon_button :close, label: "Delete #{rule.name}",
+                          url: settings_page_groups_path(confirm: rule.id), tone: :danger, title: "Delete" %>
+                  </td>
+                </tr>
+              <% end %>
+            <% end %>
+          </tbody>
+        <% end %>
+      <% else %>
+        <%= dash_empty title: "No page groups yet",
+              hint: "Groups apply to all your data, including what is already collected.",
+              action: { label: "New group", url: new_settings_page_group_path } %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

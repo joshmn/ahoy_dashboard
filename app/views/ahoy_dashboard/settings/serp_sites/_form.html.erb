@@ -1,0 +1,29 @@
+<%= dash_form_with model: @form, scope: :serp_site, url: url, method: method, card: true do |form| %>
+  <%= form.error_summary %>
+
+  <% domain_hint = capture do %>
+    Just the host. <span class="mono">https://www.example.com/x</span> is saved as <span class="mono">example.com</span>.
+  <% end %>
+  <%= form.grid do %>
+    <%= form.text_field :name, label: "Name", hint: "Shown in tables.", autocomplete: "off", placeholder: "Example" %>
+
+    <%= form.text_field :domain, label: "Domain", hint: domain_hint, mono: true, autocomplete: "off",
+          placeholder: "example.com" %>
+  <% end %>
+
+  <% subdomains_hint = capture do %>
+    When on, <span class="mono">blog.example.com</span> counts as <span class="mono">example.com</span>.
+  <% end %>
+  <%= form.fieldset :match_subdomains, label: "Subdomains" do %>
+    <%= form.switch :match_subdomains, label: "Count subdomains as this site", hint: subdomains_hint %>
+  <% end %>
+
+  <% if local_assigns[:adding] %>
+    <%= form.fieldset :every_keyword, label: "Keywords" do %>
+      <%= form.switch :every_keyword, label: "Look for it on every tracked keyword",
+            hint: "Extra sites cost nothing, and the searches already saved are read again for it. Turn it off to tick it on keywords one at a time." %>
+    <% end %>
+  <% end %>
+
+  <%= form.actions submit_label, cancel: settings_serp_sites_path %>
+<% end %>

@@ -1,0 +1,146 @@
+<% content_for :title, "Rank tracking" %>
+<% content_for :dash_settings_section, "serp_keywords" %>
+
+<% monthly = @keywords.sum { |keyword| keyword.monthly_units(@adapter) } %>
+<% check_all = AhoyDashboard::Serp::CheckNowPresenter.new %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Rank tracking",
+          lede: "Where you rank for the keywords you choose.",
+          actions: capture {
+            dash_button("Import a list", new_settings_serp_keyword_import_path, data: { tm_frame: "_top" }) +
+              dash_button("Track keyword", new_settings_serp_keyword_path, tone: :primary, data: { tm_frame: "_top" })
+          } %>
+
+    <%= dash_page_tabs render("ahoy_dashboard/settings/serp_sites/tabs", current: :keywords),
+          actions: (if @keywords.any?
+                      dash_button_to("Check all", check_all.path, reason: check_all.reason,
+                                     confirm: check_all.confirm)
+                    end) %>
+
+    <% if @provider_notice %>
+      <%= dash_notice @provider_notice.title, detail: @provider_notice.detail,
+            action: dash_button("Set up provider", settings_serp_providers_path, data: { tm_frame: "_top" }) %>
+    <% elsif @keywords.any? %>
+      <%= dash_unavailable_notice "Check all", check_all.notice_reason, fix: check_all.fix %>
+    <% end %>
+
+    <%= render "spend", spend: @spend %>
+
+    <%= dash_card do %>
+      <% if @keywords.any? %>
+        <%= dash_card_header "#{@keywords.size} #{"keyword".pluralize(@keywords.size)}" do %>
+          <span class="g-hint">
+            <% if monthly.positive? %>
+              About <%= dash_number(monthly) %> <%= "search".pluralize(monthly) %> a month through
+              <%= AhoyDashboard::Settings::Display.adapter_label(@adapter) %>
+            <% else %>
+              <% checks = @keywords.sum(&:monthly_checks) %>
+              About <%= dash_number(checks) %> <%= "check".pluralize(checks) %> a month, free while results are samples
+            <% end %>
+          </span>
+        <% end %>
+
+        <%= dash_table label: "Tracked keywords", cols: "minmax(0, 1.3fr) 110px 70px 64px 132px 78px 72px 44px 44px" do %>
+          <thead>
+            <tr>
+              <th scope="col">Keyword</th>
+              <th scope="col">How often</th>
+              <th scope="col" class="num">Pages</th>
+              <th scope="col" class="num">Sites</th>
+              <th scope="col" class="ps-3">Last checked</th>
+              <th scope="col" class="num" title="Your best position across the places it is checked from">Position</th>
+              <th scope="col"><span class="visually-hidden">Check</span></th>
+              <th scope="col"><span class="visually-hidden">Edit</span></th>
+              <th scope="col"><span class="visually-hidden">Delete</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @keywords.each do |keyword| %>
+              <% if @confirming == keyword.id.to_s %>
+                <% message = capture do %>Delete <b><%= keyword.query %></b>? Its ranking history is deleted and cannot be fetched again.<% end %>
+                <%= dash_table_confirm message, span: 9, cancel: settings_serp_keywords_path do %>
+                  <%= dash_button_to "Delete", settings_serp_keyword_path(keyword), method: :delete, tone: :danger %>
+                <% end %>
+              <% else %>
+                <% best = keyword.locations.map { |place| @latest[[ keyword.id, place ]]&.position }.compact.min %>
+                <tr>
+                  <td>
+                    <div class="t-main flex-column align-items-start gap-0">
+                      <%= link_to rank_keyword_path(keyword: keyword.id), class: "seo-link min-w-0 fw-semibold",
+                            data: { tm_frame: "_top" } do %>
+                        <%= seo_label(keyword.query) %>
+                      <% end %>
+                      <div class="t-mono"><%= keyword.places.map(&:label).join(" / ") %>, <%= keyword.search_label %></div>
+                      <% if keyword.tags.any? %>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                          <span class="visually-hidden">Tags:</span>
+                          <% keyword.tags.each do |tag| %>
+                            <%= dash_badge tag, tone: :kind %>
+                          <% end %>
+                        </div>
+                      <% end %>
+                    </div>
+                  </td>
+
+                  <td class="t-when">
+                    <%= keyword.frequency_label %>
+                    <% unless keyword.enabled? %>
+                      <%= dash_badge "Paused", title: "Not being checked" %>
+                    <% end %>
+                  </td>
+
+                  <td class="num"><%= keyword.pages %></td>
+                  <td class="num"><%= @site_counts.fetch(keyword.id, 0) %></td>
+
+                  <td class="t-when ps-3">
+                    <%= dash_ago(keyword.last_checked_at, never: "Not yet") %>
+                  </td>
+
+                  <td class="num">
+                    <% if best %>
+                      <%= best %>
+                    <% else %>
+                      <span class="nil">&mdash;</span>
+                    <% end %>
+                  </td>
+
+                  <td class="row-actions">
+                    <% why_not = check_all.reason_for(keyword, sites: @site_counts.fetch(keyword.id, 0)) %>
+                    <% if why_not %>
+                      <%= dash_button "Check", disabled: true, title: why_not,
+                            "aria-label": "Check #{keyword.query} now. #{why_not}" %>
+                    <% else %>
+                      <%= dash_button_to "Check", settings_serp_keyword_check_path(keyword),
+                            title: "Check now",
+                            aria: { label: "Check #{keyword.query} now" },
+                            confirm: AhoyDashboard::Serp::CheckNowPresenter.confirm_for(keyword, @adapter) %>
+                    <% end %>
+                  </td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button :gear, label: "Edit #{keyword.query}",
+                          url: edit_settings_serp_keyword_path(keyword), title: "Edit",
+                          data: { tm_frame: "_top" } %>
+                  </td>
+
+                  <td class="row-actions">
+                    <%= dash_icon_button :close, label: "Delete #{keyword.query}",
+                          url: settings_serp_keywords_path(confirm: keyword.id), tone: :danger,
+                          title: "Delete", data: { tm_frame: "_top" } %>
+                  </td>
+                </tr>
+              <% end %>
+            <% end %>
+          </tbody>
+        <% end %>
+      <% else %>
+        <%= dash_empty title: "Nothing tracked yet",
+              hint: "Start with a handful of searches you want to rank for. #{AhoyDashboard::Settings::Display.serp_cost_note(@adapter)}",
+              action: { label: "Track keyword", url: new_settings_serp_keyword_path, data: { tm_frame: "_top" } },
+              secondary: { label: "Import a list", url: new_settings_serp_keyword_import_path } %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

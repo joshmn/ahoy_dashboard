@@ -1,0 +1,5 @@
+<% account = AhoyDashboard::GoogleAccount.current if AhoyDashboard::SearchConsole.enabled? %>
+<% if account&.connected? && account.last_error.present? %>
+  <%= dash_notice "Search Console is not syncing.", detail: account.last_error, tone: :warning, class: "mb-3",
+        action: dash_button("Fix connection", settings_google_connection_path, data: { tm_frame: "_top" }) %>
+<% end %>

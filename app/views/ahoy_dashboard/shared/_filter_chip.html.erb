@@ -1,0 +1,43 @@
+<%# One applied filter, said the same way everywhere it appears: the dimension,
+    how it is matched, the value, and the way off the bar. The dashboard and a
+    composed question both render this, because they had drifted into saying the
+    same filter two different ways, and the explore side had put the whole
+    sentence into the value slot, where a 200px clamp cut it mid URL.
+
+    destination is which surface applying lands back on, absent meaning the
+    dashboard. carried is whatever that surface holds that the query string does
+    not, so a filter reopened from a composed question comes back to it. %>
+<% destination = local_assigns[:destination] %>
+<% carried = local_assigns.fetch(:carried, {}) %>
+<% compact = local_assigns.fetch(:compact, false) %>
+<% category = AhoyDashboard::FilterCategory.for_dimension(filter.dimension.key) %>
+
+<span class="<%= class_names("chip", "chip--value" => compact) %>">
+  <% unless compact %>
+    <%= dash_icon(dash_dimension_icon(filter.dimension), size: 12, class_name: "ci") %>
+    <span class="cd"><%= filter.dimension.filter_label %></span>
+    <span class="cis"><%= filter.operator_label %></span>
+  <% end %>
+
+  <% if category %>
+    <% editing = query.to_query.merge(carried).merge(category: category.key, edit: index) %>
+    <% editing = editing.merge(return: destination) if destination.present? %>
+
+    <%= link_to filter.value, new_filter_path(editing),
+          class: "cv",
+          title: filter.value,
+          "aria-haspopup": "dialog",
+          "aria-label": "Change the filter #{filter.label}",
+          data: {
+            tm_frame: dash_filter_frame(category),
+            action: "dash--modal#open",
+            "dash--modal-key-param": category.key
+          } %>
+  <% else %>
+    <span class="cv" title="<%= filter.value %>"><%= filter.value %></span>
+  <% end %>
+
+  <%= link_to remove_path, class: "cx", "aria-label": "Remove the filter #{filter.label}" do %>
+    <%= dash_icon(:close, size: 11) %>
+  <% end %>
+</span>

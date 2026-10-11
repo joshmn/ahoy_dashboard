@@ -1,0 +1,13 @@
+<tr>
+  <td><div class="t-main"><%= seo_label(asked.text) %></div></td>
+  <% if presenter.repeats? %><td class="num"><%= presenter.number(asked.times) %></td><% end %>
+  <% if presenter.answered? %>
+    <td>
+      <div class="seo-cell">
+        <%= seo_label(asked.top, path: true) %>
+        <% if presenter.ours?(asked.top) %><%= dash_badge "You", tone: :kind %><% end %>
+      </div>
+    </td>
+  <% end %>
+  <td class="text-end"><%= seo_track_link(asked.text) %></td>
+</tr>

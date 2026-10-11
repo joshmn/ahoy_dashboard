@@ -1,0 +1,19 @@
+<% content_for :title, "Edit an exclusion" %>
+<% content_for :dash_settings_section, "exclusions" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Edit #{@exclusion.name}",
+          lede: "Changes apply to every number on the dashboard right away, including past days." %>
+
+    <% unless @exclusion.readable? %>
+      <%= dash_notice "This one is not being applied.", tone: :warning,
+            detail: "It names something the dashboard can't read any more, or a filter an exclusion can't use. Fix the filters to turn it back on." %>
+    <% end %>
+
+    <%= dash_card do %>
+      <%= render "ahoy_dashboard/settings/exclusions/form",
+            url: settings_exclusion_path(@exclusion), method: :patch, submit_label: "Save changes" %>
+    <% end %>
+  </section>
+</div>

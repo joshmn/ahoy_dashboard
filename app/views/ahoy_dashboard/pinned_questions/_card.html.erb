@@ -1,0 +1,30 @@
+  <%= dash_card element: :a, href: card.path, class: "pq", title: "Open #{card.name} in Explore",
+        data: { tm_frame: "_top" } do %>
+    <div class="pq-top">
+      <span class="pq-name"><%= card.name %></span>
+      <%= dash_icon(:bookmark, size: 12, class_name: "pqb") %>
+    </div>
+
+    <div class="pq-q"><%= card.sentence %></div>
+
+    <div class="pq-val">
+      <b><%= card.display %></b>
+      <% if card.delta %>
+        <%= dash_delta(**card.delta, title: "vs #{card.against}") %>
+      <% end %>
+    </div>
+    <% if card.delta %>
+      <div class="pq-q">vs <%= card.against %></div>
+    <% end %>
+
+<%# Drawn by the same code that draws the chart, off the same numbers, so a
+    sparkline and the line it is a thumbnail of cannot disagree about a shape. %>
+    <svg class="pq-spark"
+         viewBox="0 0 200 44"
+         height="44"
+         preserveAspectRatio="none"
+         aria-hidden="true"
+         focusable="false"
+         data-controller="dash--spark"
+         data-dash--spark-values-value="<%= card.series.to_json %>"></svg>
+  <% end %>

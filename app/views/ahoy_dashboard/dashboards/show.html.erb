@@ -1,0 +1,5 @@
+<% if @presenter.is_a?(AhoyDashboard::Dashboards::ShellPresenter) %>
+  <%= render "ahoy_dashboard/dashboards/shell" %>
+<% else %>
+  <%= render "ahoy_dashboard/dashboards/complete" %>
+<% end %>

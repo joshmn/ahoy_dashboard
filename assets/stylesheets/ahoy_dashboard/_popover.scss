@@ -1,0 +1,230 @@
+// Every menu that opens off a control in a bar: the date range, the grouping,
+// the comparison and the export list.
+//
+// This block is a transcription of the design's popover, its class names
+// included, so that the two can be diffed rather than compared by eye. Nothing
+// here is renamed to the tm- prefix the rest of the subsystem uses, and that is
+// the point: a change to the design is a one line change here.
+
+// Scoped to .tm-popover rather than claiming every .dropdown-menu on the page.
+// This block is the design's bespoke panel; while it owned the bare Bootstrap
+// class, a plain Bootstrap dropdown could not exist anywhere in the app, because
+// it inherited this instead of the component it asked for.
+//
+// Every panel in this gem opts in by name. Anything wanting the stock component
+// leaves the class off. Note the mock also carries .dropdown-menu.popover rules
+// that nothing has ever matched, since no view adds .popover; do not reuse that
+// class as the opt-in or those dead rules come alive with it.
+.dropdown-menu.tm-popover {
+  z-index: 1070;
+  min-width: 210px;
+  padding: 5px;
+  margin: 0;
+  background: #121318;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px -8px rgba(0, 0, 0, 0.7);
+  animation: pop-in 0.14s ease both;
+
+  // Bootstrap's dropdown font size is a size above the page's. Every height in
+  // here was measured against 13px, so the menu restates it rather than let
+  // anything without a size of its own render a line taller than it was drawn.
+  font-size: $font-size-base;
+  line-height: 1.45;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.99);
+  }
+}
+
+.menu-header,
+.ck-g,
+.sn-g,
+.m-g {
+  padding: 10px 8px 4px;
+  margin: 0;
+  font-size: $font-size-xs;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t3);
+  white-space: nowrap;
+}
+
+.dropdown-menu.tm-popover {
+  --bs-dropdown-divider-bg: var(--border);
+  --bs-dropdown-divider-margin-y: 4px;
+}
+
+.menu-grouped {
+  max-height: 60vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.menu-group > .menu-item,
+.menu-header ~ .menu-item,
+.menu-header ~ form > .menu-item {
+  padding-left: 18px;
+}
+
+.menu-group > .menu-header:first-child {
+  padding-top: 6px;
+}
+
+.menu-group:first-child > .menu-header:first-child,
+.pop-sc > .menu-header:first-child,
+.dropdown-menu > .menu-header:first-child {
+  padding-top: 4px;
+}
+
+.pop-hd {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px 6px;
+  margin-bottom: 3px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pop-hd b {
+  font-size: $font-size-md;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.pop-sc {
+  max-height: 302px;
+  overflow: auto;
+}
+
+.pop-none {
+  padding: 14px 10px;
+  text-align: center;
+  font-size: $font-size-md;
+  color: var(--t3);
+  margin: 0;
+}
+
+.menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: $font-size-base;
+  color: var(--t1);
+  transition: background 0.1s, color 0.1s;
+  text-align: left;
+  border: 0;
+  background: none;
+}
+
+.menu-item:hover,
+.menu-item:focus,
+.menu-item.act {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--t1);
+  text-decoration: none;
+}
+
+.menu-item-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.menu-item-main svg {
+  color: var(--t3);
+  flex: none;
+}
+
+.menu-item:hover .menu-item-main svg,
+.menu-item:focus .menu-item-main svg {
+  color: var(--t2);
+}
+
+.menu-item-main .nm,
+.menu-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-item-main .mono {
+  font-family: var(--mono);
+  font-size: $font-size-sm;
+}
+
+.menu-item-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: $font-size-md;
+  color: var(--t3);
+  font-variant-numeric: tabular-nums;
+}
+
+.menu-item-end .ck {
+  color: var(--accent);
+}
+
+// A country row leads with its flag where every other row leads with an icon,
+// so the glyph takes the width the icon would and the labels line up.
+.flg {
+  flex: none;
+  font-size: $font-size-base;
+  line-height: 1;
+  width: 18px;
+  text-align: center;
+}
+
+// A segment carries a second line saying what it filters on, so its row is
+// taller than the rest and the label sits over the meta rather than beside it.
+.menu-item-tall {
+  height: auto;
+  min-height: 42px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.menu-item-tall .menu-item-label {
+  color: var(--t1);
+}
+
+.menu-item-tall[disabled] {
+  opacity: 0.55;
+}
+
+.menu-item-meta {
+  font-size: $font-size-sm;
+  color: var(--t3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-item-stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.menu-item-danger,
+.menu-item-danger:hover {
+  color: var(--red-t);
+}
+
+.dropdown-menu.tm-popover.dropdown-menu-end {
+  right: 0;
+  left: auto;
+}

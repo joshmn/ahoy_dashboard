@@ -1,0 +1,43 @@
+<% content_for :title, "Set up assistant" %>
+<% content_for :dash_settings_section, "ai_visibility" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Set up #{@form.label}",
+          lede: "Asked through #{@form.provider}'s API with web search on. The key is encrypted before it is stored, and it is separate from the one Ask uses." %>
+
+    <%= dash_card do %>
+      <% if @removing %>
+        <%= render "ahoy_dashboard/settings/shared/remove_secret", secret: @removing,
+              url: settings_ai_visibility_assistant_secret_path(@name, @removing.key),
+              cancel: edit_settings_ai_visibility_assistant_path(@name) %>
+      <% end %>
+
+      <%= dash_form_with model: @form, scope: :ai_visibility_assistant,
+            url: settings_ai_visibility_assistant_path(@name), method: :patch, card: true do |form| %>
+        <%= form.error_summary unlinked: [ :name ] %>
+
+        <%= form.switch :enabled, label: "Ask #{@form.label}",
+              hint: "Turn it off to stop asking #{@form.label} and keep its key and past answers." %>
+
+        <%= form.check_boxes :models, @form.model_choices, :first, :last, label: "Models",
+              id: form.field_id(:models),
+              hint: "Each model you pick is asked every prompt, so each one adds a request per prompt to every run." %>
+
+        <%= form.text_field :other_models, label: "Other models", mono: true, optional: true, autocomplete: "off",
+              placeholder: "model-name, another-model",
+              hint: "Any model #{@form.provider} offers that is not in the list, separated by commas. It has to support web search." %>
+
+        <%= form.password_field :api_key, label: "API key", mono: true, hint: @secret.hint,
+              id: "ai_visibility_assistant_credentials_api_key", name: "ai_visibility_assistant[credentials][api_key]",
+              value: nil, autocomplete: "off",
+              append: (if @secret.stored?
+                         dash_button "Remove", edit_settings_ai_visibility_assistant_path(@name, remove: @secret.key, anchor: "remove-secret"),
+                           size: :md, aria: { label: "Remove the stored #{@secret.label}" }
+                       end) %>
+
+        <%= form.actions "Save", cancel: edit_settings_ai_visibility_path %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

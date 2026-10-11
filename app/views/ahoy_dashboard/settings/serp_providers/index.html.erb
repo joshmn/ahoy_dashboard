@@ -1,0 +1,116 @@
+<% content_for :title, "Search provider" %>
+<% content_for :dash_settings_section, "serp_providers" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Search provider",
+          lede: "The search API that runs rank checks. Sample data costs nothing and is made up." %>
+
+    <%= dash_card do %>
+      <%= dash_card_header "Providers" do %>
+        <span class="g-hint">Active: <%= AhoyDashboard::Settings::Display.serp_label(@active) %></span>
+      <% end %>
+
+      <%= dash_table label: "Search providers", cols: "minmax(0, 1fr) 150px 100px 120px minmax(0, 1fr) 72px" do %>
+        <thead>
+          <tr>
+            <th scope="col">Provider</th>
+            <th scope="col">Credentials</th>
+            <th scope="col" class="num">Monthly cap</th>
+            <th scope="col" class="num">Used this month</th>
+            <th scope="col" class="ps-4">Last error</th>
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @names.each do |name| %>
+            <% record = @records[name] %>
+            <% label = AhoyDashboard::Settings::Display.serp_label(name) %>
+            <tr>
+              <td>
+                <div class="t-main">
+                  <%= link_to label, edit_settings_serp_provider_path(name), class: "set-row-link",
+                        data: { tm_frame: "_top" } %>
+                  <% if @active == name %>
+                    <%= dash_badge "Active", tone: :success %>
+                  <% end %>
+                </div>
+              </td>
+
+              <td class="t-when">
+                <%= AhoyDashboard::Settings::SerpProviderStatus.credentials_label(name, record: record) %>
+              </td>
+
+              <td class="num">
+                <% if record.nil? || record.monthly_cap_units.zero? %>
+                  <span class="nil">&mdash;</span>
+                <% else %>
+                  <%= dash_number(record.monthly_cap_units) %>
+                <% end %>
+              </td>
+              <td class="num"><%= dash_number(record&.spent_this_month.to_i) %></td>
+              <td class="t-when ps-4"><div class="text-truncate"><%= record&.last_error.presence || "None" %></div></td>
+
+              <td class="row-actions row-actions-visible">
+                <%= dash_button "Edit", edit_settings_serp_provider_path(name),
+                      aria: { label: "Set up #{label}" }, data: { tm_frame: "_top" } %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+    <% end %>
+
+    <%= dash_card class: "mt-3", id: "search-options" do %>
+      <%= dash_card_header "Keyword research, backlinks and places" do %>
+        <span class="g-hint">Rank tracking uses the active provider above</span>
+      <% end %>
+
+      <%= dash_form_with model: @options, scope: :search_options, url: settings_search_options_path, method: :patch,
+            card: true do |form| %>
+        <%= form.error_summary %>
+
+        <% providers = AhoyDashboard::SearchOptionsForm.providers %>
+
+        <section class="d-flex flex-column gap-3" aria-labelledby="search-options-keywords">
+          <h3 class="fs-6 fw-semibold mb-0" id="search-options-keywords">Keyword research</h3>
+          <%= render "ahoy_dashboard/settings/shared/feature_line", name: :keywords %>
+          <%= form.select :keywords_provider, providers, { include_blank: "Same as rank tracking" },
+                { label: "Provider", hint: "Where search volume and keyword ideas come from." } %>
+          <%= form.grid do %>
+            <%= form.select :keywords_location, AhoyDashboard::SearchOptionsForm.countries, {},
+                  { label: "Search from", hint: "The country a lookup searches from unless you pick another one on the form." } %>
+            <%= form.text_field :keywords_language, label: "Language", mono: true, autocomplete: "off",
+                  spellcheck: false, autocapitalize: "none",
+                  hint: "A language code like en or es. Leave it blank for en." %>
+          <% end %>
+        </section>
+
+        <section class="d-flex flex-column gap-3" aria-labelledby="search-options-backlinks">
+          <h3 class="fs-6 fw-semibold mb-0" id="search-options-backlinks">Backlinks</h3>
+          <%= render "ahoy_dashboard/settings/shared/feature_line", name: :backlinks %>
+          <%= form.select :backlinks_provider, providers, { include_blank: "Same as rank tracking" },
+                { label: "Provider", hint: "Where the list of sites linking to you comes from." } %>
+        </section>
+
+        <section class="d-flex flex-column gap-3" aria-labelledby="search-options-places">
+          <h3 class="fs-6 fw-semibold mb-0" id="search-options-places">The place list</h3>
+          <%= render "ahoy_dashboard/settings/shared/feature_line", name: :places %>
+          <%= form.check :places_postal_codes, label: "Include postal codes",
+                hint: "Keeps postal codes when the list is built, so the keyword forms can search from one. " \
+                      "The list gets much bigger, and the change shows after the next rebuild." %>
+          <%= dash_disclosure "Advanced", open: @options.errors.include?(:places_source) do %>
+            <div class="pt-3">
+              <%= form.text_field :places_source, label: "Monthly list address", mono: true, autocomplete: "off",
+                    spellcheck: false, autocapitalize: "none",
+                    hint: "Where the list is downloaded from each month. It is a strftime pattern, so %Y and %m become " \
+                          "the year and month. Leave it blank for the default." %>
+            </div>
+          <% end %>
+        </section>
+
+        <%= form.actions "Save" %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

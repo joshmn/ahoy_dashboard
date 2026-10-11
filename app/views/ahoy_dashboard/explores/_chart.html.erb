@@ -1,0 +1,12 @@
+<% chart_data = chart.chart_data %>
+<% chart_options = (chart.chart_options || {}).symbolize_keys %>
+
+<%= dash_card padded: true, class: "tm-chart mb-4", data: dash_chart_data(chart_data, chart_options) do %>
+  <div class="chart-wrap" data-dash--chart-target="canvas">
+    <% if chart_data.blank? %>
+      <%= dash_empty fill: true,
+            title: "No visits in this range",
+            hint: query.filters.any? ? "Try a wider date range, or drop one of the filters." : "Try a wider date range." %>
+    <% end %>
+  </div>
+<% end %>

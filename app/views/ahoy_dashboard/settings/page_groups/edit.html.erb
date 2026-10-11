@@ -1,0 +1,14 @@
+<% content_for :title, "Edit a rule" %>
+<% content_for :dash_settings_section, "page_groups" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "Edit #{@record.name}",
+          lede: "Changes apply to all your data as soon as you save." %>
+
+    <%= dash_card do %>
+      <%= render "ahoy_dashboard/settings/page_groups/form",
+            url: settings_page_group_path(@record), method: :patch, submit_label: "Save changes" %>
+    <% end %>
+  </section>
+</div>

@@ -1,0 +1,14 @@
+<% content_for :title, "New group" %>
+<% content_for :dash_settings_section, "page_groups" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "New group",
+          lede: "It applies to all your data as soon as you save." %>
+
+    <%= dash_card do %>
+      <%= render "ahoy_dashboard/settings/page_groups/form",
+            url: settings_page_groups_path, method: :post, submit_label: "Create group" %>
+    <% end %>
+  </section>
+</div>

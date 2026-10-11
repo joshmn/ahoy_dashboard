@@ -1,0 +1,16 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  host: <%= ENV.fetch("PGHOST") { "localhost" } %>
+  port: <%= ENV.fetch("PGPORT") { 5432 } %>
+  username: <%= ENV["PGUSER"] %>
+  password: <%= ENV["PGPASSWORD"] %>
+  pool: 10
+
+development:
+  <<: *default
+  database: ahoy_dashboard_development
+
+test:
+  <<: *default
+  database: ahoy_dashboard_test

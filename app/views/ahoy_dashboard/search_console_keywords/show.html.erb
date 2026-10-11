@@ -1,0 +1,64 @@
+<% content_for :title, @presenter.heading %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: @back.key || "search_console" } do %>
+  <% actions = capture do %>
+    <%= dash_link_menu(id: "tm-keyword-period",
+          icon: :cal,
+          label: @presenter.range_label,
+          section: "Date range",
+          items: @presenter.period_options) %>
+
+    <%= render "ahoy_dashboard/search_console/slice_menus", menus: @presenter.menus %>
+
+    <%= seo_track_link(@presenter.keyword, button: true) %>
+  <% end %>
+
+  <%= dash_page_head back: { label: @back.label, url: @back.url }, title: @presenter.keyword,
+        lede: @presenter.summary, actions: actions %>
+  <%= render "ahoy_dashboard/search_console/problem" %>
+
+  <% if @presenter.empty? %>
+    <%= dash_card do %>
+      <%= dash_empty **@presenter.empty_state %>
+    <% end %>
+  <% else %>
+    <% chart_data = @presenter.chart_data %>
+<%# The same strip as the dashboard's metric tiles, and joined to the chart under
+    it for the same reason: one card answering one question. %>
+    <%= dash_card element: :section, class: "seo-chart-card",
+          "aria-label": "#{@presenter.series_label} over time",
+          data: dash_chart_data(chart_data, @presenter.chart_options.symbolize_keys, kind: @presenter.chart_kind) do %>
+      <%= dash_tiles label: "Which measure the chart draws", element: :nav, ruled: true do %>
+        <% @presenter.figures.each do |figure| %>
+          <%= dash_tile figure.label, figure.display,
+                url: figure.path, current: figure.active?,
+                delta: figure.delta&.merge(title: "vs #{figure.against} before"),
+                data: { tm_frame: "_top" } %>
+        <% end %>
+      <% end %>
+
+      <div class="chart-wrap" data-dash--chart-target="canvas">
+        <% if chart_data.blank? %>
+          <%= dash_empty fill: true,
+                title: "Nothing to draw for this range", hint: @presenter.lag_note %>
+        <% end %>
+      </div>
+
+      <% notes = [ @presenter.trim_note, @presenter.gap_note, @presenter.comparison_note, @presenter.seen_note ].reject(&:blank?) %>
+      <%= dash_card_footer class: "seo-about" do %>
+        <p class="mb-0"><%= @presenter.lag_note %></p>
+        <% if notes.any? %>
+          <%= dash_disclosure "About this data", class: "mt-1" do %>
+            <% notes.each do |note| %>
+              <p><%= note %></p>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <%= render "ahoy_dashboard/search_console_keywords/days", presenter: @presenter %>
+  <% end %>
+
+  <%= render "ahoy_dashboard/search_console_keywords/pages", presenter: @presenter %>
+<% end %>

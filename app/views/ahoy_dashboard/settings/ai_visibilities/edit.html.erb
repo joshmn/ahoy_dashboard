@@ -1,0 +1,106 @@
+<% content_for :title, "AI visibility" %>
+<% content_for :dash_settings_section, "ai_visibility" %>
+<% assistants = AhoyDashboard::AiVisibility::ASSISTANTS %>
+<% run_size = @prompt_count * @targets %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "AI visibility",
+          lede: "What ChatGPT, Claude, Gemini and Perplexity say when asked your prompts, and whether they mention or cite you." %>
+
+    <% unless AhoyDashboard::AiVisibility.enabled? %>
+      <%= dash_notice detail: AhoyDashboard::Settings::Display::AI_VISIBILITY_OFF %>
+    <% end %>
+
+    <% if @at_stake.present? %>
+      <% list = tag.ul(safe_join(@at_stake.map { |stake|
+           tag.li(safe_join([ stake.prompt.text, " (", pluralize(stake.answers, "answer"), ")" ]), class: "text-break")
+         }), class: "mb-2") %>
+      <% buttons = tag.div(safe_join([
+           dash_button_to("Save and delete", settings_ai_visibility_path, method: :patch, tone: :danger,
+             params: { ai_visibility: { prompts: @form.prompts, frequency: @form.frequency,
+                                        monthly_cap: @form.monthly_cap, confirm: 1 } }),
+           dash_button("Cancel", edit_settings_ai_visibility_path, tone: :link, autofocus: true)
+         ]), class: "d-flex flex-wrap align-items-center gap-2") %>
+      <%= dash_notice "Nothing is saved yet.", tone: :warning, id: "confirm",
+            detail: "Saving removes #{@at_stake.size == 1 ? "this prompt" : "these prompts"} and every answer to #{@at_stake.size == 1 ? "it" : "them"}:",
+            action: safe_join([ list, buttons ]) %>
+    <% end %>
+
+    <%= dash_card do %>
+      <%= dash_card_header "Assistants" do %>
+        <span class="g-hint">Every assistant that is on and has a key is asked, once for each model</span>
+      <% end %>
+
+      <%= dash_table label: "Assistants", cols: "minmax(0, 0.8fr) 72px minmax(0, 1.2fr) 150px 110px minmax(0, 1fr) 72px" do %>
+        <thead>
+          <tr>
+            <th scope="col">Assistant</th>
+            <th scope="col">Asked</th>
+            <th scope="col">Models</th>
+            <th scope="col">Key</th>
+            <th scope="col">Last asked</th>
+            <th scope="col">Last error</th>
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @names.each do |name| %>
+            <% record = @records[name] %>
+            <% label = assistants.fetch(name)[:label] %>
+            <tr>
+              <td>
+                <div class="t-main">
+                  <%= link_to label, edit_settings_ai_visibility_assistant_path(name), class: "set-row-link",
+                        data: { tm_frame: "_top" } %>
+                </div>
+              </td>
+              <td>
+                <% if AhoyDashboard::AiVisibility.on?(name, record: record) %>
+                  <%= dash_badge "On", tone: :success %>
+                <% else %>
+                  <%= dash_badge "Off" %>
+                <% end %>
+              </td>
+              <td><div class="t-mono text-break"><%= AhoyDashboard::AiVisibility.models_for(name, record: record).join(", ") %></div></td>
+              <td class="t-when"><%= record&.api_key.present? ? "Stored here" : "Missing" %></td>
+              <td class="t-when"><%= dash_ago(record&.last_used_at) %></td>
+              <td class="t-when"><div class="text-truncate"><%= record&.last_error.presence || "None" %></div></td>
+              <td class="row-actions row-actions-visible">
+                <%= dash_button "Edit", edit_settings_ai_visibility_assistant_path(name),
+                      aria: { label: "Set up #{label}" }, data: { tm_frame: "_top" } %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+    <% end %>
+
+    <%= dash_card class: "mt-3" do %>
+      <%= dash_card_header "Prompts and schedule" %>
+
+      <%= dash_form_with model: @form, scope: :ai_visibility, url: settings_ai_visibility_path, method: :patch,
+            card: true do |form| %>
+        <%= form.error_summary %>
+
+        <%= form.text_area :prompts, label: "Prompts", rows: 8,
+              hint: "One per line, written the way a person types into a chat box. Every model you ask is asked each one. Removing a line deletes every answer to it." %>
+
+        <%= form.segmented :frequency, AhoyDashboard::AiVisibility::FREQUENCIES.map { |key, entry| [ key, entry[:label] ] },
+              label: "How often", size: :sm,
+              hint: "How often the whole set is asked. A run asks every prompt once of each model on every assistant that is on." %>
+
+        <% cap_hint = capture do %>
+          The most requests to send in a calendar month. 0 means no cap. It counts requests, not dollars, and a run
+          that does not fit in what is left is skipped rather than sent in part.
+          Used this month: <%= number_with_delimiter(@used) %>.
+          A run is <%= pluralize(run_size, "request") %>: <%= pluralize(@prompt_count, "prompt") %> to
+          <%= pluralize(@targets, "model") %>.
+        <% end %>
+        <%= form.number_field :monthly_cap, label: "Monthly cap", min: 0, suffix: "requests", hint: cap_hint %>
+
+        <%= form.actions "Save" %>
+      <% end %>
+    <% end %>
+  </section>
+</div>

@@ -1,0 +1,80 @@
+<% destination = local_assigns[:destination] %>
+<% carried = local_assigns.fetch(:carried, {}) %>
+<% collect = local_assigns.fetch(:collect, false) %>
+<% eager = collect || local_assigns.fetch(:eager, false) %>
+<% returning = destination.present? ? { return: destination } : {} %>
+<% base = query.to_query.except(:filters).merge(dash_carried_params(carried)).merge(returning)
+     .merge(collect ? { collect: "1" } : {}) %>
+<% content_for :dash_palette_search, facet_search_path(query.to_query.merge(dash_carried_params(carried)).merge(returning)) unless collect %>
+
+<%= dash_dialog key: "filter", id: "tm-filter-modal", title: (collect ? "Add filters" : "Filter"),
+      close_label: "Close the filters", class: "fm",
+      header_actions: dash_toggle_icon_button(off: :expand, on: :collapse, label: "Full screen", title: "Full screen",
+                        data: { action: "dash--filter-modal#expand", "dash--filter-modal-target": "expander" }),
+      data: {
+        controller: "dash--filter-modal",
+        "dash--filter-modal-contents-value": (filter_dialog_path(query.to_query.merge(dash_carried_params(carried)).merge(returning)) unless eager),
+        "dash--filter-modal-url-value": filter_values_path(base),
+        "dash--filter-modal-apply-value": (dash_destination_path(destination, query.to_query.except(:filters).merge(carried)) unless collect),
+        "dash--filter-modal-tokens-value": (collect ? [] : dash_filter_tokens(query.filters)).to_json,
+        "dash--filter-modal-operators-value": AhoyDashboard::Filter::OPERATORS.to_json,
+        "dash--filter-modal-collect-value": collect,
+        "dash--filter-modal-none-value": AhoyDashboard::QueryForm::NO_FILTERS
+      } do %>
+  <% if eager %>
+    <div class="px-3 py-2 border-bottom flex-shrink-0">
+      <%= dash_token_field class: "flex-nowrap fm-box", data: { action: "click->dash--filter-modal#box" } do %>
+        <%= dash_icon(:search, size: 16, class_name: "d-none d-sm-inline text-body-tertiary flex-shrink-0 me-1") %>
+        <div class="d-flex flex-wrap align-items-center gap-1 flex-grow-1 min-w-0">
+          <ul class="list-unstyled d-flex flex-wrap gap-1 m-0 mw-100 min-w-0" aria-label="Filters to apply"
+              data-dash--filter-modal-target="tokens" hidden>
+            <li class="fm-scope-item" hidden data-dash--filter-modal-target="scope">
+              <%= dash_badge tone: :success, class: "border border-success-subtle d-inline-flex flex-wrap align-items-center gap-1 mw-100 fm-scope" do %>
+                <span data-dash--filter-modal-target="scopeName"></span>
+                <%= dash_select nil, AhoyDashboard::Filter::OPERATORS.map { |operator, label| [ label, operator ] },
+                      label: "How it should match", id: "tm-filter-operator", class: "w-auto fm-scope__op",
+                      data: { "dash--filter-modal-target": "operator", action: "change->dash--filter-modal#operate" } %>
+                <span class="d-inline-flex flex-wrap align-items-center gap-1 min-w-0" data-dash--filter-modal-target="scopeValues" hidden></span>
+              <% end %>
+            </li>
+          </ul>
+
+          <label class="visually-hidden" for="tm-filter-input" data-dash--filter-modal-target="inputLabel">Search every value</label>
+          <input class="fm-input flex-grow-1 border-0 bg-transparent" type="search" id="tm-filter-input"
+                 placeholder="Search or pick a dimension"
+                 autocomplete="off" spellcheck="false"
+                 aria-describedby="tm-filter-keys"
+                 data-dash--filter-modal-target="input"
+                 data-action="input->dash--filter-modal#search keydown->dash--filter-modal#key">
+        </div>
+      <% end %>
+      <span class="visually-hidden" id="tm-filter-keys">Arrow keys move through the values and Enter picks one. Backspace in an empty box takes off the last value picked.</span>
+    </div>
+
+    <%= dash_dialog_body class: "p-0 d-flex fm-body", data: { "dash--filter-modal-target": "body", mode: "browse" } do %>
+      <nav class="flex-shrink-0 overflow-auto p-2 fm-rail" aria-label="Dimensions" data-dash--filter-modal-target="rail">
+        <%= render "ahoy_dashboard/filter_values/rail", base: base, destination: destination, carried: carried, collect: collect %>
+      </nav>
+
+      <div class="flex-grow-1 overflow-auto p-2 m-list fm-main">
+        <%= render "ahoy_dashboard/filter_values/panel", dimension: nil, values: [], groups: [], term: "", live: true,
+              collect: collect, destination: destination, carried: carried %>
+      </div>
+    <% end %>
+
+    <%= dash_dialog_footer(tag.span("No filters", data: { "dash--filter-modal-target": "status" })) do %>
+      <%= dash_button "Clear all", tone: :link, data: { action: "dash--filter-modal#clear", "dash--filter-modal-target": "clear" } %>
+      <%= dash_button "Cancel", data: { action: "dash--modal#close" } %>
+      <%= dash_button "Add another filter", icon: :plus, hidden: true,
+            data: { action: "dash--filter-modal#unscope", "dash--filter-modal-target": "another" } %>
+      <%= dash_button (collect ? "Add to the form" : "Apply filters"), tone: :primary,
+            data: { action: "dash--filter-modal#apply", "dash--filter-modal-target": "apply" } %>
+    <% end %>
+  <% else %>
+    <%= dash_dialog_body data: { "dash--filter-modal-target": "loading" }, "aria-busy": "false" do %>
+      <p role="status" data-dash--filter-modal-target="loadingStatus">Loading filters…</p>
+      <%= link_to "Open filters as a page", filter_values_path(query.to_query.merge(dash_carried_params(carried)).merge(returning)), data: { tm_frame: "_top" } %>
+      <%= dash_button "Try again", hidden: true, data: { "dash--filter-modal-target": "retry", action: "dash--filter-modal#retry" } %>
+    <% end %>
+  <% end %>
+<% end %>

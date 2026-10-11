@@ -1,0 +1,78 @@
+<% content_for :title, "General" %>
+<% content_for :dash_settings_section, "general" %>
+<% internal = AhoyDashboard::Sql::InternalAddresses.ranges %>
+<% defaults = AhoyDashboard::Preferences::INTERNAL_IPS %>
+<% host_unsaved = !AhoyDashboard::Preferences.stored?(:site, :host) %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: "General",
+          lede: "The site being measured, the clock every number is read against, and which addresses count as your own." %>
+
+    <%= dash_card do %>
+      <%= dash_form_with model: @form, scope: :general, url: settings_general_path, method: :patch,
+            card: true do |form| %>
+        <%= form.error_summary %>
+
+        <% host_hint = capture do %>
+          The name your site answers on, like example.com. Channels use it to tell your own pages from a real referrer,
+          and backlinks and Search Console use it to know which site to look up.
+          <% if host_unsaved %>
+            <b>Not saved yet.</b> This is filled in from the address you are on now.
+          <% end %>
+        <% end %>
+        <%= form.text_field :host, label: "Site host", hint: host_hint, mono: true, autocomplete: "off",
+              spellcheck: false, autocapitalize: "none" %>
+
+        <%= form.text_field :canonical_host, label: "Canonical host", optional: true, mono: true,
+              autocomplete: "off", spellcheck: false, autocapitalize: "none",
+              hint: "Only needed when the site answers on more than one name, like www.example.com and example.com. " \
+                    "Links the dashboard builds back to your site use this one. Leave it blank to use the site host." %>
+
+        <%= form.select :time_zone, AhoyDashboard::GeneralSettingsForm.zones,
+              { include_blank: (@form.time_zone.blank? ? "Pick a time zone" : false) },
+              { label: "Time zone", autocomplete: "off",
+                hint: "Days, hours and date ranges all break on this clock. UTC until you pick another." } %>
+
+        <%= form.text_area :internal_ips, label: "Internal addresses", mono: true, rows: 6,
+              spellcheck: false, autocapitalize: "none",
+              hint: "One address or range per line, or separated by commas. A visit from one of these is left out of every number. " \
+                    "Empty the box to count every visit. The defaults are #{defaults.to_sentence}." %>
+
+        <%= form.check :precomputed_dashboard, label: "Precompute default dashboard",
+              hint: "Save a snapshot of the default 30-day dashboard and refresh it in the background. " \
+                    "Numbers may be up to five minutes behind; realtime keeps refreshing. " \
+                    "Turn this on and save to build the first snapshot." %>
+
+        <%= form.actions "Save" %>
+      <% end %>
+    <% end %>
+
+    <%= dash_card class: "mt-3", id: "internal-addresses" do %>
+      <%= dash_card_header "Internal addresses" do %>
+        <span class="g-hint"><%= internal.any? ? "Left out of every number unless you ask for them" : "Nothing is left out" %></span>
+      <% end %>
+
+      <div class="p-3">
+        <% if internal.any? %>
+          <p class="small text-body-secondary mb-2">
+            A visit from one of these never counts, on the dashboard, in Explore, in Realtime or in an export.
+            Search and commands has Show internal addresses, which puts them back for the view you are on.
+          </p>
+          <ul class="list-unstyled d-flex flex-wrap gap-2 mb-3" aria-label="Internal addresses">
+            <% internal.each do |range| %>
+              <li><%= dash_badge range.cidr, class: "font-monospace" %></li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="small text-body-secondary mb-3">
+            The list is empty, so every visit counts wherever it came from.
+          </p>
+        <% end %>
+
+        <%= dash_button_to "Use the defaults", settings_default_internal_addresses_path, method: :post,
+              reason: ("The list is already the defaults." unless AhoyDashboard::Preferences.stored?(:site, :internal_ips)) %>
+      </div>
+    <% end %>
+  </section>
+</div>

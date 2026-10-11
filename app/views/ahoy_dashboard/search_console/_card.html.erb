@@ -1,0 +1,38 @@
+<%= dash_card element: :section,
+      class: class_names("panel panel--gsc h-100", "panel--bare" => presenter.unconfigured?),
+      "aria-labelledby": "tm-card-search_console-title",
+      data: { controller: "dash--tabs", "dash--tabs-frame-value": AhoyDashboard::SearchConsolePresenter::FRAME } do %>
+  <%= dash_card_header presenter.title, id: "tm-card-search_console-title", element: :header do %>
+    <% unless presenter.unconfigured? %>
+      <%= dash_tabs presenter.tabs.map { |option| { label: option.label, url: option.path, current: option.active? } },
+            label: "Views of #{presenter.title.downcase}", select: true %>
+    <% end %>
+  <% end %>
+
+  <% unless presenter.unconfigured? || presenter.empty? %>
+    <%= render "ahoy_dashboard/search_console/columns", presenter: presenter %>
+  <% end %>
+
+  <%= render "ahoy_dashboard/search_console/rows", presenter: presenter %>
+
+  <% unless presenter.empty? %>
+    <%= render "ahoy_dashboard/search_console/notes", presenter: presenter %>
+  <% end %>
+
+  <% if !presenter.unconfigured? && !presenter.empty? %>
+    <%= dash_card_footer action: true do %>
+      <%= dash_button presenter.details_path,
+            tone: :link,
+            class: "more",
+            "aria-haspopup": "dialog",
+            data: {
+              tm_frame: AhoyDashboard::SearchConsolePresenter::DETAILS_FRAME,
+              action: "dash--modal#open",
+              "dash--modal-key-param": "search_console"
+            } do %>
+        <%= dash_icon(:expand, size: 13, class_name: "bx") %>
+        <span><%= presenter.more_label %></span>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

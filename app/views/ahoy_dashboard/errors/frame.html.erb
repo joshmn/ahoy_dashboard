@@ -1,0 +1,6 @@
+<%= dash_frame_tag frame_id do %>
+  <%= dash_card element: :section, class: "panel h-100", role: "alert" do %>
+    <%= dash_empty compact: true, fill: true, title: @error.frame_heading, hint: @error.details.join(", "),
+          action: ({ label: "Try again", url: @error.retry_path, primary: false } if @error.retry?) %>
+  <% end %>
+<% end %>

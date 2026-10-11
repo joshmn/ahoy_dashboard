@@ -1,0 +1,905 @@
+// ---------- settings shell ----------
+.sec > .page-head {
+  margin-bottom: 4px;
+}
+
+.set-menu {
+  display: none;
+}
+
+@include dash-below(880px) {
+  .set-menu {
+    display: block;
+  }
+
+  .set-nav {
+    display: none;
+  }
+}
+
+.set-row-link {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--t1);
+  text-decoration: none;
+}
+
+.set-row-link:hover {
+  color: var(--t1);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.set-card-text {
+  margin: 0;
+  padding: 12px 14px 14px;
+  font-size: $font-size-md;
+  line-height: 1.55;
+  color: var(--t2);
+}
+
+.f-label {
+  font-size: $font-size-md;
+  font-weight: 500;
+  color: var(--t2);
+}
+
+// ---------- goal form ----------
+.goal-form:has(#goal_kind_pageview:checked) .gf-event,
+.goal-form:has(#goal_kind_custom_event:checked) .gf-path {
+  display: none;
+}
+
+// ---------- funnel form ----------
+.fs-add {
+  margin: 0 0 2px 30px;
+}
+
+// ---------- saved question form ----------
+.sq-question {
+  font-size: $font-size-lg;
+  line-height: 1.5;
+  color: var(--t1);
+}
+
+// ---------- alert rules ----------
+.al-name {
+  display: block;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--t1);
+  text-decoration: none;
+}
+
+.al-name:hover {
+  color: var(--t1);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.al-watch {
+  margin-top: 2px;
+  font-size: $font-size-sm;
+  line-height: 1.45;
+  color: var(--t3);
+}
+
+.al-rules .row-actions > * + * {
+  margin-left: 0.5rem;
+}
+
+// ---------- jobs ----------
+.jr-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.jr-name b {
+  font-weight: 500;
+}
+
+.jr-name .set-row-link {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.jr-error > td {
+  --bs-table-bg: var(--danger-fill);
+}
+
+.jr-error > td > div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.jr-error code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+// ---------- google search console ----------
+.gsc-confirm-msg {
+  font-size: $font-size-md;
+  color: var(--t2);
+}
+
+.gsc-meta .mono {
+  font-size: $font-size-sm;
+}
+
+.gsc-err {
+  margin-top: 6px;
+}
+
+.gsc-acts form {
+  margin: 0;
+}
+
+.set-more {
+  position: relative;
+}
+
+.set-more > .btn .ic {
+  margin-right: -3px;
+}
+
+.set-more__panel {
+  top: calc(100% + 4px);
+  right: 0;
+  left: auto;
+}
+
+.set-more__form {
+  display: block;
+  margin: 0;
+}
+
+.set-more__form .menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+  background: none;
+}
+
+// ---------- plain tables (search console rows, explore) ----------
+.set-table,
+.ex-table {
+  font-size: $font-size-md;
+}
+
+.set-find {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.set-find .form-control {
+  max-width: 360px;
+}
+
+// ---------- explore ----------
+// The question is two rows: what is being asked, then how the answer is drawn.
+// They used to be one wrapping line with the columns menu pushed right by
+// ms-auto, so at four filters it landed in the middle of the sentence.
+.ex-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ex-ask__sentence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  max-width: 100%;
+}
+
+// A connector and the control it introduces are one part, because the sentence
+// breaks between parts: "over" was ending a line with its date range starting
+// the next one.
+.ex-ask__part {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+// The filter list is the one part with no length limit, so it is the one part
+// allowed to break inside itself.
+.ex-ask__part--filters {
+  flex-wrap: wrap;
+}
+
+.ex-ask__word {
+  color: var(--t3);
+  white-space: nowrap;
+}
+
+.ex-ask__note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: $font-size-sm;
+  color: var(--t3);
+}
+
+.ex-ask__views {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.ex-ask__status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.ex-note {
+  margin: 0;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: $font-size-sm;
+  color: var(--t3);
+}
+
+.ex-table {
+  width: 100%;
+}
+
+.ex-label {
+  display: flex;
+  min-width: 0;
+  height: 20px;
+  align-items: center;
+  font-weight: 400;
+  color: var(--t1);
+  text-decoration: none;
+}
+
+.ex-label .rn {
+  flex: 1 1 auto;
+  contain: inline-size;
+}
+
+.ex-label:hover .nm {
+  color: var(--t1);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+// ---------- realtime ----------
+.rt-count {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+// ---------- ask ----------
+.ask-page > .alert {
+  margin-bottom: 16px;
+}
+
+.ask-notice {
+  flex: none;
+  margin: 10px 12px 12px;
+}
+
+// ---------- track a keyword ----------
+.kw-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 288px;
+  gap: 16px;
+  align-items: start;
+}
+
+.kw-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.kw-q {
+  height: 38px;
+  font-size: $font-size-lg;
+}
+
+.kw-lang {
+  max-width: 120px;
+}
+
+.kw-sugg {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kw-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kw-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: $font-size-md;
+  color: var(--t2);
+  text-decoration: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.kw-chip:hover {
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--t1);
+}
+
+.kw-chip-t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kw-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kw-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 2px 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--bs-border-radius);
+  background: var(--tm-chip-bg);
+  font-size: $font-size-md;
+  color: var(--t1);
+}
+
+.kw-tag-t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kw-tag-x.btn-icon {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+}
+
+.kw-places {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kw-place {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr) 28px;
+  gap: 8px;
+  align-items: center;
+}
+
+// The place row when there is a list to pick from. One control instead of two,
+// because what it holds is one place with a path rather than a country and a
+// string, and two fields could disagree about which country the city is in.
+.kw-place-pick {
+  grid-template-columns: minmax(0, 1fr) 28px;
+}
+
+.kw-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--bs-border-radius);
+  background: var(--bs-body-bg);
+  font-size: $font-size-md;
+  color: var(--t1);
+  text-align: left;
+}
+
+.kw-pick:hover {
+  border-color: var(--t3);
+}
+
+.kw-pick:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 1px;
+}
+
+.kw-pick .ic {
+  flex: none;
+  margin-left: auto;
+  color: var(--t3);
+}
+
+.kw-pick-t {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kw-pick-t.nil {
+  color: var(--t3);
+}
+
+// Where the next place starts from, shown in front of the blank it is waiting
+// for: "Illinois, United States" then "Pick a place". Somebody adding a second
+// city should be able to see they are still inside the same state.
+.kw-pick-ctx {
+  flex: none;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--t3);
+}
+
+.kw-pick-ctx::after {
+  content: ",";
+}
+
+.kw-add.btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-left: -6px;
+}
+
+.kw-add.btn-link:hover {
+  color: var(--t1);
+}
+
+.kw-sum {
+  position: sticky;
+  top: 81px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+
+.kw-sum-hd {
+  margin: 0;
+  font-size: $font-size-lg;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.kw-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+}
+
+.kw-facts > div {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.kw-facts dt {
+  font-size: $font-size-sm;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--t3);
+}
+
+.kw-facts dd {
+  margin: 0;
+  font-size: $font-size-md;
+  line-height: 1.45;
+  color: var(--t1);
+  overflow-wrap: anywhere;
+}
+
+.kw-facts dd.nil {
+  color: var(--t3);
+}
+
+.kw-cost {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.kw-big {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-size: $font-size-md;
+  color: var(--t2);
+}
+
+.kw-big b {
+  font-size: $font-size-3xl;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--t1);
+}
+
+.kw-cost-hint,
+.kw-over {
+  margin: 0;
+  font-size: $font-size-sm;
+  line-height: 1.5;
+  color: var(--t3);
+}
+
+.kw-over {
+  padding: 7px 9px;
+  border: 1px solid rgba(210, 166, 94, 0.32);
+  border-radius: 7px;
+  background: rgba(210, 166, 94, 0.08);
+  color: #e3bd7c;
+}
+
+.kw-acts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kw-acts .btn {
+  justify-content: center;
+  width: 100%;
+  height: 32px;
+}
+
+@include dash-below(1000px) {
+  .kw-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kw-sum {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .kw-place {
+    grid-template-columns: minmax(0, 1fr) 28px;
+  }
+
+  .kw-place .form-control {
+    grid-row: 2;
+  }
+}
+
+.kw-place:has(> [data-remove][hidden]) {
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+}
+
+.kw-place-pick:has(> [data-remove][hidden]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+// ---------- the place picker ----------
+// A row is two controls: the name picks the place, the chevron opens what is
+// inside it. A state is both, and a row that only did one of them would make
+// half the tree unreachable.
+// The popover's own scroller, which is what this borrows, has no padding of its
+// own, so its scrollbar landed on top of the chevron that opens a place. The
+// gutter is reserved rather than overlaid, and the row keeps a little of its
+// own clearance for the browsers that overlay it anyway.
+//
+// It is also taller than a popover. 302px is right for something hanging off a
+// button; this is a dialog with 60vh to spend, and a list of 240 countries in a
+// third of it is a lot of scrolling.
+.pl-sc {
+  max-height: min(48vh, 440px);
+  scrollbar-gutter: stable;
+}
+
+.pl-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  gap: 2px;
+  align-items: center;
+  padding-right: 4px;
+}
+
+.pl-row .menu-item {
+  width: 100%;
+}
+
+.pl-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pl-in {
+  margin-left: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: $font-size-sm;
+  color: var(--t3);
+}
+
+.pl-kind {
+  font-size: $font-size-sm;
+  color: var(--t3);
+  text-transform: lowercase;
+}
+
+.pl-into.btn-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--t3);
+}
+
+.pl-into.btn-icon:hover {
+  color: var(--t1);
+}
+
+.pl-more {
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  .kw-place:has(> [data-remove][hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+// ---------- importing a list ----------
+// Same two column shape as tracking one keyword, because it is the same
+// decision at a different size: pick the searches on the left, see what they
+// cost on the right, and never scroll past the button.
+.kwi-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.kwi-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kwi-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kwi-find {
+  position: relative;
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 320px;
+}
+
+.kwi-wipe.btn-icon {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  transform: translateY(-50%);
+}
+
+.kwi-acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+// The whole reason the page was unreadable: a hundred and fifty rows pushed
+// every setting and the button below the fold. The list scrolls inside itself
+// and the rest of the form stays where it is.
+.kwi-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kwi-list .table-scroll {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.kwi-list thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bs-body-bg);
+}
+
+.kwi-paste {
+  padding-top: 8px;
+}
+
+// ---------- page group preview ----------
+.grp-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.grp-preview-hd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.grp-preview-hd h2 {
+  margin: 0;
+  font-size: $font-size-md;
+  font-weight: 500;
+  color: var(--t2);
+}
+
+.grp-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.grp-list:empty {
+  display: none;
+}
+
+.grp-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: $font-size-md;
+}
+
+.grp-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.grp-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  color: var(--t1);
+}
+
+.grp-count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--t3);
+}
+
+.grp-list .grp-more {
+  color: var(--t3);
+}
+
+// The way into the whole list. Underlined because it is the one row in the box
+// that does something, and nothing else about a row says it is a control.
+.grp-more-open.btn-link {
+  --bs-btn-padding-x: 0;
+  --bs-btn-padding-y: 0;
+  font-size: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+
+.grp-more-open.btn-link:hover {
+  background: none;
+  text-decoration-color: currentcolor;
+}
+
+// Inside the dialog the box is the whole panel, so it drops the edge it needs
+// under the field and lets the panel's own scroll carry the rows.
+.grp-list-all {
+  border: 0;
+}
+
+.grp-list-all li {
+  min-height: 32px;
+  padding: 0;
+}
+
+
+.tm-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.tm-range__bound {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tm-range__word {
+  color: var(--t3);
+  white-space: nowrap;
+}
+
+.tm-range .form-control {
+  width: auto;
+}
+
+.tm-range__time.form-control {
+  width: 7.5rem;
+}
+
+.tm-range__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 575.98px) {
+  .tm-range__bound {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .tm-range__word {
+    width: 2.5rem;
+  }
+}

@@ -1,0 +1,53 @@
+<% content_for :title, "#{@chat.title_or_default} - Ask" %>
+<% available = AhoyDashboard::Assistant.available? %>
+
+<section class="ask-page">
+  <%= dash_page_head title: @chat.title_or_default, clip: true,
+        lede: "Answers come from the same data as the dashboard.",
+        actions: capture {
+          dash_button_to("New question", chats_path, method: :post,
+                         reason: (AhoyDashboard::Settings::Display.assistant_notice unless available)) +
+            dash_button("All conversations", chats_path)
+        } %>
+
+  <% unless available %>
+    <%= render "ahoy_dashboard/chats/unavailable" %>
+  <% end %>
+
+  <%= dash_card class: "chat-card",
+        data: { controller: "dash--chat-ask",
+                action: "keydown->dash--chat-ask#keydown",
+                "chat-fresh": @chat.chat_messages.none?.to_s } do %>
+    <%= dash_card_header "Conversation" do %>
+      <% if @chat.chat_messages.any? %>
+        <%= dash_button_to "Delete", chat_path(@chat), method: :delete, tone: :danger,
+              confirm: "Delete this conversation?" %>
+      <% end %>
+    <% end %>
+
+    <%= render "ahoy_dashboard/chats/thread", chat: @chat %>
+
+    <%= form_with url: chat_messages_path(@chat), method: :post, class: "chat-ask",
+          data: { "dash--chat-ask-target": "form" } do %>
+      <div class="chat-ask__row">
+        <%= label_tag "message_content", "Ask about the data", class: "visually-hidden" %>
+        <%= text_area_tag "message[content]", nil, id: "message_content", rows: 1,
+              class: "chat-ask__inp",
+              placeholder: "Ask about traffic, searches or rankings",
+              autocomplete: "off", autofocus: available, disabled: !available,
+              data: { "dash--chat-ask-target": "input",
+                      action: "input->dash--chat-ask#grow" },
+              "aria-describedby": "chat_ask_hint" %>
+        <button type="submit" class="chat-send" aria-label="Ask" aria-describedby="chat_ask_hint"
+                <%= "disabled" unless available %>
+                data-dash--chat-ask-target="send">
+          <%= dash_icon(:up, size: 15) %>
+        </button>
+      </div>
+
+      <p class="chat-ask-hint small text-body-tertiary" id="chat_ask_hint">
+        <%= available ? "Enter to send, Shift+Enter for a new line." : AhoyDashboard::Settings::Display.assistant_notice %>
+      </p>
+    <% end %>
+  <% end %>
+</section>

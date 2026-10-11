@@ -1,0 +1,13 @@
+  <% if cards.any? %>
+    <section class="pinned-qs" aria-labelledby="tm-pinned-title">
+      <header class="pq-hd">
+        <h2 id="tm-pinned-title">Pinned questions</h2>
+        <%= dash_button "Manage in Explore", settings_saved_queries_path,
+              tone: :link, data: { tm_frame: "_top" } %>
+      </header>
+
+      <div class="pq-grid">
+        <%= render partial: "ahoy_dashboard/pinned_questions/card", collection: cards, as: :card %>
+      </div>
+    </section>
+  <% end %>

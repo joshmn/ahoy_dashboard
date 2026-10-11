@@ -1,0 +1,26 @@
+<% skipped = Array(local_assigns[:except]).map(&:to_s) %>
+<% query.to_query.each do |name, value| %>
+  <% next if name.to_s == "filters" || skipped.include?(name.to_s) %>
+  <% next if value.nil? || value.to_s.empty? %>
+  <%= hidden_field_tag name, value, id: nil %>
+<% end %>
+<%# The filter being edited is left out on purpose: the row in the form puts it
+    back with whatever it was changed to, so applying replaces rather than adds a
+    second filter on the same dimension. %>
+<% dropped = local_assigns[:except_filter] %>
+<% numbered = local_assigns[:numbered] %>
+<% if query.filters.none? && query.carried_filters.present? && !local_assigns.key?(:except_filter) %>
+  <%= hidden_field_tag "filters", query.carried_filters, id: nil %>
+<% end %>
+<% index = -1 %>
+<% query.filters.groups.each_with_index do |group, position| %>
+  <% group.each do |filter| %>
+    <% index += 1 %>
+    <% next if dropped.present? && index == dropped.to_i %>
+    <% fields = filter.to_param %>
+    <% fields = fields.merge(AhoyDashboard::Filters::GROUP => position) if !group.single? || position == numbered %>
+    <% fields.each do |name, value| %>
+      <%= hidden_field_tag "filters[][#{name}]", value, id: nil %>
+    <% end %>
+  <% end %>
+<% end %>

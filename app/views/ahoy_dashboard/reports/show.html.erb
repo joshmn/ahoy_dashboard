@@ -1,0 +1,11 @@
+<% if params[:view] == "details" %>
+  <%= dash_frame_tag "report_details_#{@report.key}" do %>
+    <%= render "ahoy_dashboard/reports/details", report: @report, tab: @tab, presenter: @presenter %>
+  <% end %>
+<% else %>
+  <%= dash_frame_tag "report_#{@report.key}" do %>
+    <% cache_if @snapshot, dash_dashboard_cache_key([:report, @report.key], snapshot: @snapshot), expires_in: AhoyDashboard::Dashboards::Snapshot::MAX_AGE do %>
+      <%= render "ahoy_dashboard/reports/card", report: @report, tab: @tab, presenter: @presenter %>
+    <% end %>
+  <% end %>
+<% end %>

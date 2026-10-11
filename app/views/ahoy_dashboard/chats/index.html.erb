@@ -1,0 +1,54 @@
+<% content_for :title, "Ask" %>
+<% available = AhoyDashboard::Assistant.available? %>
+
+<section class="ask-page">
+  <%= dash_page_head title: "Ask",
+        lede: "Ask questions about your traffic, searches and rankings. Answers come from the same data as the dashboard.",
+        actions: dash_button_to("Start a question", chats_path, method: :post, tone: :primary,
+                                reason: (AhoyDashboard::Settings::Display.assistant_notice unless available)) %>
+
+  <% unless available %>
+    <%= render "ahoy_dashboard/chats/unavailable" %>
+  <% end %>
+
+  <%= dash_card do %>
+    <% if @chats.any? %>
+      <%= dash_card_header pluralize(@result.total, "conversation") %>
+
+      <%= dash_table label: "Chats", cols: "minmax(0, 1fr) 110px 140px" do %>
+        <thead>
+          <tr>
+            <th scope="col">Question</th>
+            <th scope="col" class="num">Messages</th>
+            <th scope="col">Asked</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @chats.each do |chat| %>
+            <tr>
+              <td>
+                <div class="t-main">
+                  <%= link_to chat.title_or_default, chat_path(chat), class: "set-row-link text-truncate" %>
+                  <% if chat.pending? %>
+                    <%= dash_badge "Writing" %>
+                  <% end %>
+                </div>
+              </td>
+              <td class="num"><%= chat.chat_messages.size %></td>
+              <td class="t-when"><%= dash_ago(chat.created_at) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+
+      <% if @result.pages > 1 %>
+        <%= dash_pager "Page #{@result.page} of #{@result.pages}", label: "Pages of conversations",
+              previous: (chats_path(page: @result.page - 1) if @result.previous?),
+              following: (chats_path(page: @result.page + 1) if @result.more?) %>
+      <% end %>
+    <% else %>
+      <%= dash_empty title: "Nothing asked yet",
+            hint: available ? "Start a question and it reads your traffic, searches and rankings to answer." : "Your questions show here once the assistant is on." %>
+    <% end %>
+  <% end %>
+</section>

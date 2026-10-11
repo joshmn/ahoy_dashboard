@@ -1,0 +1,27 @@
+<% list_id = "#{scope}_tag_suggestions" %>
+<% hint = local_assigns.fetch(:hint, "Type a tag and press Enter. A tag is only a label, for reading your rankings one group at a time.") %>
+<div data-controller="dash--tag-field" data-dash--tag-field-name-value="<%= scope %>[tags][]">
+  <%= form.text_field :tags, label: "Tags", optional: true, hint: hint,
+        value: form.object.tag_list.join(", "), autocomplete: "off", list: list_id,
+        placeholder: "Brand, pricing, blog",
+        data: { "dash--tag-field-target": "entry",
+                action: "keydown->dash--tag-field#key change->dash--tag-field#commit" } %>
+
+  <ul class="kw-tags list-unstyled mb-0 mt-2" aria-label="Tags added" hidden
+      data-dash--tag-field-target="list"></ul>
+
+  <datalist id="<%= list_id %>">
+    <% form.object.tag_suggestions.each do |tag| %>
+      <option value="<%= tag %>"></option>
+    <% end %>
+  </datalist>
+
+  <template data-dash--tag-field-target="template">
+    <li class="kw-tag">
+      <span class="kw-tag-t" data-tag-text></span>
+      <%= dash_icon_button :close, label: "Remove tag", class: "kw-tag-x",
+            data: { action: "dash--tag-field#remove" } %>
+      <input type="hidden" value="">
+    </li>
+  </template>
+</div>

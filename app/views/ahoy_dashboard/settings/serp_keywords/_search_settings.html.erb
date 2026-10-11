@@ -1,0 +1,81 @@
+<% import = local_assigns.fetch(:import, false) %>
+<% cost_line = import ? "Each place adds a search for every keyword." : "Each place is another search every time it runs." %>
+
+<% places_hint = capture do %>
+  <% if plan.picker? %>
+    Up to <%= AhoyDashboard::SerpKeyword::MAX_LOCATIONS %> places. Pick a country to search the whole of it,
+    or keep opening it to reach a state, a county or a city. <%= cost_line %>
+  <% else %>
+    Up to <%= AhoyDashboard::SerpKeyword::MAX_LOCATIONS %> places. Leave the city blank to search the whole country.
+    For a city, use Google's name for it, like <span class="mono">Chicago,Illinois,United States</span>.
+    <%= cost_line %>
+    <% if plan.picker_hint? %>
+      <%= dash_link "Build the place list", settings_job_run_path("places"), data: { tm_frame: "_top" } %>
+      to pick from every place Google will search from instead of typing them.
+    <% elsif plan.picker_off_reason %>
+      <%= dash_link plan.picker_off_reason, settings_job_run_path("places"), data: { tm_frame: "_top" } %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<%= form.fieldset :locations, label: "Places to search from", hint: places_hint, id: form.field_id(:locations) do %>
+  <div class="kw-places">
+    <% plan.rows.each_with_index do |row, index| %>
+      <% row_id = "#{scope}_place_#{index}" %>
+      <div class="kw-place<%= " kw-place-pick" if plan.picker? %>" id="<%= row_id %>"
+           data-dash--keyword-form-target="place"
+           data-place-name="<%= row.label %>"
+           data-place-code="<%= row.code %>"
+           data-place-parent="<%= row.parent_code %>"
+           data-place-parent-label="<%= row.parent_label %>">
+        <% if plan.picker? %>
+          <input type="hidden" name="<%= scope %>[place_countries][]" value="<%= row.country %>">
+          <input type="hidden" name="<%= scope %>[place_cities][]" value="<%= row.city %>">
+
+          <button type="button" class="kw-pick" data-tm-place="<%= row_id %>"
+                  data-place-label="Place {n}" aria-label="Place <%= index + 1 %>">
+            <span class="kw-pick-ctx" data-place-context <%= "hidden" if row.label.present? || row.parent_label.blank? %>><%= row.parent_label %></span>
+            <span class="kw-pick-t<%= " nil" if row.label.blank? %>" data-place-text><%= row.label.presence || "Pick a place" %></span>
+            <%= dash_icon :chevron_down, size: 13 %>
+          </button>
+        <% else %>
+          <label class="visually-hidden" for="<%= scope %>_place_country_<%= index %>"
+                 data-place-label="Country for place {n}">Country for place <%= index + 1 %></label>
+          <%= form.select :place_countries, [ [ "Pick a country", "" ] ] + plan.countries,
+                { selected: row.country },
+                name: "#{scope}[place_countries][]", id: "#{scope}_place_country_#{index}" %>
+
+          <label class="visually-hidden" for="<%= scope %>_place_city_<%= index %>"
+                 data-place-label="City for place {n}">City for place <%= index + 1 %></label>
+          <%= form.text_field :place_cities, value: row.city, name: "#{scope}[place_cities][]",
+                id: "#{scope}_place_city_#{index}", placeholder: "Whole country", autocomplete: "off" %>
+        <% end %>
+
+        <%= dash_icon_button :close, label: "Delete place #{index + 1}", tone: :danger, hidden: true,
+              data: { remove: "", action: "dash--keyword-form#removePlace" } %>
+      </div>
+    <% end %>
+  </div>
+
+  <%= dash_button "Add a place", tone: :link, icon: :plus, class: "kw-add", hidden: true,
+        data: { "dash--keyword-form-target": "add", action: "dash--keyword-form#addPlace" } %>
+<% end %>
+
+<% if plan.picker? %>
+  <%= render "ahoy_dashboard/settings/places/dialog" %>
+<% end %>
+
+<%= form.grid do %>
+  <%= form.segmented :device, AhoyDashboard::Serp::DEVICES, label: "Device", id: form.field_id(:device) %>
+
+  <%= form.text_field :language, label: "Language", hint: "Two letter code, like en or es.", mono: true,
+        class: "kw-lang", autocomplete: "off", placeholder: "en" %>
+<% end %>
+
+<%= form.segmented :frequency, AhoyDashboard::Settings::KeywordPlanPresenter::FREQUENCY_LABELS.to_a,
+      label: "How often", hint: "Weekly is enough for most keywords and costs a seventh of daily.",
+      id: form.field_id(:frequency) %>
+
+<%= form.segmented :pages,
+      (1..AhoyDashboard::Serp::MAX_PAGES).map { |count| [ count, "Top #{count * AhoyDashboard::Serp::RESULTS_PER_PAGE}" ] },
+      label: "How deep", hint: "Most people never look past the top 20.", id: form.field_id(:pages) %>

@@ -1,0 +1,94 @@
+<% content_for :title, @presenter.title %>
+
+<%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "search_console" } do %>
+  <% actions = capture do %>
+    <%= dash_link_menu(id: "sc-period",
+          icon: :cal,
+          label: @presenter.range_label,
+          section: "Date range",
+          items: AhoyDashboard::SeoRange.periods.reject(&:custom?).map { |period|
+            { label: period.label, url: @presenter.path(period: period.key), active: period.key == query.period.key }
+          }) %>
+
+    <%= render "ahoy_dashboard/search_console/slice_menus", menus: @presenter.menus %>
+
+    <%= dash_button_to "Sync now", @presenter.sync_path, reason: @presenter.sync_reason %>
+  <% end %>
+
+  <%= dash_page_head title: @presenter.title, lede: @presenter.subtitle, actions: actions %>
+  <%= render "ahoy_dashboard/search_console/problem" %>
+
+  <% if @presenter.any? %>
+    <%= dash_unavailable_notice "Sync now", @presenter.sync_reason, fix: @presenter.sync_fix %>
+  <% end %>
+
+  <% if @presenter.any? %>
+<%# The four numbers, each against the same length of time before it, and each
+    one the switch for what the chart under it draws. Position counts the wrong
+    way round, so a fall in it is the green one. %>
+    <%= dash_card element: :section, class: "seo-chart-card",
+          "aria-label": "Search performance over time",
+          data: dash_chart_data(@presenter.chart_data, @presenter.chart_options) do %>
+      <%= dash_tiles label: "Which measure the chart draws", element: :nav, ruled: true do %>
+        <% @presenter.tiles.each do |tile| %>
+          <%= dash_tile tile.label, tile.display,
+                url: @presenter.path(measure: tile.key), current: tile.measure == @presenter.measure,
+                delta: tile.delta&.merge(title: @presenter.comparison_title),
+                data: { tm_frame: "_top" } %>
+        <% end %>
+      <% end %>
+
+      <div class="chart-wrap" data-dash--chart-target="canvas"></div>
+
+      <%= dash_card_footer class: "sc-data-note" do %><%= @presenter.data_note %><% end %>
+    <% end %>
+  <% else %>
+    <%= dash_card do %>
+      <%= dash_empty **@presenter.empty_state %>
+    <% end %>
+  <% end %>
+
+  <% if @presenter.connected? || @presenter.any? %>
+  <%= dash_card class: "mt-3" do %>
+    <%= dash_card_header do %>
+      <%= dash_tabs @presenter.tabs.map { |option|
+            { label: option.label, url: option.path, current: option.active?, data: { tm_frame: "_top" } }
+          },
+          label: "Which rows to list" %>
+
+      <%= form_with url: @presenter.path, method: :get, class: "sc-find ms-auto",
+            html: { role: "search", "aria-label": "Filter the rows" } do %>
+        <%= hidden_field_tag :measure, @presenter.measure.key, id: nil %>
+        <%= hidden_field_tag :tab, @presenter.tab, id: nil %>
+        <% @presenter.slice.to_query.each do |name, value| %>
+          <%= hidden_field_tag name, value, id: nil %>
+        <% end %>
+        <%= render "ahoy_dashboard/shared/query_fields", except: [ :q ] %>
+
+        <%= dash_search_field :q, @presenter.term, id: "sc-filter", label: "Filter the rows", placeholder: "Filter…" %>
+      <% end %>
+
+      <span class="g-hint"><%= @presenter.rows_caption %></span>
+      <% if @presenter.rows? %>
+        <%= seo_csv(@presenter, @presenter.tab) %>
+      <% end %>
+      <%= seo_track_form("sc-track") if @presenter.queries? && @presenter.rows? %>
+    <% end %>
+
+    <%= render "ahoy_dashboard/search_console_reports/rows", presenter: @presenter %>
+  <% end %>
+  <% end %>
+
+<%# One keyword, at its own grain, in its own dialog. A sibling of the cards so
+    position: fixed resolves against the page and a card reloading cannot destroy
+    it while it is open. The whole panel is inside the frame, because the title is
+    the keyword and only the frame knows which one was asked for. %>
+  <div>
+    <%= dash_dialog key: "keyword", labelledby: "tm-modal-keyword-title" do %>
+      <%= dash_frame_tag AhoyDashboard::SearchConsoleKeywordPresenter::DETAILS_FRAME do %>
+        <h2 class="visually-hidden" id="tm-modal-keyword-title">Search details</h2>
+        <%= dash_empty "Loading the query", compact: true, role: "status" %>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

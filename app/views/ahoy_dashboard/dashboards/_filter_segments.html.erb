@@ -1,0 +1,68 @@
+<%# The top of the filter dialog's rail: the saved segments, then what can be
+    done with the filters already on the bar.
+
+    Picking a segment replaces the filters on the bar rather than adding to
+    them. A segment is a whole saved question, and two "is" filters on one
+    dimension ask for rows that are two things at once, which is nothing.
+    Filters#replacing settled that for a clicked row and this is the same call,
+    made once for the whole set. Nothing is silent about it either way: the
+    chips on the bar are rewritten to exactly what got applied.
+
+    The applied filters section acts on the bar, not on whatever is being built
+    in the box above, and its heading says so because the box sits right there.
+
+    Each section renders nothing when there is nothing to put in it. An empty
+    heading is worse than no heading.
+
+    The query is a local so the partial can be rendered on its own, and falls back
+    to the dashboard's own when the dialog renders it without one. %>
+<% current = local_assigns.fetch(:query) { query } %>
+<% destination = local_assigns[:destination] %>
+<% carried = local_assigns.fetch(:carried, {}) %>
+<% segments = AhoyDashboard::SegmentDecorator.wrap(AhoyDashboard::Segment.listed) %>
+<% applied = current.filters.to_param %>
+<% heading = "fm-rail__heading small fw-semibold text-uppercase text-body-tertiary px-2 mb-1" %>
+
+<% if segments.any? %>
+  <section class="mb-3" aria-labelledby="tm-filter-rail-segments">
+    <h3 class="<%= heading %>" id="tm-filter-rail-segments">Segments</h3>
+    <%= dash_nav_list do %>
+      <% segments.each do |segment| %>
+        <% if segment.readable? %>
+          <% saved = segment.to_filters.to_param %>
+          <%= dash_nav_item segment.name, dash_destination_path(destination, current.to_query.merge(carried).merge(filters: saved)),
+                icon: :filter, current: saved == applied, class: "fm-rail__link", title: segment.meta,
+                data: { tm_frame: "_top" } %>
+<%# Visible and disabled with the reason rather than dropped, so a segment that
+    stopped working does not quietly vanish off the list while it is still
+    sitting on the settings screen. %>
+        <% else %>
+          <%= dash_nav_item segment.name, icon: :filter, disabled: true, class: "fm-rail__link", title: segment.meta %>
+          <li class="small text-body-tertiary ps-4 pe-2 pb-1"><%= segment.meta %></li>
+        <% end %>
+      <% end %>
+    <% end %>
+  </section>
+<% end %>
+
+<% if current.filters.any? %>
+  <% view = current.to_query.merge(carried).merge(return: destination, filters: applied).compact %>
+  <section class="mb-3" aria-labelledby="tm-filter-rail-applied">
+    <h3 class="<%= heading %>" id="tm-filter-rail-applied">Applied filters</h3>
+    <%= dash_nav_list do %>
+      <%= dash_nav_item "Save as a segment", new_settings_segment_path(filters: applied), icon: :plus,
+            class: "fm-rail__link", data: { tm_frame: "_top" } %>
+      <% if current.filters.none? { |filter| AhoyDashboard::Exclusion::UNUSABLE.include?(filter.dimension.key) } %>
+        <%= dash_nav_item "Hide traffic like this...", new_settings_exclusion_path(filters: applied), icon: :close,
+              class: "fm-rail__link", data: { tm_frame: "_top" } %>
+      <% end %>
+      <% if current.defaulted? %>
+        <%= dash_nav_item "Stop opening with these", settings_default_segment_path, method: :delete, params: view,
+              icon: :close, class: "fm-rail__link" %>
+      <% else %>
+        <%= dash_nav_item "Open with these", settings_default_segment_path, method: :post, params: view,
+              icon: :check, class: "fm-rail__link", title: "The dashboard opens with them." %>
+      <% end %>
+    <% end %>
+  </section>
+<% end %>

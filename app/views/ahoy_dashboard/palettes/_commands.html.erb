@@ -1,0 +1,16 @@
+<% palette.groups.each_with_index do |(group, items), index| %>
+  <div role="group" aria-labelledby="<%= interactive ? "tm-palette" : "commands" %>-group-<%= index %>" <% if interactive %>data-dash--palette-target="group"<% end %>>
+    <div class="ck-g" id="<%= interactive ? "tm-palette" : "commands" %>-group-<%= index %>"><%= group %></div>
+    <% items.each do |item| %>
+      <a href="<%= item.path %>" class="ck-item" data-tm-frame="_top"
+         <% if interactive %>role="option" aria-selected="false" data-dash--palette-target="item"<% end %>
+         data-term="<%= "#{group} #{item.label} #{item.badge}".squish.downcase %>">
+        <%= dash_icon(item.icon, size: 14, class_name: "cki") %>
+        <span><%= item.label %></span>
+        <% if item.badge %>
+          <%= dash_badge item.badge, class: "ms-auto" %>
+        <% end %>
+      </a>
+    <% end %>
+  </div>
+<% end %>

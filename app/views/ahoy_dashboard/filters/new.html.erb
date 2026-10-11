@@ -1,0 +1,98 @@
+<% content_for :title, @presenter.category.title %>
+<% hint_id = "tm-filter-hint-#{@presenter.category.key}" %>
+
+<%# Everything outside the frame is what a reader with no JavaScript gets: the
+    frame is lifted out of this page and the rest left behind, so the dialog never
+    shows a second copy of the heading it already has. %>
+<h2 class="h5 mb-3"><%= @presenter.category.title %></h2>
+
+<%= dash_card padded: true, class: "mb-3" do %>
+  <%= dash_frame_tag dash_filter_frame(@presenter.category) do %>
+<%# A plain GET to the dashboard, which is the whole point: the dashboard is one
+    URL and a filter has to survive without any of this running. _top because the
+    form sits in a frame and applying leaves it. %>
+    <%= form_with url: @presenter.destination, method: :get, class: "",
+          data: {
+            controller: "dash--filter",
+            tm_frame: "_top",
+            "dash--filter-editing-value": @presenter.editing.present?,
+            "dash--filter-options-url-value": @presenter.options_url
+          } do %>
+      <%= render "ahoy_dashboard/shared/query_fields", except_filter: @presenter.edit_index, numbered: @presenter.group_number %>
+      <% @presenter.carried.each do |name, value| %>
+        <%= hidden_field_tag name, value, id: nil %>
+      <% end %>
+
+      <p class="form-text mb-3" id="<%= hint_id %>">
+        <% if @presenter.editing %>
+          Change the value and apply, and this filter is replaced rather than added to. Clear the
+          box and apply to take it off.
+        <% else %>
+          Each box lists the values already in the range you are looking at. Anything you type is used
+          as it is, and a box you leave alone adds no filter.
+        <% end %>
+      </p>
+
+      <% @presenter.dimensions.each do |dimension| %>
+        <% row = dash_filter_row_id(@presenter.category, dimension) %>
+        <% editing = @presenter.editing_for(dimension) %>
+        <% grouped = @presenter.group_number && editing %>
+<%# The three keys have to stay adjacent and in this order. Rails starts a new
+    filter the moment one of them repeats, so a stray field between them would
+    split one row across two filters. %>
+        <div class="tm-filter-row row g-2 align-items-center mb-2">
+          <%= hidden_field_tag "filters[][dimension]", dimension.key, id: nil %>
+
+          <label class="col-sm-3 col-form-label col-form-label-sm text-sm-end" for="<%= row %>-value"><%= dimension.filter_label %></label>
+
+          <div class="col-sm-9">
+            <%= dash_input_group do %>
+              <label class="visually-hidden" for="<%= row %>-operator">How <%= dimension.filter_label %> should match</label>
+              <select class="form-select flex-grow-0 w-auto" id="<%= row %>-operator" name="filters[][operator]">
+                <% AhoyDashboard::Filter::OPERATORS.each do |operator, operator_label| %>
+                  <option value="<%= operator %>" <%= "selected" if editing&.operator.to_s == operator.to_s %>><%= operator_label %></option>
+                <% end %>
+              </select>
+
+              <input class="form-control"
+                     id="<%= row %>-value"
+                     type="text"
+                     name="filters[][value]"
+                     value="<%= editing&.value %>"
+                     autocomplete="off"
+                     placeholder="Select a value"
+                     list="<%= row %>-options"
+                     aria-describedby="<%= hint_id %>"
+                     data-dash--filter-target="value"
+                     data-dash--filter-dimension-param="<%= dimension.key %>"
+                     data-action="input->dash--filter#search">
+
+              <%= dash_icon_button :close, label: "Clear the #{dimension.filter_label.downcase} value", tone: :secondary,
+                    data: { action: "dash--filter#clear" } %>
+            <% end %>
+
+            <datalist id="<%= row %>-options">
+              <% @presenter.options_for(dimension).each do |value| %>
+                <option value="<%= value %>"></option>
+              <% end %>
+            </datalist>
+          </div>
+
+          <%= hidden_field_tag "filters[][group]", @presenter.group_number, id: nil if grouped %>
+        </div>
+      <% end %>
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+<%# A link, not a button: modal#close swallows the click while the dialog is open,
+    and without it this is the way back out of the page. %>
+        <%= dash_button "Cancel", @presenter.cancel, tone: :link, size: :md,
+              data: { action: "dash--modal#close", tm_frame: "_top" } %>
+        <%= dash_button "Apply filter", type: "submit", tone: :primary, size: :md,
+              "aria-describedby": "tm-filter-why-#{@presenter.category.key}",
+              data: { "dash--filter-target": "submit" } %>
+        <span class="dash-why align-self-center" id="tm-filter-why-<%= @presenter.category.key %>"
+              data-dash--filter-target="blocked" hidden>Pick or type a value to apply the filter.</span>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

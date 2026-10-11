@@ -1,0 +1,252 @@
+<% batch = @batch %>
+<% rows = batch ? @picked : @candidates %>
+<% title = batch ? "Track searches" : "Import keywords" %>
+<% content_for :title, title %>
+<% content_for :dash_settings_section, "serp_keywords" %>
+
+<div class="set-main">
+  <section class="sec">
+    <%= dash_page_head title: title,
+          lede: batch ? "The searches you ticked in Search Console. Pick where and how often once, for all of them." : "Tick what is worth tracking, or paste your own list. Everything here gets the same settings.",
+          actions: (dash_button("Track one keyword", new_settings_serp_keyword_path, data: { tm_frame: "_top" }) unless batch) %>
+
+    <%= dash_form_with stack: false, model: @form, scope: :serp_keyword_import,
+          url: settings_serp_keyword_import_path, method: :post, class: "kw-form",
+          data: { controller: "dash--keyword-form",
+                  action: "change->dash--keyword-form#refresh input->dash--keyword-form#refresh",
+                  "dash--keyword-form-costs-value": @plan.costs.to_json,
+                  "dash--keyword-form-durations-value": @plan.durations.to_json,
+                  "dash--keyword-form-month-value": AhoyDashboard::Settings::KeywordPlanPresenter::MONTH.to_i,
+                  "dash--keyword-form-limit-value": AhoyDashboard::Serp::KeywordImportForm::MAX_QUERIES,
+                  "dash--keyword-form-remaining-value": (@plan.remaining if @plan.capped?) } do |form| %>
+      <div class="kw-main">
+        <%= form.error_summary batch ? "That did not save." : "That did not import.", unlinked: [ :engine ] %>
+
+        <% if batch %>
+          <%= hidden_field_tag :batch, 1, id: nil %>
+        <% end %>
+        <% if return_path %>
+          <%= hidden_field_tag :return_to, return_path, id: nil %>
+        <% end %>
+
+        <%= dash_card element: :section, aria: { labelledby: "kwi-what-title" } do %>
+          <div class="kwi-block" data-controller="dash--keyword-list">
+            <div class="kwi-head">
+              <h2 class="fs-6 fw-semibold mb-0" id="kwi-what-title">
+                <%= batch ? "Searches you ticked" : "From Search Console" %>
+              </h2>
+              <% unless batch %>
+                <p class="tm-lede">
+                  Your top queries from the last <%= AhoyDashboard::Serp::ImportCandidatesQuery::DEFAULT_DAYS %>
+                  days that are not tracked yet. Position is Google's average.
+                </p>
+              <% end %>
+            </div>
+
+            <% if rows.any? %>
+              <div class="kwi-bar">
+                <div class="kwi-find">
+                  <%= dash_search_field :kwi_find, nil, label: "Search this list", id: "kwi-find",
+                        placeholder: "Search this list",
+                        data: { "dash--keyword-list-target": "search",
+                                action: "input->dash--keyword-list#filter" } %>
+                  <%= dash_icon_button :close, label: "Clear the search", hidden: true,
+                        class: "kwi-wipe",
+                        data: { "dash--keyword-list-target": "clear", action: "dash--keyword-list#wipe" } %>
+                </div>
+
+                <% unless batch %>
+                  <% sorts = [ [ "impressions", "Impressions" ], [ "clicks", "Clicks" ], [ "position", "Position" ] ] %>
+                  <%= dash_segmented sorts.each_with_index.map { |(key, label), index|
+                        { label: label, current: index.zero?,
+                          data: { key: key, "dash--keyword-list-target": "sort",
+                                  action: "dash--keyword-list#sort" } } },
+                      label: "Sort this list by" %>
+                <% end %>
+
+                <div class="kwi-acts">
+                  <%= dash_button "Select all", data: { action: "dash--keyword-list#all" } %>
+                  <%= dash_button "Clear", tone: :link, data: { action: "dash--keyword-list#none" } %>
+                  <span class="g-hint" role="status" data-dash--keyword-list-target="shown"></span>
+                </div>
+              </div>
+
+              <div class="kwi-list">
+                <%= dash_table label: batch ? "Searches to track" : "Search Console queries",
+                      cols: batch ? "34px minmax(0, 1fr)" : "34px minmax(0, 1fr) 78px 100px 78px", compact: true do %>
+                  <thead>
+                    <tr>
+                      <th scope="col"><span class="visually-hidden">Track</span></th>
+                      <th scope="col"><%= batch ? "Search" : "Query" %></th>
+                      <% unless batch %>
+                        <th scope="col" class="num">Clicks</th>
+                        <th scope="col" class="num">Impressions</th>
+                        <th scope="col" class="num">Position</th>
+                      <% end %>
+                    </tr>
+                  </thead>
+                  <tbody data-dash--keyword-list-target="body">
+                    <% rows.each_with_index do |row, index| %>
+                      <% query = batch ? row : row.query %>
+                      <% id = "serp_keyword_import_selected_#{index}" %>
+                      <tr data-dash--keyword-list-target="row"
+                          data-term="<%= query.downcase %>"
+                          <% unless batch %>
+                            data-clicks="<%= row.clicks %>"
+                            data-impressions="<%= row.impressions %>"
+                            data-position="<%= row.position %>"
+                          <% end %>>
+                        <td>
+                          <% if batch %>
+                            <%= hidden_field_tag "track[]", query, id: nil %>
+                          <% end %>
+                          <%= check_box_tag "serp_keyword_import[selected][]", query,
+                                Array(@form.selected).include?(query), id: id,
+                                aria: { label: "Track #{query}" },
+                                data: { "dash--keyword-form-target": "pick" } %>
+                        </td>
+                        <td>
+                          <label class="t-main mb-0" for="<%= id %>"><%= query %></label>
+                        </td>
+                        <% unless batch %>
+                          <td class="num"><%= dash_number(row.clicks) %></td>
+                          <td class="num"><%= dash_number(row.impressions) %></td>
+                          <td class="num t2"><%= row.position %></td>
+                        <% end %>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                <% end %>
+
+                <p class="pop-none" hidden data-dash--keyword-list-target="empty">
+                  Nothing in this list matches what you typed.
+                </p>
+              </div>
+            <% elsif AhoyDashboard::SearchConsole.installed? %>
+              <%= dash_empty title: "Nothing to offer here",
+                    hint: "Search Console is not connected, or every query it knows about is already tracked. You can still paste your own list below.",
+                    action: { label: "Connect Search Console", url: settings_google_connection_path,
+                              data: { tm_frame: "_top" } } %>
+            <% else %>
+              <%= dash_empty title: "Nothing to offer here",
+                    hint: "Search Console is not installed yet, so there are no queries to pick from. You can still paste your own list below.",
+                    action: { label: "Install Search Console", url: settings_google_connection_path,
+                              data: { tm_frame: "_top" } } %>
+            <% end %>
+          </div>
+        <% end %>
+
+        <% unless batch %>
+          <%= dash_card element: :section do %>
+            <div class="kwi-block">
+              <%= dash_disclosure "Paste your own list", open: @form.pasted.present?, bar: true do %>
+                <div class="kwi-paste">
+                  <%= form.text_area :pasted, label: "One keyword per line", rows: 6, autocomplete: "off",
+                        hint: "Up to #{AhoyDashboard::Serp::KeywordImportForm::MAX_QUERIES} in one go. Repeats, and anything already tracked, are skipped.",
+                        data: { "dash--keyword-form-target": "pasted" } %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        <% end %>
+
+        <%= dash_card element: :section, aria: { labelledby: "kwi-how-title" } do %>
+          <div class="kwi-block">
+            <div class="kwi-head">
+              <h2 class="fs-6 fw-semibold mb-0" id="kwi-how-title">Where and how to search</h2>
+              <p class="tm-lede">Every keyword here gets these. You can change any one of them on its own later.</p>
+            </div>
+
+            <%= render "ahoy_dashboard/settings/serp_keywords/search_settings",
+                  form: form, plan: @plan, scope: "serp_keyword_import", import: true %>
+          </div>
+        <% end %>
+
+        <%= dash_card element: :section do %>
+          <div class="kwi-block">
+            <% if @sites.any? %>
+              <%= form.check_boxes :site_ids, @sites, ->(site) { site.id.to_s }, :name, label: "Sites to look for",
+                    hint: "Every site is read from the same search, so extra sites cost nothing.",
+                    detail: ->(site) { site.domain }, id: form.field_id(:site_ids) %>
+            <% else %>
+              <% sites_hint = capture do %>
+                No sites yet. You can import now and attach sites later.
+                <%= dash_link "Add site", new_settings_serp_site_path, data: { tm_frame: "_top" } %>
+              <% end %>
+              <%= form.fieldset :site_ids, label: "Sites to look for", hint: sites_hint, id: form.field_id(:site_ids) do %><% end %>
+            <% end %>
+
+            <%= render "ahoy_dashboard/settings/serp_keywords/tags_field", form: form, scope: "serp_keyword_import",
+                  hint: "Type a tag and press Enter. Everything imported here gets these tags." %>
+          </div>
+        <% end %>
+
+        <%= form.hidden_field :engine %>
+      </div>
+
+      <%= dash_card element: :aside, class: "kw-sum", aria: { labelledby: "kwi-sum-title" } do %>
+        <h2 class="kw-sum-hd" id="kwi-sum-title">What gets imported</h2>
+
+        <dl class="kw-facts">
+          <div>
+            <dt>Keywords</dt>
+            <dd class="<%= "nil" if @plan.batch_size.zero? %>" data-dash--keyword-form-target="count">
+              <%= @plan.batch_size.zero? ? "Nothing picked yet" : pluralize(@plan.batch_size, "keyword") %>
+            </dd>
+          </div>
+          <div>
+            <dt>From</dt>
+            <dd class="<%= "nil" if @plan.places.empty? %>" data-dash--keyword-form-target="where"><%= @plan.where_label.presence || "No place picked" %></dd>
+          </div>
+          <div>
+            <dt>Device</dt>
+            <dd data-dash--keyword-form-target="device"><%= @plan.device_label %></dd>
+          </div>
+          <div>
+            <dt>Checked</dt>
+            <dd data-dash--keyword-form-target="often"><%= @plan.often_label %></dd>
+          </div>
+        </dl>
+
+        <div class="kw-cost" aria-live="polite">
+          <% if @plan.free? %>
+            <p class="kw-big">
+              <b data-dash--keyword-form-target="total"><%= number_with_delimiter(@plan.batch_checks) %> <%= "check".pluralize(@plan.batch_checks) %></b>
+              <span>a month</span>
+            </p>
+            <p class="kw-cost-hint">
+              Free while results are samples.
+              <%= link_to "Choose a search provider", settings_serp_providers_path, data: { tm_frame: "_top" } %>
+            </p>
+          <% else %>
+            <p class="kw-big">
+              <b data-dash--keyword-form-target="total"><%= number_with_delimiter(@plan.batch_monthly) %> <%= "unit".pluralize(@plan.batch_monthly) %></b>
+              <span>a month</span>
+            </p>
+            <p class="kw-cost-hint">Through <%= @plan.provider_label %>, for everything on this list together.</p>
+            <% if @plan.capped? %>
+              <p class="kw-cost-hint">
+                Your cap is <%= number_with_delimiter(@plan.cap) %> a month, and <%= number_with_delimiter(@plan.remaining) %> are left.
+              </p>
+              <p class="kw-over" data-dash--keyword-form-target="over" <%= "hidden" unless @plan.batch_over_cap? %>>
+                That is more than what is left of your cap this month.
+              </p>
+            <% end %>
+          <% end %>
+
+          <p class="kw-over" data-dash--keyword-form-target="limit"
+             <%= "hidden" unless @plan.batch_size > AhoyDashboard::Serp::KeywordImportForm::MAX_QUERIES %>>
+            Only the first <%= AhoyDashboard::Serp::KeywordImportForm::MAX_QUERIES %> are imported.
+          </p>
+        </div>
+
+        <div class="kw-acts">
+          <%= form.submit(@plan.batch_size.zero? ? "Track keywords" : "Track #{pluralize(@plan.batch_size, 'keyword')}",
+                class: dash_button_class(tone: :primary, size: :md),
+                data: { "dash--keyword-form-target": "submit" }) %>
+          <%= dash_button "Cancel", return_path || settings_serp_keywords_path, tone: :link, size: :md %>
+        </div>
+      <% end %>
+    <% end %>
+  </section>
+</div>
