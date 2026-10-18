@@ -3,15 +3,6 @@ require "tempfile"
 
 module AhoyDashboard
   module Places
-    # The published list, read a batch at a time.
-    #
-    # It is sixteen megabytes and a quarter of a million lines, so it lands in a
-    # tempfile and is parsed off disk rather than held in memory as one string.
-    #
-    # The file is named for the month it was published in and the old ones stay
-    # up, so a run on the second of the month asks for this month and walks
-    # backwards if it is not there yet. That is what makes a missed run harmless:
-    # whenever it next runs it gets the newest list that exists.
     class Source
       OPEN_TIMEOUT = 10
       READ_TIMEOUT = 120
@@ -59,9 +50,6 @@ module AhoyDashboard
 
       private
 
-      # A silent zero row sync is worse than a failed one: the picker would go on
-      # answering with a list that is however old it already was, and nothing
-      # would say so. If the columns move, this stops.
       def check_columns(line)
         missing = HEADERS - line.headers.map(&:to_s)
         return true if missing.empty?
@@ -111,8 +99,8 @@ module AhoyDashboard
       end
 
       def stream(uri, file)
-        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
-                                            open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
+        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https", open_timeout: OPEN_TIMEOUT,
+                                            read_timeout: READ_TIMEOUT, max_retries: 0) do |http|
           request = Net::HTTP::Get.new(uri)
           request["User-Agent"] = AhoyDashboard.user_agent
 

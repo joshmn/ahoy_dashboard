@@ -1,10 +1,4 @@
 module AhoyDashboard
-  # What the month is made of. The provider row holds a running total because
-  # that is what the ceiling is checked against; this holds the same units
-  # broken up by day and by what they went on.
-  #
-  # Keyed by the adapter's name rather than a provider row, because the sample
-  # adapter runs with no row saved anywhere.
   class SerpSpendDay < AhoyDashboard::Record
     KINDS = { checks: 0, keywords: 1, backlinks: 2 }.freeze
 
@@ -16,9 +10,6 @@ module AhoyDashboard
     scope :for_provider, ->(name) { where(provider: name.to_s) }
     scope :in_days, ->(range) { where(on: range) }
 
-    # Never raises in front of a check. A host part way through the migration
-    # has spending that should still work, not spending that blows up on a
-    # missing table, and the ceiling itself lives on the provider row.
     def self.record!(provider:, kind:, units:, on:)
       units = units.to_i
       return if provider.blank? || units.zero?

@@ -295,10 +295,10 @@ Type 2 or more characters and it also searches the values in your traffic, up to
 
 Source and Referrer rows show each site's icon. A background job fetches it from DuckDuckGo's icon service and serves it from `/favicons/<domain>`, so the browser looking at the dashboard never talks to anybody else. Until the icon is cached, the row keeps its letter and the request returns immediately.
 
-- Only domains that have referred a visit get an icon. Anything else is a 404 and fetches nothing.
+- Only domains that have referred a visit in the last 90 days get an icon. Anything else is a 404 and fetches nothing, so an older referrer on a long date range keeps its letter.
 - An icon is cached for 30 days, a domain with no icon for a day, and a failed fetch for 10 minutes.
 - A brand new referring domain waits up to an hour for its icon, because the list of known domains is cached that long.
-- A site with more than 2,000 referring domains gets icons for 2,000 of them, picked in no particular order.
+- A site with more than 2,000 referring domains in that window gets icons for the 2,000 it saw most recently.
 - Rows without an icon show the domain's first letter.
 - Warming requires a cache and a background queue. With no cache or an inline job adapter, rows keep their letters without making external requests.
 

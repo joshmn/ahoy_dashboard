@@ -1,12 +1,8 @@
 module AhoyDashboard
   module Settings
-    # Which rules are on and what each one's number is. Only those two: the
-    # question a rule asks is code, and a screen that let somebody edit it would
-    # be a rules engine nobody asked for.
-    class AlertRulesController < AhoyDashboard::BaseController
+    class AlertRulesController < AhoyDashboard::Settings::BaseController
       requires_installed :alerts
 
-      before_action :set_section
       before_action :set_rule, only: [ :edit, :update ]
 
       def index
@@ -20,12 +16,12 @@ module AhoyDashboard
       end
 
       def update
-        if @rule.waiting_on && ActiveModel::Type::Boolean.new.cast(rule_params[:enabled])
-          redirect_to edit_settings_alert_rule_path(@rule), alert: "#{@rule.name} cannot be switched on. #{@rule.waiting_on.detail}"
-        elsif @rule.update(rule_params)
-          redirect_to settings_alert_rules_path, notice: "Saved #{@rule.name}."
-        else
-          render :edit, status: :unprocessable_entity
+        AhoyDashboard::Alerts::Rules::UpdateCommand.call(rule: @rule, attributes: rule_params) do
+          on(:ok) { redirect_to settings_alert_rules_path, notice: "Saved #{@rule.name}." }
+          on(:refused) do |waiting_on|
+            redirect_to edit_settings_alert_rule_path(@rule), alert: "#{@rule.name} cannot be switched on. #{waiting_on.detail}"
+          end
+          on(:invalid) { render :edit, status: 422 }
         end
       end
 
@@ -37,10 +33,6 @@ module AhoyDashboard
 
       def rule_params
         params.require(:alert_rule).permit(:enabled, :threshold, :floor, :severity)
-      end
-
-      def set_section
-        @dash_settings_section = "alert_rules"
       end
     end
   end

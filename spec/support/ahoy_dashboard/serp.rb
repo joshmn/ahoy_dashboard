@@ -1,15 +1,7 @@
-require_relative "switches"
-
 module SerpFixtures
   FIXTURE_ROOT = Pathname(__dir__).join("serp/fixtures")
   API_KEY = "serpapi-test-key".freeze
 
-  def serp_settings(**values, &block)
-    with_ahoy_dashboard_settings(:serp, **values, &block)
-  end
-
-  # Off in test, the same posture as search console, so a spec that wants the
-  # tracking to actually run has to say so.
   def serp_enabled!(provider: :fake)
     allow(AhoyDashboard::Serp).to receive(:enabled?).and_return(true)
     allow(AhoyDashboard::Serp).to receive(:provider) { AhoyDashboard::Serp.record&.name&.to_sym || provider.to_sym }
@@ -22,6 +14,15 @@ module SerpFixtures
 
   def serp_fixture(name)
     JSON.parse(FIXTURE_ROOT.join("#{name}.json").read)
+  end
+
+  def our_serp_site
+    AhoyDashboard::SerpSite.ours || create(:dash_serp_site, :ours)
+  end
+
+  def serp_reading(keyword, position:, at:, site: our_serp_site, location: "us", provider: "fake", **check)
+    run = create(:dash_serp_run, keyword: keyword, provider: provider, location: location, checked_at: at)
+    create(:dash_serp_check, run: run, site: site, position: position, **check)
   end
 
   def serpapi_body(organic: [], ai_overview: nil, search_id: "test-search-id", status: "Success")

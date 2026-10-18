@@ -1,17 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard job run times", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
-  before do
-    allow(AhoyDashboard::Serp).to receive(:enabled?).and_return(false)
-    allow(AhoyDashboard::Alerts).to receive(:enabled?).and_return(false)
-    allow(AhoyDashboard::SearchConsole).to receive(:enabled?).and_return(false)
-    allow(AhoyDashboard::Backlinks).to receive(:enabled?).and_return(false)
-    sign_in create(:user, :admin)
-  end
+  before { sign_in create(:user, :admin) }
 
   def cadence_of(key)
     row = document.css("tr").find { |tr| tr.at_css("[title='#{key}']") }

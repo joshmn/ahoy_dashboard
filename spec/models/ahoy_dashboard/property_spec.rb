@@ -1,10 +1,6 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::Property do
-  it "sits on the prefixed table" do
-    expect(described_class.table_name).to eq("ahoy_dashboard_properties")
-  end
-
   describe "validations" do
     it "wants a key" do
       expect(described_class.new).not_to be_valid

@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   rspec:
-    name: Rails ${{ matrix.rails }} / Ruby ${{ matrix.ruby }}
+    name: Rails ${{ matrix.rails }} / Ruby ${{ matrix.ruby }}${{ matrix.postgres && format(' / PostgreSQL {0}', matrix.postgres) || '' }}
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -36,6 +36,10 @@ jobs:
           - rails: "8.1"
             ruby: "3.2"
             gemfile: rails_8_1
+          - rails: "8.1"
+            ruby: "3.2"
+            gemfile: rails_8_1
+            postgres: "18"
     env:
       BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/${{ matrix.gemfile }}.gemfile
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ahoy_dashboard_test
@@ -43,11 +47,29 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Start PostgreSQL
+        if: ${{ !matrix.postgres }}
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql libpq-dev
           sudo systemctl start postgresql
           sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+      - name: Start PostgreSQL ${{ matrix.postgres }}
+        if: ${{ matrix.postgres }}
+        env:
+          POSTGRES_VERSION: ${{ matrix.postgres }}
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail --silent --show-error --location -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt jammy-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install --yes "postgresql-${POSTGRES_VERSION}" libpq-dev
+          pg_lsclusters --no-header | awk -v keep="$POSTGRES_VERSION" '$1 != keep { print $1, $2 }' | while read -r version cluster; do
+            sudo pg_dropcluster --stop "$version" "$cluster"
+          done
+          sudo pg_conftool "$POSTGRES_VERSION" main set port 5432
+          sudo pg_ctlcluster "$POSTGRES_VERSION" main restart
+          sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+          sudo -u postgres psql -tAc "show server_version" | tee /dev/stderr | grep -q "^${POSTGRES_VERSION}\."
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}

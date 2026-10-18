@@ -1,22 +1,18 @@
 <% content_for :title, "Kept from the assistant" %>
 <% content_for :dash_settings_section, "assistant_providers" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Kept from the assistant",
-          lede: "Anything ticked here is never read by the assistant. It cannot break traffic down by it, filter on it, or see its value in a filter you have on." %>
+<%= dash_page_head title: "Kept from the assistant",
+      lede: "Anything ticked here is never read by the assistant. It cannot break traffic down by it, filter on it, or see its value in a filter you have on." %>
 
-    <%= dash_card do %>
-      <%= dash_form_with model: @form, scope: :assistant_dimensions,
-            url: settings_assistant_dimensions_path, method: :patch, card: true do |form| %>
-        <%= form.error_summary %>
+<%= dash_card do %>
+  <%= dash_form_with model: @form, scope: :assistant_dimensions,
+        url: settings_assistant_dimensions_path, method: :patch, card: true do |form| %>
+    <%= form.error_summary %>
 
-        <%= form.check_boxes :keys, @form.choices, :key, :label, label: "Dimensions",
-              id: form.field_id(:keys), detail: ->(choice) { choice.key },
-              hint: "Worth ticking anything that can name a person, like an IP address, or a full URL that carries an email or a token in its query string." %>
+    <%= form.check_boxes :keys, @form.choices, :key, :label, label: "Dimensions",
+          id: form.field_id(:keys), detail: ->(choice) { choice.key },
+          hint: "Worth ticking anything that can name a person, like an IP address, or a full URL that carries an email or a token in its query string." %>
 
-        <%= form.actions "Save", cancel: settings_assistant_providers_path %>
-      <% end %>
-    <% end %>
-  </section>
-</div>
+    <%= form.actions "Save", cancel: settings_assistant_providers_path %>
+  <% end %>
+<% end %>

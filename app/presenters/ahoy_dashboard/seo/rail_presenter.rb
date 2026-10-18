@@ -53,7 +53,7 @@ module AhoyDashboard
 
       def menu_item(item)
         { label: item.label, url: item.url, active: item.current?, note: menu_note(item),
-          data: { tm_frame: "_top" } }
+          data: AhoyDashboard::SetupNotice::TOP }
       end
 
       def menu_note(item)
@@ -66,27 +66,14 @@ module AhoyDashboard
         installed = surface.installed?
 
         Item.new(key: surface.key, label: surface.title, url: surface.path(carried),
-                 current: surface.key == current, ready: installed && ready?(surface.key),
+                 current: surface.key == current, ready: installed && ready?(surface),
                  state: (surface.feature_state unless installed))
       end
 
       attr_reader :available
 
-      def ready?(key)
-        case key
-        when "search_console" then available.include?(:search_console) || available.include?(:keywords)
-        when "opportunities", "brand_split" then available.include?(:keywords)
-        when "cannibalization", "conversions" then available.include?(:page_rows)
-        when "rankings", "visibility", "position_changes", "landing_pages" then available.include?(:checks)
-        when "volatility" then available.include?(:results)
-        when "serp_features" then available.include?(:run_pages)
-        when "keyword_gap" then available.include?(:checks) && available.include?(:rivals)
-        when "keyword_research" then available.include?(:ideas)
-        when "backlinks" then available.include?(:backlinks)
-        when "alerts" then available.include?(:alerts)
-        when "ai_visibility" then available.include?(:ai_answers)
-        else true
-        end
+      def ready?(surface)
+        Array(surface.needs).all? { |need| Array(need).any? { |one| available.include?(one) } }
       end
 
       def carried

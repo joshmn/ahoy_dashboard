@@ -1,19 +1,6 @@
 import { Controller } from "../runtime/controllers.js"
-
-// The segment and exclusion forms' filters field.
-//
-// One line per filter. A row's values live in one text box, one per line, which
-// is what the form posts, so a pasted list and a list picked in the filter
-// dialog end up in the same place. The row shows the first few of them and a count
-// until it is opened. Rows and sets added after the page loaded are clones of
-// server-rendered templates, so a new one and one that came with the page
-// cannot drift.
-//
-// With the JavaScript off, rows still open, take a pasted list, and come off.
-// Only picking in the filter dialog needs this.
-//
-// The dialog knows nothing about rows or sets. The buttons that open it say
-// where its picks should land, and Apply hands them back as one event.
+import { escapeHtml } from "../runtime/html.js"
+import { plural } from "../runtime/text.js"
 
 const PLACEHOLDERS = { key: /__key\d*__/g, dimension: "__dimension__", label: "__label__", lower: "__lower__" }
 const SHOWN = 3
@@ -80,9 +67,6 @@ export default class extends Controller {
     this.changed()
   }
 
-  // Picking from traffic for one row opens the dialog on that row's dimension
-  // and nothing else, holding the values the row already has, so taking one
-  // off in the dialog takes it off the row.
   more(event) {
     const row = this.rowOf(event.currentTarget)
     if (!row) return
@@ -254,9 +238,9 @@ export default class extends Controller {
     const name = label || dimension
     const html = template.innerHTML
       .replaceAll(PLACEHOLDERS.key, this.newKey())
-      .replaceAll(PLACEHOLDERS.dimension, this.escape(dimension))
-      .replaceAll(PLACEHOLDERS.label, this.escape(name))
-      .replaceAll(PLACEHOLDERS.lower, this.escape(name.toLowerCase()))
+      .replaceAll(PLACEHOLDERS.dimension, escapeHtml(dimension))
+      .replaceAll(PLACEHOLDERS.label, escapeHtml(name))
+      .replaceAll(PLACEHOLDERS.lower, escapeHtml(name.toLowerCase()))
 
     const row = this.fragment(html)
     holder.appendChild(row)
@@ -274,7 +258,7 @@ export default class extends Controller {
     const values = this.valuesOf(row)
 
     row.querySelectorAll("[data-fx-count]").forEach((node) => { node.textContent = String(values.length) })
-    row.querySelectorAll("[data-fx-noun]").forEach((node) => { node.textContent = values.length === 1 ? "value" : "values" })
+    row.querySelectorAll("[data-fx-noun]").forEach((node) => { node.textContent = plural(values.length, "value") })
     if (live) return
 
     const list = row.querySelector("[data-fx-list]")
@@ -339,13 +323,5 @@ export default class extends Controller {
 
   operatorOf(row) {
     return row.querySelector("select[name$='[operator]']")?.value
-  }
-
-  escape(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
   }
 }

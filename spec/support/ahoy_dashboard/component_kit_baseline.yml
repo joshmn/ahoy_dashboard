@@ -1,79 +1,48 @@
 ---
 bootstrap:
-  app/views/ahoy_dashboard/dashboards/_filter_menu.html.erb:
-    modal-body: 1
   app/views/ahoy_dashboard/dashboards/_stats.html.erb:
     form-check: 1
     form-switch: 1
   app/views/ahoy_dashboard/filters/new.html.erb:
     form-control: 1
-    form-select: 1
     form-text: 1
   app/views/ahoy_dashboard/funnels/_details.html.erb:
-    modal-body: 1
     progress: 1
     progress-bar: 1
-  app/views/ahoy_dashboard/journeys/_column.html.erb:
-    form-control: 1
-  app/views/ahoy_dashboard/reports/_details.html.erb:
-    form-control: 1
-    modal-body: 1
-  app/views/ahoy_dashboard/search_console/_details.html.erb:
-    modal-body: 1
-  app/views/ahoy_dashboard/search_console_keywords/_details.html.erb:
-    modal-body: 1
-  app/views/ahoy_dashboard/seo/brand_splits/show.html.erb:
-    form-control: 1
-retired:
-  app/views/ahoy_dashboard/filters/new.html.erb:
-    dash-why: 1
-  assets/stylesheets/ahoy_dashboard/_base.scss:
-    txt-btn: 2
-  assets/stylesheets/ahoy_dashboard/_settings.scss:
-    sel: 1
+retired: {}
 stylesheet:
   assets/stylesheets/ahoy_dashboard/_base.scss:
-    radius literal: 3
-    rgb colour: 6
+    radius literal: 1
   assets/stylesheets/ahoy_dashboard/_chat.scss:
-    hex colour: 8
-    radius literal: 16
-    rgb colour: 19
+    hex colour: 6
+    radius literal: 15
+    rgb colour: 16
   assets/stylesheets/ahoy_dashboard/_chip.scss:
     radius literal: 3
-    rgb colour: 1
   assets/stylesheets/ahoy_dashboard/_chrome.scss:
-    radius literal: 2
-    rgb colour: 8
-  assets/stylesheets/ahoy_dashboard/_dashboard.scss:
-    hex colour: 1
-    radius literal: 3
-    rgb colour: 4
-  assets/stylesheets/ahoy_dashboard/_mock.scss:
-    hex colour: 24
-    radius literal: 43
-    rgb colour: 73
-  assets/stylesheets/ahoy_dashboard/_overlay.scss:
     rgb colour: 1
+  assets/stylesheets/ahoy_dashboard/_dashboard.scss:
+    radius literal: 2
+    rgb colour: 2
+  assets/stylesheets/ahoy_dashboard/_mock.scss:
+    hex colour: 13
+    radius literal: 30
+    rgb colour: 55
   assets/stylesheets/ahoy_dashboard/_polish.scss:
     radius literal: 1
-    rgb colour: 2
   assets/stylesheets/ahoy_dashboard/_polish_app.scss:
     hex colour: 1
     radius literal: 3
-    rgb colour: 4
+    rgb colour: 2
   assets/stylesheets/ahoy_dashboard/_polish_dashboard.scss:
     hex colour: 1
-    radius literal: 3
-    rgb colour: 11
+    radius literal: 2
+    rgb colour: 7
   assets/stylesheets/ahoy_dashboard/_polish_seo.scss:
-    hex colour: 3
+    hex colour: 2
     radius literal: 9
-    rgb colour: 11
+    rgb colour: 8
   assets/stylesheets/ahoy_dashboard/_popover.scss:
     hex colour: 1
     radius literal: 2
-    rgb colour: 3
-  assets/stylesheets/ahoy_dashboard/_table.scss:
-    radius literal: 1
-    rgb colour: 3
+    rgb colour: 2

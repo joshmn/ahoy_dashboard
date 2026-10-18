@@ -84,15 +84,5 @@ module AhoyDashboard
     def hash
       [self.class, to_h].hash
     end
-
-    def deconstruct
-      self.class.members.map { |name| public_send(name) }
-    end
-
-    def deconstruct_keys(keys)
-      return to_h unless keys
-
-      to_h.select { |name, _value| keys.include?(name) }
-    end
   end
 end

@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::TimeseriesQuery do
   let(:range) { dash_time(2026, 8, 8)..dash_time(2026, 8, 11).end_of_day }
@@ -30,8 +29,6 @@ RSpec.describe AhoyDashboard::TimeseriesQuery do
     expect(points.map(&:first)).to eq(points.map(&:first).sort)
   end
 
-  # An 11pm visit in Chicago is 4am the next day in UTC. Bucketing in UTC moves
-  # it a whole day and every daily total on the chart is wrong by one evening.
   describe "the day boundary" do
     before do
       late = dash_visit(started_at: dash_time(2026, 8, 10, 23, 0), visitor: "late")
@@ -62,15 +59,12 @@ RSpec.describe AhoyDashboard::TimeseriesQuery do
 
   describe "counts" do
     before do
-      first = dash_visit(started_at: dash_time(2026, 8, 9, 9), visitor: "a")
-      dash_page_view(first, path: "/a", at: dash_time(2026, 8, 9, 9))
+      first = dash_landing("/a", at: dash_time(2026, 8, 9, 9), visitor: "a")
       dash_page_view(first, path: "/b", at: dash_time(2026, 8, 9, 9, 5))
 
-      second = dash_visit(started_at: dash_time(2026, 8, 9, 14), visitor: "a")
-      dash_page_view(second, path: "/a", at: dash_time(2026, 8, 9, 14))
+      dash_landing("/a", at: dash_time(2026, 8, 9, 14), visitor: "a")
 
-      third = dash_visit(started_at: dash_time(2026, 8, 10, 9), visitor: "b")
-      dash_page_view(third, path: "/a", at: dash_time(2026, 8, 10, 9))
+      dash_landing("/a", at: dash_time(2026, 8, 10, 9), visitor: "b")
     end
 
     it "counts visits per bucket" do
@@ -85,8 +79,6 @@ RSpec.describe AhoyDashboard::TimeseriesQuery do
       expect(by_date(series("pageviews")).values).to eq([ 0, 3, 1, 0 ])
     end
 
-    # An average of averages is not the average. The ninth is one bounce in two
-    # visits and the tenth is one in one, which is 50 and 100, not 75.
     it "computes a bounce rate per bucket rather than averaging the buckets" do
       values = by_date(series("bounce_rate")).values
 
@@ -124,23 +116,14 @@ RSpec.describe AhoyDashboard::TimeseriesQuery do
 
   describe "scroll depth" do
     before do
-      ninth = dash_visit(started_at: dash_time(2026, 8, 9, 9), visitor: "a")
-      dash_page_view(ninth, path: "/a", at: dash_time(2026, 8, 9, 9))
-      engagement(ninth, depth: 20, at: dash_time(2026, 8, 9, 9, 1))
-      engagement(ninth, depth: 60, at: dash_time(2026, 8, 9, 9, 2))
+      ninth = dash_landing("/a", at: dash_time(2026, 8, 9, 9), visitor: "a")
+      dash_engagement(ninth, depth: 20, at: dash_time(2026, 8, 9, 9, 1), time: nil)
+      dash_engagement(ninth, depth: 60, at: dash_time(2026, 8, 9, 9, 2), time: nil)
 
-      tenth = dash_visit(started_at: dash_time(2026, 8, 10, 9), visitor: "b")
-      dash_page_view(tenth, path: "/a", at: dash_time(2026, 8, 10, 9))
-      engagement(tenth, depth: 90, at: dash_time(2026, 8, 10, 9, 1))
+      tenth = dash_landing("/a", at: dash_time(2026, 8, 10, 9), visitor: "b")
+      dash_engagement(tenth, depth: 90, at: dash_time(2026, 8, 10, 9, 1), time: nil)
     end
 
-    def engagement(visit, depth:, at:, path: "/a")
-      dash_goal(visit, AhoyDashboard::ENGAGEMENT, at: at, path: path, scroll_depth: depth)
-    end
-
-    # Two page views read to 20 and 60 is a bucket that averages 40. Averaging
-    # the ninth's 40 against the tenth's 90 across buckets would say 65 for a day
-    # nobody spent on the site.
     it "averages the depth inside each bucket rather than across them" do
       values = by_date(series("scroll_depth")).values
 
@@ -153,19 +136,15 @@ RSpec.describe AhoyDashboard::TimeseriesQuery do
     end
 
     it "reads past a depth the client never should have sent" do
-      junk = dash_visit(started_at: dash_time(2026, 8, 11, 9), visitor: "c")
-      dash_page_view(junk, path: "/a", at: dash_time(2026, 8, 11, 9))
-      engagement(junk, depth: "most", at: dash_time(2026, 8, 11, 9, 1))
+      junk = dash_landing("/a", at: dash_time(2026, 8, 11, 9), visitor: "c")
+      dash_engagement(junk, depth: "most", at: dash_time(2026, 8, 11, 9, 1), time: nil)
 
       expect(by_date(series("scroll_depth")).values).to eq([ 0.0, 40.0, 90.0, 0.0 ])
     end
   end
 
-  # A visit that started inside the range can own an event outside it. Left
-  # alone groupdate drops that row and the chart stops adding up to the strip.
   it "keeps every pageview of an in range visit on the chart" do
-    late = dash_visit(started_at: dash_time(2026, 8, 11, 23, 45))
-    dash_page_view(late, path: "/a", at: dash_time(2026, 8, 11, 23, 45))
+    late = dash_landing("/a", at: dash_time(2026, 8, 11, 23, 45))
     dash_page_view(late, path: "/b", at: dash_time(2026, 8, 12, 0, 10))
 
     expect(series("pageviews").sum(&:last)).to eq(scope.pageviews.count)

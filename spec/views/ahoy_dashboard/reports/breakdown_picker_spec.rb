@@ -1,19 +1,22 @@
 require "rails_helper"
 
-# The partial is a self-contained control the card head renders, so it is read
-# here rather than through a request: the card decides whether to render it, and
-# what it says about the choice is this file's business.
 RSpec.describe "ahoy_dashboard/reports/_breakdown_picker", type: :view do
   let(:report) { AhoyDashboard::Report.find("pages") }
+  let(:form) { AhoyDashboard::QueryForm.from_params({ period: "7d" }) }
 
   before do
-    form = AhoyDashboard::QueryForm.from_params({ period: "7d" })
+    query = form
 
-    view.define_singleton_method(:query) { form }
+    view.define_singleton_method(:query) { query }
   end
 
   def picker(tab)
-    render partial: "ahoy_dashboard/reports/breakdown_picker", locals: { report: report, tab: tab }
+    presenter = AhoyDashboard::ReportPresenter.new(
+      query: form, report: report, tab: tab,
+      result: AhoyDashboard::BreakdownQuery::Result.new(rows: [], total: 0, more: false)
+    )
+
+    render partial: "ahoy_dashboard/reports/breakdown_picker", locals: { report: report, presenter: presenter }
 
     Nokogiri::HTML5.fragment(rendered)
   end
@@ -34,8 +37,6 @@ RSpec.describe "ahoy_dashboard/reports/_breakdown_picker", type: :view do
     expect(labels(tab("entry_pages"))).to eq([ "Path", "URL", "Hostname" ])
   end
 
-  # Nothing on the exit pages tab can answer a second question, and a menu with
-  # one item in it is a control that does nothing.
   it "renders nothing at all for a tab that offers no choice" do
     expect(picker(tab("exit_pages")).css("*")).to be_empty
     expect(picker(AhoyDashboard::Report.find("sources").tab("channels")).css("*")).to be_empty
@@ -53,8 +54,6 @@ RSpec.describe "ahoy_dashboard/reports/_breakdown_picker", type: :view do
     expect(picker(tab("entry_pages")).at_css("a[aria-current=true]").text.strip).to eq("Path")
   end
 
-  # The tick is read off the dimension the card actually grouped by, so it cannot
-  # promise a url while the rows are paths.
   it "ticks the option the card fell back to on a value nobody registered" do
     expect(picker(tab("entry_pages", "banana")).at_css("a[aria-current=true]").text.strip)
       .to eq("Path")

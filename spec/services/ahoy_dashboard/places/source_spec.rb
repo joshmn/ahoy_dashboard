@@ -34,6 +34,15 @@ RSpec.describe AhoyDashboard::Places::Source do
     expect(found.map(&:country_code).uniq).to eq([ "us" ])
   end
 
+  it "turns off the retry Net::HTTP does on its own, so a download cut off halfway is not written twice" do
+    allow(Net::HTTP).to receive(:start).and_call_original
+    stub_request(:get, url(2026, 9)).to_return(status: 200, body: body)
+
+    rows(described_class.new(on: Date.new(2026, 9, 2)))
+
+    expect(Net::HTTP).to have_received(:start).with("cdn.dataforseo.com", 443, hash_including(max_retries: 0))
+  end
+
   it "leaves postal codes out by default, because a rank check is never run from one" do
     stub_request(:get, url(2026, 9)).to_return(status: 200, body: body)
 
@@ -48,9 +57,6 @@ RSpec.describe AhoyDashboard::Places::Source do
     expect(found.map(&:kind)).to include("postal code")
   end
 
-  # The file is named for the month it was published in and the old ones stay
-  # up, so a run before this month's exists, or a run that was missed for a
-  # while, takes the newest one there is rather than failing.
   it "walks back a month at a time when this month is not published yet" do
     stub_request(:get, url(2026, 9)).to_return(status: 404, body: "")
     stub_request(:get, url(2026, 8)).to_return(status: 200, body: body)

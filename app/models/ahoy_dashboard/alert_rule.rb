@@ -1,17 +1,11 @@
 module AhoyDashboard
-  # What to watch for. The key decides which evaluator runs and the threshold is
-  # the one number that rule reads.
-  #
-  # Seeded switched off. A rule that fires the day it is installed has never been
-  # calibrated against anything, and the fastest way to make somebody archive
-  # these unread is to send them a week of noise first.
   class AlertRule < AhoyDashboard::Record
     self.table_name = "ahoy_dashboard_alert_rules"
 
     enum :severity, { high: 0, medium: 1, low: 2 }, validate: true, prefix: true
 
     has_many :events, -> { order(fired_at: :desc) }, class_name: "AhoyDashboard::AlertEvent",
-             foreign_key: :rule_id, inverse_of: :rule, dependent: :destroy
+             foreign_key: :rule_id, inverse_of: :rule, dependent: :delete_all
 
     validates :key, :name, presence: true
     validates :key, uniqueness: true, inclusion: { in: ->(_rule) { Alerts::Catalogue.keys } }
@@ -59,10 +53,6 @@ module AhoyDashboard
 
     def quiet?
       last_fired_at.nil?
-    end
-
-    def to_param
-      id.to_s
     end
 
     private

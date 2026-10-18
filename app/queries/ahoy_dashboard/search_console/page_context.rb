@@ -4,13 +4,9 @@ module AhoyDashboard
 
   module SearchConsole
 
-    class PageContext
-      attr_reader :account, :countries, :stored_span
-
+    PageContext = Data.define(:account, :countries, :stored_span) do
       def initialize(account: nil, countries: [], stored_span: nil)
-        @account = account
-        @countries = countries
-        @stored_span = stored_span
+        super
       end
 
       def connected?

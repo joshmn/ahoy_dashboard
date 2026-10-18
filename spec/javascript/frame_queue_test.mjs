@@ -1,25 +1,21 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { FrameQueue } from "../../assets/javascript/runtime/frame_queue.js"
+import { deferred } from "./support/deferred.mjs"
 
 const flush = () => new Promise((resolve) => setImmediate(resolve))
 
 const panel = (id, started) => {
-  let finish
-  let fail
-  const response = new Promise((resolve, reject) => {
-    finish = resolve
-    fail = reject
-  })
+  const response = deferred()
 
   return {
     id,
     isConnected: true,
-    finish,
-    fail,
+    finish: response.resolve,
+    fail: response.reject,
     loadInitial() {
       started.push(id)
-      return response
+      return response.promise
     },
   }
 }

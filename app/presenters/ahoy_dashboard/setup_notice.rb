@@ -44,6 +44,25 @@ module AhoyDashboard
         hint: "Alerts only fire for rules that are on. Pick the ones you want to watch.",
         label: "Alert rules"
       },
+      alert_emails: {
+        title: "Set up alert emails to hear about alerts",
+        label: "Set up alert emails"
+      },
+      ai_visibility: {
+        title: "Turn on AI visibility to get started",
+        hint: "AI visibility is off. Every answer is a paid request, so it stays off until you " \
+              "switch it on under Settings, Features."
+      },
+      ai_assistant: {
+        title: "Turn on an assistant to get started",
+        hint: "Every assistant that is on and has a key is asked your prompts.",
+        label: "Set up an assistant"
+      },
+      ai_prompts: {
+        title: "Write your prompts to get started",
+        hint: "Write the questions you want to show up in, one per line.",
+        label: "Write prompts"
+      },
       keyword_research: {
         title: "Turn on keyword research to get started",
         hint: "Keyword research is off. It uses a paid keyword data provider, so it stays off until you " \
@@ -98,9 +117,12 @@ module AhoyDashboard
 
     def self.search_console(routes, account: google_account, hint: nil)
       step = search_console_step(account)
-      url = step == :property ? routes.edit_settings_search_console_property_path : routes.settings_google_connection_path
 
-      call(step, url: url, hint: hint)
+      call(step, url: search_console_url(routes, step), hint: hint)
+    end
+
+    def self.search_console_url(routes, step)
+      step == :property ? routes.edit_settings_search_console_property_path : routes.settings_google_connection_path
     end
   end
 end

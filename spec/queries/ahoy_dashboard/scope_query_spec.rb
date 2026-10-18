@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::ScopeQuery do
   let(:range) { dash_day_range(2026, 8, 10) }
@@ -14,13 +13,9 @@ RSpec.describe AhoyDashboard::ScopeQuery do
     expect(dash_scope(range: range, include_crawlers: true)).to be_include_crawlers
   end
 
-  # Plausible's session model: an event belongs to the range its visit started
-  # in, not the range its own timestamp falls in. Everything on the dashboard
-  # tells one story only because of this.
   describe "range anchoring" do
     it "keeps an event whose visit started inside the range" do
-      visit = dash_visit(started_at: dash_time(2026, 8, 10, 23, 50))
-      dash_page_view(visit, path: "/a", at: dash_time(2026, 8, 10, 23, 50))
+      visit = dash_landing("/a", at: dash_time(2026, 8, 10, 23, 50))
       dash_page_view(visit, path: "/b", at: dash_time(2026, 8, 11, 0, 20))
 
       scope = dash_scope(range: range)
@@ -39,11 +34,6 @@ RSpec.describe AhoyDashboard::ScopeQuery do
       expect(scope.pageviews.count).to eq(0)
     end
 
-    # ahoy's store clamps an event that arrives before its own visit up to the
-    # visit's start, so no event of an in-range visit can predate the range. The
-    # floor is what gives the planner something to narrow ahoy_events by, and
-    # without it every event-scope card reads the whole table however short the
-    # range is.
     it "reads no event older than the range, and keeps the ones after it" do
       late = dash_visit(started_at: dash_time(2026, 8, 10, 23, 50))
       dash_page_view(late, path: "/b", at: dash_time(2026, 8, 11, 0, 20))
@@ -53,7 +43,7 @@ RSpec.describe AhoyDashboard::ScopeQuery do
       expect(scope.pageviews.count).to eq(1)
       expect(scope.visit_events.to_sql).to include(%("ahoy_events"."time" >=))
       expect(scope.events.to_sql).to include(%("ahoy_events"."time" >=))
-      expect(scope.base_events.to_sql).to include(%("ahoy_events"."time" >=))
+      expect(scope.session_events.to_sql).to include(%("ahoy_events"."time" >=))
     end
 
     it "asks for no floor when the range has no beginning" do
@@ -66,13 +56,10 @@ RSpec.describe AhoyDashboard::ScopeQuery do
       bot = dash_visit(started_at: dash_time(2026, 8, 10, 3), visitor: "bot")
       dash_page_view(bot, path: "/faq.md", at: dash_time(2026, 8, 10, 3), crawler: "GPTBot")
 
-      mixed = dash_visit(started_at: dash_time(2026, 8, 10, 4), visitor: "mixed")
-      dash_page_view(mixed, path: "/faq", at: dash_time(2026, 8, 10, 4))
+      mixed = dash_landing("/faq", at: dash_time(2026, 8, 10, 4), visitor: "mixed")
       dash_page_view(mixed, path: "/faq.md", at: dash_time(2026, 8, 10, 5), crawler: "ClaudeBot")
     end
 
-    # The site tracks bots on the .md and .txt mirrors on purpose, so leaving
-    # them in makes the dashboard mostly robots.
     it "leaves a bot only visit out by default" do
       scope = dash_scope(range: range)
 
@@ -90,8 +77,7 @@ RSpec.describe AhoyDashboard::ScopeQuery do
 
   describe "events and pageviews" do
     it "keeps goals in events and out of pageviews" do
-      visit = dash_visit(started_at: dash_time(2026, 8, 10, 9))
-      dash_page_view(visit, path: "/search", at: dash_time(2026, 8, 10, 9))
+      visit = dash_landing("/search", at: dash_time(2026, 8, 10, 9))
       dash_goal(visit, "site_searched", at: dash_time(2026, 8, 10, 9, 1), query: "thomson")
 
       scope = dash_scope(range: range)
@@ -102,21 +88,15 @@ RSpec.describe AhoyDashboard::ScopeQuery do
     end
   end
 
-  # A goal filter has to mean "the sessions that converted", not "the event rows
-  # that are that conversion". A conversion carries no path, so ANDing a goal
-  # filter with a page filter the naive way asks for rows that are both at once,
-  # which is nothing.
   describe "a goal filter" do
     before do
-      AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "site_searched")
+      create(:dash_goal, event_name: "site_searched")
 
-      converter = dash_visit(started_at: dash_time(2026, 8, 10, 9), visitor: "converter")
-      dash_page_view(converter, path: "/search", at: dash_time(2026, 8, 10, 9))
+      converter = dash_landing("/search", at: dash_time(2026, 8, 10, 9), visitor: "converter")
       dash_page_view(converter, path: "/thanks", at: dash_time(2026, 8, 10, 9, 4))
       dash_goal(converter, "site_searched", at: dash_time(2026, 8, 10, 9, 1))
 
-      bystander = dash_visit(started_at: dash_time(2026, 8, 10, 10), visitor: "bystander")
-      dash_page_view(bystander, path: "/search", at: dash_time(2026, 8, 10, 10))
+      dash_landing("/search", at: dash_time(2026, 8, 10, 10), visitor: "bystander")
     end
 
     let(:scope) do
@@ -127,8 +107,6 @@ RSpec.describe AhoyDashboard::ScopeQuery do
       expect(scope.visits.pluck(:visitor_token)).to eq([ "converter" ])
     end
 
-    # All of the converting session's page views, not just the conversion. A goal
-    # filter picks which sessions to look at, not which views to count.
     it "counts every page view of a converted session" do
       expect(scope.pageviews.count).to eq(2)
       expect(scope.pageviews.pluck(AhoyDashboard::Sql::EVENT_PATH).sort).to eq(%w[/search /thanks])
@@ -153,14 +131,12 @@ RSpec.describe AhoyDashboard::ScopeQuery do
 
   describe "a visit scope filter" do
     before do
-      AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "site_searched")
+      create(:dash_goal, event_name: "site_searched")
 
-      us = dash_visit(started_at: dash_time(2026, 8, 10, 9), visitor: "us", country: "US")
-      dash_page_view(us, path: "/a", at: dash_time(2026, 8, 10, 9))
+      us = dash_landing("/a", at: dash_time(2026, 8, 10, 9), visitor: "us", country: "US")
       dash_page_view(us, path: "/b", at: dash_time(2026, 8, 10, 9, 5))
 
-      ca = dash_visit(started_at: dash_time(2026, 8, 10, 10), visitor: "ca", country: "CA")
-      dash_page_view(ca, path: "/a", at: dash_time(2026, 8, 10, 10))
+      dash_landing("/a", at: dash_time(2026, 8, 10, 10), visitor: "ca", country: "CA")
     end
 
     it "narrows the visits and the pageviews through the join" do
@@ -171,17 +147,12 @@ RSpec.describe AhoyDashboard::ScopeQuery do
     end
   end
 
-  # The filter-by-page behaviour that makes this a plausible clone rather than
-  # a table of counts: the sessions become the sessions that saw the page, the
-  # pageview count becomes views of that page.
   describe "an event scope filter" do
     before do
-      both = dash_visit(started_at: dash_time(2026, 8, 10, 9), visitor: "both")
-      dash_page_view(both, path: "/pricing", at: dash_time(2026, 8, 10, 9))
+      both = dash_landing("/pricing", at: dash_time(2026, 8, 10, 9), visitor: "both")
       dash_page_view(both, path: "/features", at: dash_time(2026, 8, 10, 9, 5))
 
-      other = dash_visit(started_at: dash_time(2026, 8, 10, 10), visitor: "other")
-      dash_page_view(other, path: "/features", at: dash_time(2026, 8, 10, 10))
+      dash_landing("/features", at: dash_time(2026, 8, 10, 10), visitor: "other")
     end
 
     it "narrows the visits to the ones that saw the page" do
@@ -213,12 +184,10 @@ RSpec.describe AhoyDashboard::ScopeQuery do
 
   describe "an exit page filter" do
     before do
-      left_on_b = dash_visit(started_at: dash_time(2026, 8, 10, 9), visitor: "left_on_b")
-      dash_page_view(left_on_b, path: "/a", at: dash_time(2026, 8, 10, 9))
+      left_on_b = dash_landing("/a", at: dash_time(2026, 8, 10, 9), visitor: "left_on_b")
       dash_page_view(left_on_b, path: "/b", at: dash_time(2026, 8, 10, 9, 5))
 
-      left_on_a = dash_visit(started_at: dash_time(2026, 8, 10, 10), visitor: "left_on_a")
-      dash_page_view(left_on_a, path: "/b", at: dash_time(2026, 8, 10, 10))
+      left_on_a = dash_landing("/b", at: dash_time(2026, 8, 10, 10), visitor: "left_on_a")
       dash_page_view(left_on_a, path: "/a", at: dash_time(2026, 8, 10, 10, 5))
     end
 
@@ -239,12 +208,37 @@ RSpec.describe AhoyDashboard::ScopeQuery do
       ))
       expect(conflicting.visits).to be_empty
     end
+
+    it "reads an or'd exit page group off one pass over the page views" do
+      scope = dash_scope(range: range, filters: AhoyDashboard::Filters.new([
+        dash_group([ "exit_page", "is", "/a" ], [ "exit_page", "is", "/b" ])
+      ]))
+
+      expect(scope.visits.pluck(:visitor_token)).to contain_exactly("left_on_a", "left_on_b")
+      expect(scope.visits.to_sql.scan("distinct on").size).to eq(1)
+
+      one_side = dash_scope(range: range, filters: AhoyDashboard::Filters.new([
+        dash_group([ "exit_page", "is", "/a" ], [ "exit_page", "contains", "nowhere" ])
+      ]))
+      expect(one_side.visits.pluck(:visitor_token)).to eq([ "left_on_a" ])
+    end
+  end
+
+  describe "#relation_for" do
+    it "checks for a page view inside the range on an entry dimension, and still drops visits without one" do
+      viewed = dash_landing("/in", at: dash_time(2026, 8, 10, 9), visitor: "viewed")
+      dash_visit(started_at: dash_time(2026, 8, 10, 10), visitor: "never")
+
+      relation = dash_scope(range: range).relation_for(AhoyDashboard::Dimension.find("entry_page"))
+
+      expect(relation.to_sql).to include("dash_views.time >=")
+      expect(relation.pluck(:visitor_token)).to eq([ "viewed" ])
+    end
   end
 
   describe "#with_exits" do
     it "hangs the last page of each visit off the visit row" do
-      visit = dash_visit(started_at: dash_time(2026, 8, 10, 9), visitor: "one")
-      dash_page_view(visit, path: "/a", at: dash_time(2026, 8, 10, 9))
+      visit = dash_landing("/a", at: dash_time(2026, 8, 10, 9), visitor: "one")
       dash_page_view(visit, path: "/b", at: dash_time(2026, 8, 10, 9, 5))
 
       scope = dash_scope(range: range)
@@ -268,7 +262,7 @@ RSpec.describe AhoyDashboard::ScopeQuery do
     distinct = double("distinct visits")
     allow(scope.visits).to receive(:distinct).and_return(distinct)
     calls = 0
-    allow(distinct).to receive(:count).with(:visitor_token) do
+    allow(distinct).to receive(:count).with(AhoyDashboard::Sql::VISITOR_TOKEN) do
       calls += 1
       sleep 0.02
       17
@@ -303,17 +297,14 @@ RSpec.describe AhoyDashboard::ScopeQuery do
     end
 
     before do
-      AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "site_searched")
+      create(:dash_goal, event_name: "site_searched")
 
-      us = dash_visit(started_at: dash_time(2026, 8, 10, 9), visitor: "us", country: "US")
-      dash_page_view(us, path: "/a", at: dash_time(2026, 8, 10, 9))
+      us = dash_landing("/a", at: dash_time(2026, 8, 10, 9), visitor: "us", country: "US")
       dash_page_view(us, path: "/b", at: dash_time(2026, 8, 10, 9, 5))
 
-      ca = dash_visit(started_at: dash_time(2026, 8, 10, 10), visitor: "ca", country: "CA", browser: "Firefox")
-      dash_page_view(ca, path: "/pricing", at: dash_time(2026, 8, 10, 10))
+      dash_landing("/pricing", at: dash_time(2026, 8, 10, 10), visitor: "ca", country: "CA", browser: "Firefox")
 
-      de = dash_visit(started_at: dash_time(2026, 8, 10, 11), visitor: "de", country: "DE")
-      dash_page_view(de, path: "/a", at: dash_time(2026, 8, 10, 11))
+      de = dash_landing("/a", at: dash_time(2026, 8, 10, 11), visitor: "de", country: "DE")
       dash_goal(de, "site_searched", at: dash_time(2026, 8, 10, 11, 2))
     end
 
@@ -368,11 +359,8 @@ RSpec.describe AhoyDashboard::ScopeQuery do
 
   describe "excluded traffic" do
     before do
-      AhoyDashboard::Exclusion.create!(name: "Data centers", filters: [
-        { "dimension" => "asn", "operator" => "contains", "value" => "AMAZON", "group" => 0 },
-        { "dimension" => "asn", "operator" => "contains", "value" => "GOOGLE", "group" => 0 }
-      ])
-      AhoyDashboard::Exclusion.create!(name: "Scanners", filters: [ { "dimension" => "page", "operator" => "contains", "value" => "wp-login" } ])
+      dash_exclusion("Data centers", [ "asn", "contains", "AMAZON", 0 ], [ "asn", "contains", "GOOGLE", 0 ])
+      dash_exclusion("Scanners", [ "page", "contains", "wp-login" ])
 
       { "person" => nil, "office" => "Comcast Cable", "aws" => "AMAZON-02", "gcp" => "GOOGLE-CLOUD", "scanner" => "Hetzner" }.each_with_index do |(visitor, asn), hour|
         visit = dash_visit(started_at: dash_time(2026, 8, 10, 9 + hour), visitor: visitor, asn: asn)

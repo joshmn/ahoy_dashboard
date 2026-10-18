@@ -1,9 +1,11 @@
 module AhoyDashboard
   module Seo
     class AlertPresenter < BasePresenter
+      delegate :rules, :live, :sample_data?, :enabled?, :deliverable?, :emailing?, to: :result
+
       def tiles
         [
-          Tile.new(label: "Rules", value: number(result.rules.size), note: "#{result.live.size} on", tone: nil),
+          Tile.new(label: "Rules", value: number(rules.size), note: "#{live.size} on", tone: nil),
           Tile.new(label: "Alerts", value: number(result.total), note: range_label, tone: nil),
           Tile.new(label: "Serious", value: number(result.firing), note: "high severity", tone: nil),
           Tile.new(label: "Quiet rules", value: number(result.quiet), note: "never fired", tone: nil),
@@ -12,16 +14,8 @@ module AhoyDashboard
         ]
       end
 
-      def rules
-        result.rules
-      end
-
       def events
         @events ||= AhoyDashboard::AlertEventDecorator.wrap(result.events)
-      end
-
-      def sample_data?(event)
-        result.sample_data?(event)
       end
 
       def sample_notice
@@ -57,18 +51,6 @@ module AhoyDashboard
         routes.seo_alert_path(query.to_query.merge(page: page))
       end
 
-      def enabled?
-        result.enabled?
-      end
-
-      def deliverable?
-        result.deliverable?
-      end
-
-      def emailing?
-        result.emailing?
-      end
-
       def delivery_value
         return "Emailing" if emailing?
 
@@ -85,11 +67,10 @@ module AhoyDashboard
         return AhoyDashboard::SetupNotice.call(:alerts, url: features_path) unless enabled?
 
         unless deliverable? || emailing?
-          return { title: "Set up alert emails to hear about alerts", hint: email_setup_hint,
-                   action: { label: "Set up alert emails", url: emails_path, data: AhoyDashboard::SetupNotice::TOP } }
+          return AhoyDashboard::SetupNotice.call(:alert_emails, url: emails_path, hint: email_setup_hint)
         end
 
-        return nil if result.live.any?
+        return nil if live.any?
 
         AhoyDashboard::SetupNotice.call(:alert_rule, url: rules_path)
       end
@@ -133,39 +114,19 @@ module AhoyDashboard
         rule.condition
       end
 
-      def watches_for(rule)
-        AhoyDashboard::AlertRuleDecorator.new(rule).watches
-      end
-
-      def severity_tone(severity)
-        seo_tone(severity)
-      end
-
-      def seo_tone(severity)
-        case severity
-        when :high then :danger
-        when :medium then :warning
-        else :neutral
-        end
-      end
-
-      def severity_label(severity)
-        severity.to_s.capitalize
-      end
-
       def csv_tables
         [
           CsvTable.new(key: "recent", label: "Recent alerts", headers: alerts_headers) do
             events.map do |event|
-              values = [ csv_time(event.fired_at), severity_label(event.severity), event.headline, event.detail,
+              values = [ csv_time(event.fired_at), event.severity_label, event.headline, event.detail,
                          event.rule.name, ("Sample" if sample_data?(event)) ]
-              values << sent_label(event) if deliverable?
+              values << event.sent_label if deliverable?
               values
             end
           end,
           CsvTable.new(key: "rules", label: "Rules that are on",
                        headers: [ "Rule", "Fires when", "Fired", "Last fired" ]) do
-            result.live.map do |rule|
+            live.map do |rule|
               [ rule.name, condition_for(rule), rule.fired_count, csv_time(rule.last_fired_at) ]
             end
           end
@@ -184,12 +145,6 @@ module AhoyDashboard
 
       def alerts_headers
         [ "When", "Severity", "What happened", "Detail", "Rule", "Sample data", *("Sent" if deliverable?) ]
-      end
-
-      def sent_label(event)
-        return "Sent" if event.delivered?
-
-        event.delivery_error.present? ? "Failed" : "Not sent"
       end
     end
   end

@@ -18,22 +18,16 @@ module AhoyDashboard
           AhoyDashboard::Assistant::Tools::BaseTool.window_params(self)
         end
 
-        def execute(query: nil, **asked)
-          return { error: "rank tracking is not installed, so there is nothing to read" } unless self.class.available?
+        private
 
+        def answer(query: nil, **asked)
           site = AhoyDashboard::SerpSite.ours
           return not_ours if site.nil?
 
           read = window(**asked)
 
           query.present? ? one(read, query, site) : all(read, site)
-        rescue Window::UnknownPeriod => e
-          unknown_period(e)
-        rescue Slice::InvalidFilters => e
-          invalid_filters(e)
         end
-
-        private
 
         def not_ours
           sites = AhoyDashboard::SerpSite.pluck(:domain)

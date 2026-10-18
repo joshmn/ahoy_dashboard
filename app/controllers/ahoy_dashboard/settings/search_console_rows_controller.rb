@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class SearchConsoleRowsController < AhoyDashboard::BaseController
+    class SearchConsoleRowsController < AhoyDashboard::Settings::BaseController
       requires_installed :search_console
 
       def index

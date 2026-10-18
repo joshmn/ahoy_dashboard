@@ -5,7 +5,6 @@ module AhoyDashboard
       SEARCHES_SHOWN = 12
       POOL_LIMIT = 100
       ASKED = "people_also_ask".freeze
-      SHARE_FLOOR = 3
 
       SHORT = {
         "featured_snippet" => "Snippet",
@@ -23,6 +22,8 @@ module AhoyDashboard
       CELLS = { ours: "shown, with your site in it", on: "shown", off: "not shown" }.freeze
 
       Feature = Data.define(:key, :label, :short, :seen, :share, :ours, :leader, :ownable)
+
+      delegate :clean?, :unreadable?, to: :result
 
       def tracking_phrases
         (questions + searches).map(&:text)
@@ -44,7 +45,7 @@ module AhoyDashboard
             tally = holders(key).flatten.each_with_object(Hash.new(0)) { |value, counts| counts[value] += 1 }
 
             Feature.new(key: key, label: label, short: SHORT.fetch(key, label), seen: seen, share: share,
-                        ours: holders(key).count { |domains| domains.any? { |domain| ours?(domain) } },
+                        ours: holders(key).count { |domains| domains.any? { |domain| mine?(domain) } },
                         leader: tally.max_by { |_domain, count| count }&.first, ownable: tally.any?)
           end
         end
@@ -82,7 +83,7 @@ module AhoyDashboard
       def cell(row, feature)
         return :off unless row.has?(feature.key)
 
-        domains_for(row, feature.key).any? { |domain| ours?(domain) } ? :ours : :on
+        domains_for(row, feature.key).any? { |domain| mine?(domain) } ? :ours : :on
       end
 
       def cell_label(state)
@@ -139,10 +140,6 @@ module AhoyDashboard
         "#{pluralize(result.searches.size, "suggestion")} from Google"
       end
 
-      def clean?
-        result.clean?
-      end
-
       def shown(key)
         result.counts.find { |candidate, _label, _seen, _share| candidate == key }&.third.to_i
       end
@@ -154,7 +151,7 @@ module AhoyDashboard
       end
 
       def answered_note
-        answered = result.questions.count { |asked| asked.answers.keys.any? { |domain| ours?(domain) } }
+        answered = result.questions.count { |asked| asked.answers.keys.any? { |domain| mine?(domain) } }
 
         "#{number(answered)} answered by you"
       end
@@ -168,14 +165,6 @@ module AhoyDashboard
       def blind_note
         "Some older checks did not save the results page, so they have no features to show. " \
           "They are counted separately."
-      end
-
-      def ours?(domain)
-        result.mine?(domain)
-      end
-
-      def unreadable?
-        result.unreadable?
       end
 
       def csv_tables
@@ -221,7 +210,7 @@ module AhoyDashboard
         headers = [ "Question", ("Searches" if repeats?), ("Answered by" if answered?) ].compact
 
         CsvTable.new(key: "questions", label: "People also ask", headers: headers) do
-          (questions_head + questions_rest).map do |asked|
+          questions.map do |asked|
             line = [ asked.text ]
             line << asked.times if repeats?
             line << asked.top if answered?
@@ -232,7 +221,7 @@ module AhoyDashboard
 
       def related_table
         CsvTable.new(key: "related", label: "Related searches", headers: [ "Related search", "Searches" ]) do
-          (searches_head + searches_rest).map { |suggestion| [ suggestion.text, suggestion.times ] }
+          searches.map { |suggestion| [ suggestion.text, suggestion.times ] }
         end
       end
 

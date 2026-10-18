@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe AhoyDashboard::Alerts::Rules::InstallCommand do
   it "installs every rule switched off at its default threshold" do
@@ -18,7 +17,7 @@ RSpec.describe AhoyDashboard::Alerts::Rules::InstallCommand do
   end
 
   it "leaves a rule somebody switched on alone" do
-    create(:dash_alert_rule, key: "job_failed", name: "A job failed", enabled: true, severity: :low)
+    create(:dash_alert_rule, key: "job_failed", enabled: true, severity: :low)
 
     described_class.call
 
@@ -28,10 +27,7 @@ RSpec.describe AhoyDashboard::Alerts::Rules::InstallCommand do
   it "checks installed keys in one read without touching existing rules" do
     described_class.call
     before = AhoyDashboard::AlertRule.order(:id).map(&:attributes)
-    queries = []
-    subscriber = ->(_name, _started, _finished, _id, payload) { queries << payload[:sql] unless payload[:name] == "SCHEMA" }
-
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { described_class.call }
+    queries = captured_sql(cached: true) { described_class.call }
 
     expect(AhoyDashboard::AlertRule.order(:id).map(&:attributes)).to eq(before)
     expect(queries.count { |sql| sql.start_with?("SELECT") }).to eq(1)
@@ -64,14 +60,14 @@ RSpec.describe AhoyDashboard::Alerts::Rules::InstallCommand do
     expect(event.reload.rule).to eq(obsolete)
   end
 
-  it "says how many rules it added and how many it dropped" do
+  it "says how many rules it added, leaving retired rows out of the count" do
     obsolete = build(:dash_alert_rule, key: "retired_rule")
     obsolete.save!(validate: false)
 
     outcome = described_class.call[:ok]
 
-    expect(outcome).to have_attributes(added: AhoyDashboard::Alerts::Catalogue.keys.size, removed: 0)
-    expect(described_class.call[:ok]).to have_attributes(added: 0, removed: 0)
+    expect(outcome).to have_attributes(added: AhoyDashboard::Alerts::Catalogue.keys.size)
+    expect(described_class.call[:ok]).to have_attributes(added: 0)
   end
 
   describe "with some sources not installed" do
@@ -85,17 +81,16 @@ RSpec.describe AhoyDashboard::Alerts::Rules::InstallCommand do
       expect(AhoyDashboard::AlertRule.pluck(:key)).to match_array(AhoyDashboard::Alerts::Catalogue.keys)
       expect(AhoyDashboard::AlertRule.where(key: rank_keys).map(&:waiting_on).map(&:label)).to all(eq("Rank tracking"))
       expect(AhoyDashboard::AlertRule.find_by(key: "job_failed").waiting_on).to be_nil
-      expect(outcome).to have_attributes(added: AhoyDashboard::Alerts::Catalogue.keys.size, removed: 0)
+      expect(outcome).to have_attributes(added: AhoyDashboard::Alerts::Catalogue.keys.size)
     end
 
     it "leaves the rows of rules that are installed but whose source is not" do
       rank_keys.each { |key| create(:dash_alert_rule, key: key, name: key.humanize, enabled: true) }
       uninstall_ahoy_dashboard(:serp)
 
-      outcome = described_class.call[:ok]
+      described_class.call
 
       expect(AhoyDashboard::AlertRule.where(key: rank_keys).pluck(:key, :enabled)).to match_array(rank_keys.map { |key| [ key, true ] })
-      expect(outcome).to have_attributes(removed: 0)
     end
 
     it "does nothing when alerts themselves are not installed" do

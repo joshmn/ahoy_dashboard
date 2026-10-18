@@ -1,0 +1,8 @@
+<%= dash_card element: :section, class: local_assigns[:card_class], "aria-label": title do %>
+  <%= dash_card_header title do %>
+    <%= dash_badge state.badge, tone: :warning %>
+  <% end %>
+  <div class="p-3">
+    <%= render "ahoy_dashboard/shared/feature_state", state: state %>
+  </div>
+<% end %>

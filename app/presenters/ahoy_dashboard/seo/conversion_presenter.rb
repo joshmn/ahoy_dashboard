@@ -1,6 +1,8 @@
 module AhoyDashboard
   module Seo
     class ConversionPresenter < BasePresenter
+      delegate :rows, :goals?, to: :result
+
       def tiles
         [
           Tile.new(label: "Search clicks", value: number(clicks), note: "Google's total for the range", tone: nil),
@@ -10,10 +12,6 @@ module AhoyDashboard
           Tile.new(label: "Converting pages", value: goals? ? number(result.converting.size) : nil, note: nil, tone: nil),
           Tile.new(label: "Not converting", value: goals? ? number(result.leaking.size) : nil, note: "pages with traffic", tone: nil)
         ]
-      end
-
-      def rows
-        result.rows
       end
 
       def clicks
@@ -48,19 +46,11 @@ module AhoyDashboard
         result.leaking.first(15)
       end
 
-      def goals?
-        result.goals?
-      end
-
       def goal_notice
         AhoyDashboard::SetupNotice.call(
           :goal, url: new_goal_path,
                  hint: "Clicks and visits still show below. Conversions show once a goal says which page visit or event counts."
         )
-      end
-
-      def conversions_label(row)
-        goals? ? number(row.conversions) : DASH
       end
 
       def rate_label(row)

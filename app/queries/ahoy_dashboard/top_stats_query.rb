@@ -1,47 +1,41 @@
 module AhoyDashboard
-  # The numbers across the top of the dashboard, one per chartable metric, and
-  # the same set for the comparison range when one is asked for.
-  class TopStatsQuery
+  class TopStatsQuery < AhoyDashboard::Query
     Stat = Data.define(:metric, :value, :comparison_value, :change)
     Totals = Data.define(:visitors, :visits, :pageviews, :bounces, :browsed, :duration, :scroll_depth)
     WithSeries = Data.define(:stats, :series, :comparison_series)
-    SESSION_SERIES_METRICS = %w[visitors views_per_visit bounce_rate visit_duration].freeze
+    SESSION_SERIES_METRICS = %w[visitors visits views_per_visit bounce_rate visit_duration].freeze
 
     SESSION_COLUMNS = {
-      visitors: Arel.sql('count(distinct tm_visits.visitor_token collate "C")'),
+      visitors: Sql::SESSION_VISITORS,
       visits: Arel.sql("count(*)"),
-      pageviews: Arel.sql("coalesce(sum(tm_visits.pageviews), 0)"),
+      pageviews: Sql::SESSION_PAGEVIEWS,
       bounces: Arel.sql(Sql::COUNT_BOUNCED),
       browsed: Arel.sql(Sql::COUNT_BROWSED),
-      duration: Arel.sql("coalesce(avg(tm_visits.duration), 0)")
+      duration: Sql::SESSION_DURATION
     }.freeze
     VISIT_COLUMNS = {
-      visitors: Arel.sql('count(distinct ahoy_visits.visitor_token collate "C")'),
+      visitors: Sql::VISITORS,
       visits: Arel.sql("count(*)")
     }.freeze
 
-    def self.call(**options)
-      new(**options).call
-    end
-
-    def self.with_series(scope:, metric:, comparison_scope: nil, interval: TimeseriesQuery::DEFAULT_INTERVAL)
-      new(scope: scope, comparison_scope: comparison_scope).with_series(metric: metric, interval: interval)
-    end
-
-    # A caller that already counted the current range can still build precisely
-    # the same comparison as the strip without counting that range again.
-    def self.stat(metric:, value:, comparison_value: nil)
-      change = unless comparison_value.nil? || comparison_value.to_f.zero?
-        (((value - comparison_value) / comparison_value.to_f) * 100).round
+    class << self
+      def with_series(scope:, metric:, comparison_scope: nil, interval: TimeseriesQuery::DEFAULT_INTERVAL)
+        new(scope: scope, comparison_scope: comparison_scope).with_series(metric: metric, interval: interval)
       end
 
-      Stat.new(metric: metric, value: value, comparison_value: comparison_value, change: change)
+      def stat(metric:, value:, comparison_value: nil)
+        change = unless comparison_value.nil? || comparison_value.to_f.zero?
+          (((value - comparison_value) / comparison_value.to_f) * 100).round
+        end
+
+        Stat.new(metric: metric, value: value, comparison_value: comparison_value, change: change)
+      end
     end
 
     def initialize(scope:, comparison_scope: nil, metrics: nil)
       @scope = scope
       @comparison_scope = comparison_scope
-      keys = metrics && Array(metrics).map { |metric| metric.respond_to?(:key) ? metric.key : metric.to_s }
+      keys = metrics && Array(metrics).map { |metric| TimeseriesQuery.metric_key(metric) }
       @metrics = AhoyDashboard::Metric::ALL.select { |metric| keys.nil? || keys.include?(metric.key) }
     end
 
@@ -52,9 +46,8 @@ module AhoyDashboard
     end
 
     def with_series(metric:, interval:)
-      key = metric.respond_to?(:key) ? metric.key : metric.to_s
-      interval = interval.to_s.to_sym
-      interval = TimeseriesQuery::DEFAULT_INTERVAL unless TimeseriesQuery::INTERVALS.include?(interval)
+      key = TimeseriesQuery.metric_key(metric)
+      interval = TimeseriesQuery.interval(interval)
       current = read_totals(scope, series_key: key, interval: interval)
       previous = comparison_scope && read_totals(comparison_scope, series_key: key, interval: interval)
 
@@ -81,9 +74,6 @@ module AhoyDashboard
       end
     end
 
-    # Session facts share one pass. Without a view filter its pageview counts
-    # also give the pageview total; a view filter needs a separate count because
-    # it narrows the views, not the events inside those sessions.
     def read_totals(target, series_key: nil, interval: nil)
       readings = {}
       if series_key
@@ -109,22 +99,14 @@ module AhoyDashboard
       return session_pageviews?(target) if key == "views_per_visit"
       return true unless key == "visitors"
 
-      # The headline-only bucket aggregates can outweigh the shared scan on an
-      # unusually dense visitor chart. Keep the original path beyond the same
-      # bucket budget used by the custom-range picker; no points are removed.
       target.range.end - target.range.begin <= Period::MAX_BUCKETS * Sql::Buckets::LENGTHS.fetch(interval)
     end
 
-    # A chart bucket and the headline total can share the session reduction.
-    # The grand total has its own distinct visitor count; daily counts cannot
-    # be summed because one visitor may return on several days.
     def session_totals_and_series(target, key, interval)
       bucket = Sql::Buckets.sql(TimeseriesQuery::SESSION_START, interval)
       columns = SESSION_COLUMNS.dup
       columns[:duration_sum] = Arel.sql("sum(tm_visits.duration)") if key == "visit_duration"
-      relation = AhoyDashboard.visit.unscoped.from(Arel.sql("(#{target.per_visit.to_sql}) tm_visits"))
-
-      relation = relation.group(Arel.sql("grouping sets ((#{bucket}), ())"))
+      relation = target.sessions.group(Arel.sql("grouping sets ((#{bucket}), ())"))
       rows = cached_pluck(relation: relation, columns: [Arel.sql("grouping(#{bucket})"), bucket, *columns.values]) do |fresh|
         target.cache_total_visitors(fresh.find { |row| row.first == 1 }.fetch(2))
         if key == "visitors" && reusable_visitor_counts?(target)
@@ -132,37 +114,32 @@ module AhoyDashboard
             .cache_counted_rows(fresh.map { |row| row.first(3) })
         end
       end
-      rows.yield_self do |rows|
-          total = {}
-          counts = {}
-          rows.each do |grouped, time, *values|
-            facts = columns.keys.zip(values).to_h
-            if grouped == 1
-              total = facts
-            else
-              counts[time] = session_series_value(key, facts)
-            end
-          end
-
-          default = session_series_value(key, {})
-          { total: total, series: Sql::Buckets.fill(counts, target.range, interval, default: default).to_a }
+      total = {}
+      counts = {}
+      rows.each do |grouped, time, *values|
+        facts = columns.keys.zip(values).to_h
+        if grouped == 1
+          total = facts
+        else
+          counts[time] = session_series_value(key, facts)
         end
+      end
+
+      default = session_series_value(key, {})
+      { total: total, series: Sql::Buckets.fill(counts, target.range, interval, default: default).to_a }
     end
 
     def session_series_value(key, facts)
       case key
       when "visitors" then facts[:visitors].to_i
+      when "visits" then facts[:visits].to_i
       when "views_per_visit" then ratio(facts[:pageviews].to_i, facts[:visits]).round(2)
       when "bounce_rate" then ratio(facts[:bounces].to_i * 100, facts[:browsed]).round(1)
-      # Keep the chart's sum/count arithmetic, including its rounding, separate
-      # from the headline's PostgreSQL AVG.
       when "visit_duration" then ratio(facts[:duration_sum].to_f, facts[:visits]).round
       end
     end
 
     def reusable_visitor_counts?(target)
-      # Session SQL joins the event table directly. A host event scope can
-      # narrow the separate human-visit relation, so do not publish over it.
       target.include_crawlers? || AhoyDashboard.event.all.to_sql == AhoyDashboard.event.unscoped.to_sql
     end
 
@@ -172,7 +149,7 @@ module AhoyDashboard
       Totals.new(
         visitors: sessions[:visitors].to_i,
         visits: sessions[:visits].to_i,
-        pageviews: (readings[:pageviews] ? readings[:pageviews] : sessions[:pageviews]).to_i,
+        pageviews: (readings[:pageviews] || sessions[:pageviews]).to_i,
         bounces: sessions[:bounces].to_i,
         browsed: sessions[:browsed].to_i,
         duration: sessions[:duration].to_f,
@@ -180,8 +157,6 @@ module AhoyDashboard
       )
     end
 
-    # The engagement event carries its own depth, so this is an average over
-    # events and there is nothing the per visit table can say about it.
     def scroll_depth_for(target)
       relation = target.visit_events.where(name: AhoyDashboard::ENGAGEMENT)
 
@@ -191,11 +166,10 @@ module AhoyDashboard
     def sessions_row(target)
       fields = session_fields
       if wanted?("bounce_rate", "visit_duration")
-        relation = AhoyDashboard.visit.unscoped.from(Arel.sql("(#{target.per_visit.to_sql}) tm_visits"))
+        relation = target.sessions
         columns = SESSION_COLUMNS
         fields += [ :pageviews ] if session_pageviews?(target)
       else
-        # A single pinned visitor/visit total needs no per-session event reduction.
         relation = target.visits
         columns = VISIT_COLUMNS
       end
@@ -203,8 +177,7 @@ module AhoyDashboard
       rows = cached_pluck(relation: relation, columns: fields.map { |field| columns.fetch(field) }) do |fresh|
         target.cache_total_visitors(Array(fresh.first).fetch(fields.index(:visitors))) if fields.include?(:visitors)
       end
-      rows.first
-        .yield_self { |row| fields.zip(Array(row)).to_h }
+      fields.zip(Array(rows.first)).to_h
     end
 
     def cached_pluck(relation:, columns:)

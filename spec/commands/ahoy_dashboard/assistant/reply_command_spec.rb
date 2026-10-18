@@ -1,16 +1,15 @@
 require "rails_helper"
-require "support/ahoy_dashboard/assistant"
 
 RSpec.describe AhoyDashboard::Assistant::ReplyCommand do
-  let(:chat) { AhoyDashboard::Chat.create! }
+  let(:chat) { create(:dash_chat) }
 
   def decorate(message)
     AhoyDashboard::ChatMessageDecorator.new(message)
   end
 
   def asked(question = "how is traffic?")
-    chat.chat_messages.create!(role: :user, status: :complete, content: question)
-    chat.chat_messages.create!(role: :assistant, status: :pending)
+    create(:dash_chat_message, chat: chat, content: question)
+    create(:dash_chat_message, :assistant, :pending, chat: chat)
   end
 
   it "fills in the answer and what it read to get there" do
@@ -120,15 +119,15 @@ RSpec.describe AhoyDashboard::Assistant::ReplyCommand do
 
   it "replays the conversation so the model has what came before" do
     assistant_enabled!
-    chat.chat_messages.create!(role: :user, status: :complete, content: "first question")
-    chat.chat_messages.create!(role: :assistant, status: :complete, content: "first answer")
+    create(:dash_chat_message, chat: chat, content: "first question")
+    create(:dash_chat_message, :assistant, chat: chat, content: "first answer")
     built = assistant_answers("second answer")
     message = asked("second question")
 
     described_class.call(message: message)
 
-    expect(built).to have_received(:add_message).with(role: :user, content: "first question", tool_calls: [])
-    expect(built).to have_received(:add_message).with(role: :assistant, content: "first answer", tool_calls: [])
+    expect(built).to have_received(:add_message).with(role: :user, content: "first question", tool_calls: [], reasoning: nil)
+    expect(built).to have_received(:add_message).with(role: :assistant, content: "first answer", tool_calls: [], reasoning: nil)
     expect(built).to have_received(:ask).with("second question")
   end
 
@@ -194,17 +193,17 @@ RSpec.describe AhoyDashboard::Assistant::ReplyCommand do
 
   it "leaves a question whose answer failed out of what it replays" do
     assistant_enabled!
-    chat.chat_messages.create!(role: :user, status: :complete, content: "answered question")
-    chat.chat_messages.create!(role: :assistant, status: :complete, content: "an answer")
-    chat.chat_messages.create!(role: :user, status: :complete, content: "failed question")
-    chat.chat_messages.create!(role: :assistant, status: :failed, content: described_class::FAILED_MESSAGE)
+    create(:dash_chat_message, chat: chat, content: "answered question")
+    create(:dash_chat_message, :assistant, chat: chat, content: "an answer")
+    create(:dash_chat_message, chat: chat, content: "failed question")
+    create(:dash_chat_message, :assistant, :failed, chat: chat, content: described_class::FAILED_MESSAGE)
     built = assistant_answers("second try")
     message = asked("asked again")
 
     described_class.call(message: message)
 
-    expect(built).to have_received(:add_message).with(role: :user, content: "answered question", tool_calls: [])
-    expect(built).to have_received(:add_message).with(role: :assistant, content: "an answer", tool_calls: [])
+    expect(built).to have_received(:add_message).with(role: :user, content: "answered question", tool_calls: [], reasoning: nil)
+    expect(built).to have_received(:add_message).with(role: :assistant, content: "an answer", tool_calls: [], reasoning: nil)
     expect(built).not_to have_received(:add_message).with(hash_including(content: "failed question"))
     expect(built).to have_received(:add_message).twice
     expect(built).to have_received(:ask).with("asked again")
@@ -213,14 +212,14 @@ RSpec.describe AhoyDashboard::Assistant::ReplyCommand do
   it "replays which tools an earlier answer called, so a follow-up knows what was read" do
     assistant_enabled!
     read = [ { "name" => "breakdown", "arguments" => { "dimension" => "source", "period" => "7d" } } ]
-    chat.chat_messages.create!(role: :user, status: :complete, content: "where from?")
-    chat.chat_messages.create!(role: :assistant, status: :complete, content: "Mostly Google.", tool_calls: read)
+    create(:dash_chat_message, chat: chat, content: "where from?")
+    create(:dash_chat_message, :assistant, chat: chat, content: "Mostly Google.", tool_calls: read)
     built = assistant_answers("the week before")
     message = asked("and the week before?")
 
     described_class.call(message: message)
 
-    expect(built).to have_received(:add_message).with(role: :assistant, content: "Mostly Google.", tool_calls: read)
+    expect(built).to have_received(:add_message).with(role: :assistant, content: "Mostly Google.", tool_calls: read, reasoning: nil)
   end
 
   it "says the model declined rather than showing half an answer" do
@@ -298,7 +297,7 @@ RSpec.describe AhoyDashboard::Assistant::ReplyCommand do
   end
 
   it "leaves an answered turn alone" do
-    message = chat.chat_messages.create!(role: :assistant, status: :complete, content: "done")
+    message = create(:dash_chat_message, :assistant, chat: chat, content: "done")
 
     events = described_class.call(message: message)
 

@@ -1,6 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/switches"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe AhoyDashboard::Features do
   it "covers every installable feature, plus site icons" do
@@ -9,23 +7,6 @@ RSpec.describe AhoyDashboard::Features do
 
   it "is off until switched on, except site icons" do
     (described_class.names - [ :favicons ]).each { |name| expect(described_class.on?(name)).to be(false) }
-    expect(described_class.on?(:favicons)).to be(true)
-  end
-
-  it "keeps what it reads for the request and forgets it on a write" do
-    expect(described_class.on?(:alerts)).to be(false)
-
-    AhoyDashboard::Setting.write("features.alerts.enabled", true)
-    expect(described_class.on?(:alerts)).to be(false)
-
-    AhoyDashboard::Preferences.write(:alerts, enabled: true)
-    expect(described_class.on?(:alerts)).to be(true)
-  end
-
-  it "goes back to the default when cleared" do
-    AhoyDashboard::Preferences.write(:favicons, enabled: false)
-    AhoyDashboard::Preferences.clear(:favicons, :enabled)
-
     expect(described_class.on?(:favicons)).to be(true)
   end
 

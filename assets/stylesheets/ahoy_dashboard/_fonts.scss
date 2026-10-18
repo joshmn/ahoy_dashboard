@@ -1,16 +1,3 @@
-// Inter and JetBrains Mono, served by us.
-//
-// Both are SIL Open Font License; the license text sits beside the files in
-// assets/javascript/fonts/ and has to stay there.
-//
-// The URLs are relative on purpose. The stylesheet is served at
-// <mount>/assets/<build>/ahoy_dashboard.css and the fonts resolve against it, so
-// they pick up the same content digest without the stylesheet having to know
-// what it is. This is the same reason the digest is a path segment rather than
-// part of a filename.
-//
-// Variable weight axis, so one file covers 400 through 700 rather than four.
-
 @font-face {
   font-family: "Inter";
   font-style: normal;

@@ -2,7 +2,7 @@ module AhoyDashboard
   module Alerts
     module Rules
       class InstallCommand < AhoyDashboard::Command
-        Outcome = Data.define(:added, :removed)
+        Outcome = Data.define(:added)
 
         def call
           return broadcast(:not_installed) unless Alerts.installed?
@@ -12,7 +12,7 @@ module AhoyDashboard
           added = definitions.reject { |definition| existing.include?(definition.key) }
                              .map { |definition| install(definition) }
                              .count(&:saved_change_to_id?)
-          broadcast(:ok, Outcome.new(added: added, removed: 0))
+          broadcast(:ok, Outcome.new(added: added))
         end
 
         private

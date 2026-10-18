@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::PageVisitorsQuery do
   let(:now) { dash_time(2026, 8, 10, 12) }
@@ -12,8 +11,7 @@ RSpec.describe AhoyDashboard::PageVisitorsQuery do
 
   before do
     12.times do |index|
-      visit = dash_visit(started_at: now - 1.hour, visitor: "visitor-#{index % 3}", country: "US")
-      dash_page_view(visit, path: "/page-#{index}")
+      visit = dash_landing("/page-#{index}", at: now - 1.hour, visitor: "visitor-#{index % 3}", country: "US")
       dash_page_view(visit, path: "/shared", at: now + 1.day)
     end
     visitor = dash_visit(started_at: now, visitor: "only-goal", country: "CA")
@@ -25,7 +23,7 @@ RSpec.describe AhoyDashboard::PageVisitorsQuery do
   end
 
   def result(form: query, **options)
-    AhoyDashboard::ReportQuery.call(query: form, report: report, **options).fetch(:result)
+    AhoyDashboard::ReportQuery.call(query: form, report: report, **options).result
   end
 
   def shared(form: query)
@@ -93,18 +91,14 @@ RSpec.describe AhoyDashboard::PageVisitorsQuery do
 
   it "reads the page grouping once for the report and initial journey" do
     journey = AhoyDashboard::JourneyQuery.new(scope: query.scope)
-    statements = []
-    subscriber = lambda do |*, payload|
-      statements << payload[:sql] if !payload[:cached] && payload[:sql].include?("GROUP BY") && payload[:sql].include?("ahoy_events")
-    end
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+    statements = captured_sql("ahoy_events") do
       AhoyDashboard.visit.uncached do
         result(page_visitors: journey.page_visitors)
         journey.call
       end
     end
 
-    expect(statements.size).to eq(1)
+    expect(statements.count { |sql| sql.include?("GROUP BY") }).to eq(1)
   end
 
   it "does not offer prepared counts for a chosen journey path" do

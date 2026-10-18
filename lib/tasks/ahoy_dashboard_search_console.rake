@@ -1,17 +1,8 @@
-# Separate from telemetry.rake, which is the demo data generator. These two are
-# operational: what is configured, and pull it now.
 namespace :ahoy_dashboard do
-  not_installed = lambda do |name|
-    feature = AhoyDashboard::Installation.fetch(name)
-    next false if feature.installed?
-
-    puts "#{feature.label.downcase} is not installed. #{AhoyDashboard::Schedule.install_steps([ name ])}"
-    true
-  end
-
   desc "report what the search console integration has and what it is missing"
   task search_console: :environment do
-    next if not_installed.call(:search_console)
+    feature = AhoyDashboard::FeatureState.for(:search_console)
+    next puts(feature.terminal_line) unless feature.installed?
 
     account = AhoyDashboard::GoogleAccount.current
 
@@ -62,7 +53,8 @@ namespace :ahoy_dashboard do
       end
     end
 
-    connection_path = AhoyDashboard.mount_path("settings/google_connection")
+    routes = AhoyDashboard::Engine.routes.url_helpers
+    connection_path = routes.settings_google_connection_path
 
     puts "next"
     if !AhoyDashboard::SearchConsole.credentials?
@@ -75,7 +67,7 @@ namespace :ahoy_dashboard do
     elsif account.nil? || !account.connected?
       puts "  publish the google cloud project, then connect at #{connection_path}"
     elsif !account.property_selected?
-      puts "  pick a property at #{AhoyDashboard.mount_path("settings/search_console_property/edit")}"
+      puts "  pick a property at #{routes.edit_settings_search_console_property_path}"
     elsif account.last_error.present?
       puts "  reconnect google, the stored grant is not working"
     elsif totals.zero?
@@ -87,7 +79,8 @@ namespace :ahoy_dashboard do
 
   desc "pull search console now instead of waiting for the nightly job"
   task search_console_pull: :environment do
-    next if not_installed.call(:search_console)
+    feature = AhoyDashboard::FeatureState.for(:search_console)
+    next puts(feature.terminal_line) unless feature.installed?
 
     AhoyDashboard::SearchConsole::IngestCommand.call do
       on(:ok) do |result|

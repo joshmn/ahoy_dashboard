@@ -13,9 +13,11 @@ module AhoyDashboard
         def call
           @answer = ClaimService.call(run: run, prompt: prompt, assistant: assistant, model: model, now: now)
           return broadcast(:duplicate) if answer.nil?
-          return fail!("no key") if AiVisibility.api_key(assistant).blank?
 
-          reply = AiVisibility.client_for(assistant, model).ask(prompt.text)
+          key = record&.api_key
+          return fail!("no key") if key.blank?
+
+          reply = AiVisibility.client_for(assistant, model, key: key).ask(prompt.text)
           store(reply)
           record&.record_success!(now: now)
 
@@ -31,7 +33,9 @@ module AhoyDashboard
         attr_reader :run, :prompt, :assistant, :model, :now, :answer
 
         def record
-          @record ||= Assistant.for(assistant)
+          return @record if defined?(@record)
+
+          @record = Assistant.for(assistant)
         end
 
         def store(reply)

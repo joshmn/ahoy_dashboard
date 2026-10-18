@@ -54,7 +54,7 @@ module AhoyDashboard
         [
           CsvTable.new(key: "searches", label: "Most changed searches",
                        headers: [ "Search", "Day", "Score", "Turnover", "Shuffle", "New on the page" ]) do
-            (busiest_head + busiest_rest).map do |busy|
+            busiest.map do |busy|
               [ busy.query, csv_date(busy.on), busy.score.round(1), csv_percent(busy.turnover),
                 csv_percent(busy.shuffle), arrived(busy).join(", ").presence ]
             end

@@ -2,11 +2,7 @@
 
 <%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: @back.key || "search_console" } do %>
   <% actions = capture do %>
-    <%= dash_link_menu(id: "tm-keyword-period",
-          icon: :cal,
-          label: @presenter.range_label,
-          section: "Date range",
-          items: @presenter.period_options) %>
+    <%= seo_period_menu(@presenter, id: "tm-keyword-period") %>
 
     <%= render "ahoy_dashboard/search_console/slice_menus", menus: @presenter.menus %>
 
@@ -18,16 +14,12 @@
   <%= render "ahoy_dashboard/search_console/problem" %>
 
   <% if @presenter.empty? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.empty_state %>
-    <% end %>
+    <%= dash_empty_card **@presenter.empty_state %>
   <% else %>
     <% chart_data = @presenter.chart_data %>
-<%# The same strip as the dashboard's metric tiles, and joined to the chart under
-    it for the same reason: one card answering one question. %>
     <%= dash_card element: :section, class: "seo-chart-card",
           "aria-label": "#{@presenter.series_label} over time",
-          data: dash_chart_data(chart_data, @presenter.chart_options.symbolize_keys, kind: @presenter.chart_kind) do %>
+          data: dash_chart_data(chart_data, @presenter.chart_options.symbolize_keys) do %>
       <%= dash_tiles label: "Which measure the chart draws", element: :nav, ruled: true do %>
         <% @presenter.figures.each do |figure| %>
           <%= dash_tile figure.label, figure.display,

@@ -1,6 +1,6 @@
 <% content_for :title, @presenter.heading %>
 
-<% check = AhoyDashboard::Serp::CheckNowPresenter.new(keyword: @presenter.keyword) %>
+<% check = @presenter.check_now %>
 
 <%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: @back.key || "rankings", site: @site } do %>
   <% actions = capture do %>
@@ -16,8 +16,7 @@
             items: @presenter.location_options) %>
     <% end %>
 
-    <%= dash_link_menu(id: "tm-rank-keyword-period", icon: :cal,
-          label: @presenter.range_label, section: "Date range", items: @presenter.period_options) %>
+    <%= seo_period_menu(@presenter, id: "tm-rank-keyword-period") %>
 
     <%= dash_button "See clicks", search_console_keyword_path(@presenter.query.to_query.merge(q: @presenter.heading)),
           data: { tm_frame: "_top" } %>
@@ -31,14 +30,12 @@
   <%= dash_unavailable_notice "Check now", check.notice_reason, fix: check.fix %>
 
   <% if @presenter.empty? %>
-    <%= dash_card do %>
-      <%= dash_empty title: @presenter.empty_title, hint: @presenter.empty_hint %>
-    <% end %>
+    <%= dash_empty_card title: @presenter.empty_title, hint: @presenter.empty_hint %>
   <% else %>
     <% chart_data = @presenter.chart_data %>
     <% charted = seo_charted?(@presenter.readings) || chart_data.blank? %>
     <%= dash_card element: :section, class: "seo-chart-card", "aria-label": "Position over time",
-          data: (dash_chart_data(chart_data, @presenter.chart_options.symbolize_keys, kind: @presenter.chart_kind) if charted) do %>
+          data: (dash_chart_data(chart_data, @presenter.chart_options.symbolize_keys) if charted) do %>
       <%= dash_tiles label: "Summary figures", ruled: true do %>
         <% @presenter.tiles.each_with_index do |tile, index| %>
           <%= dash_tile tile.label, tile.value, note: tile.note, note_tone: (@presenter.change_tone if index.zero?) %>
@@ -84,17 +81,9 @@
           <% @presenter.rows.each do |point| %>
             <tr>
               <td><div class="t-main"><%= @presenter.stamp(point.at) %></div></td>
-              <td class="num"><%= point.position || tag.span("&mdash;".html_safe, class: "nil") %></td>
-              <td>
-                <% if point.cited %>
-                  <%= dash_badge "Cited", tone: :success %>
-                <% elsif point.overview %>
-                  <%= dash_badge "Shown" %>
-                <% else %>
-                  <span class="nil">&mdash;</span>
-                <% end %>
-              </td>
-              <td><%= seo_page_link(seo_url_path(point.url)) %></td>
+              <td class="num"><%= dash_value(point.position) %></td>
+              <td><%= seo_overview_badge(@presenter.overview_label(point), titled: false) %></td>
+              <td><%= seo_page_link(point.url) %></td>
             </tr>
           <% end %>
         </tbody>
@@ -122,20 +111,7 @@
               </thead>
               <tbody>
                 <% @presenter.rivals.each do |rival| %>
-                  <tr>
-                    <td class="num"><%= rival.position %></td>
-                    <td>
-                      <div class="seo-stack">
-                        <span class="t-main min-w-0">
-                          <%= seo_label(rival.domain, path: true) %>
-                          <% if @presenter.site && rival.domain == @presenter.site.domain %>
-                            <%= dash_badge "You", tone: :kind %>
-                          <% end %>
-                        </span>
-                        <span class="seo-sub"><%= seo_label(rival.title.presence || rival.link) %></span>
-                      </div>
-                    </td>
-                  </tr>
+                  <%= render "result", number: rival.position, result: rival, mine: @presenter.mine?(rival.domain) %>
                 <% end %>
               </tbody>
             <% end %>
@@ -165,20 +141,7 @@
               </thead>
               <tbody>
                 <% @presenter.citations.each do |citation| %>
-                  <tr>
-                    <td class="num"><%= citation.slot %></td>
-                    <td>
-                      <div class="seo-stack">
-                        <span class="t-main min-w-0">
-                          <%= seo_label(citation.domain, path: true) %>
-                          <% if @presenter.site && citation.domain == @presenter.site.domain %>
-                            <%= dash_badge "You", tone: :kind %>
-                          <% end %>
-                        </span>
-                        <span class="seo-sub"><%= seo_label(citation.title.presence || citation.link) %></span>
-                      </div>
-                    </td>
-                  </tr>
+                  <%= render "result", number: citation.slot, result: citation, mine: @presenter.mine?(citation.domain) %>
                 <% end %>
               </tbody>
             <% end %>

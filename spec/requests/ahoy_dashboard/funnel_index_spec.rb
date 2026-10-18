@@ -3,7 +3,6 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard funnel pages", type: :request do
-  let(:document) { Nokogiri::HTML5(response.body) }
   let(:goals) { create_list(:dash_goal, 2) }
   let!(:funnels) { Array.new(6) { |index| create(:dash_funnel, position: index + 1, goals: goals) } }
   let(:filters) { [{ dimension: "country", operator: "is", value: "CA" }] }

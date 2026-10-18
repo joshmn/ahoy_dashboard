@@ -1,7 +1,7 @@
 module AhoyDashboard
   class PropertyForm < AhoyDashboard::Form
-    attribute :key, :string
-    attribute :label, :string
+    attribute :key, TRIMMED
+    attribute :label, TRIMMED
 
     validates :key, presence: true
     validates :key, format: {
@@ -9,12 +9,12 @@ module AhoyDashboard
       message: "can be up to #{AhoyDashboard::Dimension::PROPERTY_NAME_LENGTH} characters, with no line breaks or tabs"
     }, allow_blank: true
 
-    def key
-      super().to_s.strip.presence
+    def record_attributes
+      { key: key, label: label }
     end
 
-    def label
-      super().to_s.strip.presence
+    def add_duplicate_error
+      errors.add(:key, "is already on the list")
     end
   end
 end

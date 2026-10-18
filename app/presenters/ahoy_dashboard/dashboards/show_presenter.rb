@@ -7,8 +7,8 @@ module AhoyDashboard
     class ShowPresenter
       attr_reader :query, :chart, :computed_at
 
-      delegate :chart_data, :chart_options, :tiles, :comparison_label, :range_label, :realtime,
-        :interval_options, :comparison_options, :as_json, to: :chart
+      delegate :chart_data, :chart_options, :tiles, :range_label, :realtime, :comparing?,
+        :comparison_switch_label, :comparison_switch_path, :as_json, to: :chart
 
       def initialize(query:, result:)
         @query = query
@@ -29,7 +29,7 @@ module AhoyDashboard
       end
 
       def report_presenters
-        @report_presenters ||= result.reports.map { |reading| ReportPresenter.new(query: query, **reading) }
+        @report_presenters ||= result.reports.map { |reading| ReportPresenter.new(query: query, **reading.to_h) }
       end
 
       def grid_reports
@@ -51,9 +51,7 @@ module AhoyDashboard
       end
 
       def funnel_presenters
-        @funnel_presenters ||= result.funnels.map do |reading|
-          FunnelPresenter.new(query: query, funnel: reading.funnel, result: reading)
-        end
+        @funnel_presenters ||= FunnelPresenter.wrap(result.funnels, query: query)
       end
 
       def funnels

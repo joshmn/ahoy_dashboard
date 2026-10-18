@@ -64,4 +64,14 @@ RSpec.describe AhoyDashboard::Seo::KeywordGapQuery do
     expect(presenter(result).position_label(standing(row, unticked))).to eq("Nowhere")
     expect(result.attached.map(&:name)).to contain_exactly("Ticked", "Unticked")
   end
+
+  it "leaves out a place the keyword no longer searches, the way Rankings does" do
+    run = create(:dash_serp_run, keyword: contested, location: "gb", checked_at: 1.day.ago)
+    create(:dash_serp_check, run: run, site: ours, position: 2)
+
+    rows = described_class.call(site: ours, range: range).rows
+
+    expect(rows.map { |row| [ row.query, row.location ] })
+      .to contain_exactly([ "fci thomson visiting", "us" ], [ "fci thomson commissary", "us" ])
+  end
 end

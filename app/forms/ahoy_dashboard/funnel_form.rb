@@ -1,20 +1,13 @@
 module AhoyDashboard
-  # The typed-in shape of a funnel: a name, and the goals to walk in order.
-  #
-  # The steps arrive as one select per slot, so the submitted order is the funnel
-  # order and a slot left blank is a step taken out. Blanks are dropped rather
-  # than kept, which is what closes the gap when somebody empties a middle slot.
   class FunnelForm < AhoyDashboard::Form
     MINIMUM_STEPS = AhoyDashboard::Funnel::MINIMUM_STEPS
 
-    # The steps are permitted separately, because they arrive as an array of goal
-    # ids rather than as a scalar.
     FIELDS = %i[name].freeze
     STEPS_FIELD = { goal_ids: [] }.freeze
     DUPLICATE_MESSAGE = "A funnel is already called that. Names have to be different, because the " \
                         "name is how the report is picked.".freeze
 
-    attribute :name, :string
+    attribute :name, TRIMMED
     attribute :goal_ids
 
     validates :name, presence: true
@@ -26,16 +19,16 @@ module AhoyDashboard
       new(name: funnel.name, goal_ids: funnel.funnel_steps.map(&:goal_id))
     end
 
-    def name
-      super().to_s.strip.presence
-    end
-
     def goal_ids
       Array(super).map { |value| value.to_s.strip }.reject(&:blank?).map(&:to_i)
     end
 
     def slots
       goal_ids + Array.new(spare_slots)
+    end
+
+    def goal_options
+      @goal_options ||= AhoyDashboard::Goal.ordered.map { |goal| [ goal.name, goal.id ] }
     end
 
     def spare_slots
@@ -47,13 +40,6 @@ module AhoyDashboard
       self
     end
 
-    # Take one step out and hand back a form to redraw, without saving. Not saved
-    # on purpose: removing one of two steps would fail the minimum, and answering
-    # a remove with a validation error rather than with the step gone reads as the
-    # button not working. The operator sees it go and then saves.
-    #
-    # Returns self unchanged for an index that is not a slot, which is what a
-    # hand-edited value is.
     def without_slot(index)
       position = index.to_s
       return self unless position.match?(/\A\d+\z/) && position.to_i < goal_ids.size
@@ -66,6 +52,14 @@ module AhoyDashboard
       { name: name }
     end
 
+    def step_attributes
+      goal_ids.each_with_index.map { |goal_id, index| { goal_id: goal_id, position: index + 1 } }
+    end
+
+    def add_duplicate_error
+      errors.add(:base, DUPLICATE_MESSAGE)
+    end
+
     private
 
     def enough_steps
@@ -74,8 +68,6 @@ module AhoyDashboard
       errors.add(:goal_ids, "need at least #{MINIMUM_STEPS} steps before a funnel means anything")
     end
 
-    # The same goal twice is a mistake rather than a loop: it would count the same
-    # event at two places in the sequence and the second one could never fail.
     def no_repeated_step
       return if goal_ids.uniq.size == goal_ids.size
 

@@ -196,7 +196,7 @@ Search Console numbers never line up perfectly, even inside Google's own interfa
 - **Google hides some queries.** Rare ones, and anything that looks personal. Their clicks count in the day's total and belong to no query. Open "Show all queries" on the card to see what share of clicks got a name.
 - **Google cuts the list off.** It serves at most 50,000 rows a day, ranked by clicks, and drops the rest. The dashboard asks for one day at a time so the cap bites as little as possible. On a big site it still bites.
 - **Query and page hides more than query alone.** So a query's clicks by page add up to less than its clicks.
-- **The card and the Performance page read different tables.** The card sums query-and-page rows and adds unfinished days. Performance reads the query table and stops at finished days. The same query can show different numbers on each.
+- **The card and the Performance page can cover different days.** Both rank queries from the query table and pages from query-and-page rows. The card adds unfinished days and Performance stops at finished days, so the same query can show different numbers on each.
 - **Search Console isn't ahoy.** Google counts clicks from its results. ahoy counts visits that ran your tracking. They measure different things, and the dashboard never joins them row by row.
 
 The totals are right. The lists underneath them are always short.
@@ -256,7 +256,7 @@ A failed sync puts a message on Settings, Search Console under "Last sync failed
 | "This Google account can no longer read example.com in Search Console. Give it access again there, or pick another property." | Give the account access to the property again in Search Console, or pick a different property. |
 | "Some days came back with rows the database would not store, and those days were skipped. Everything else in the window was saved." | Check the log for the database error |
 
-Settings, Jobs shows these runs as "Ran". The message on Settings, Search Console is the real result.
+Settings, Jobs shows a run that hit the quota as "Ran" and every other one here as "Failed", so the "A job failed" alert rule hears about them. The message on Settings, Search Console is the one that says what to do.
 
 A gap that runs past a week doesn't close on its own: the nightly job only rereads the last 7 finished days. Use [Fill missing days](#fill-missing-days) on Settings, Search Console to pull it back in.
 

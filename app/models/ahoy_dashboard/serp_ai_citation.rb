@@ -6,9 +6,5 @@ module AhoyDashboard
     validates :link, :checked_at, presence: true
 
     normalizes :domain, with: ->(value) { Serp::Domain.host(value) }
-
-    scope :chronological, -> { order(:checked_at, :slot) }
-    scope :in_range, ->(range) { where(checked_at: range) }
-    scope :for_tag, ->(tag) { tag.present? ? where(run_id: SerpRun.for_tag(tag).select(:id)) : all }
   end
 end

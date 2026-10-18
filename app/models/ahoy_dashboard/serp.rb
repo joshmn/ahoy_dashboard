@@ -16,8 +16,6 @@ module AhoyDashboard
 
     DEVICES = %w[desktop mobile tablet].freeze
 
-    # Where the spend card starts warning, and what the alert rule defaults to,
-    # so the page and the email never disagree about what "nearly there" means.
     NEAR_CAP_PERCENT = 80
 
     ADAPTERS = {
@@ -64,8 +62,12 @@ module AhoyDashboard
         ADAPTERS.fetch(key).constantize
       end
 
-      def adapter(name = provider, **options)
-        adapter_class(name).new(**options)
+      def adapter(name = provider)
+        adapter_class(name).new
+      end
+
+      def sample?(name = provider)
+        name.to_s == Adapters::FakeAdapter.adapter_name
       end
 
       def credential(name, key)

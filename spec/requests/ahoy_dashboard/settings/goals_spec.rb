@@ -1,59 +1,23 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard goal settings", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
   def traffic!
-    visit = dash_visit(started_at: now - 1.day, visitor: "visitor-1")
-    dash_page_view(visit, path: "/resources", at: now - 1.day)
+    visit = dash_landing("/resources", at: now - 1.day, visitor: "visitor-1")
     dash_goal(visit, "site_searched", at: now - 1.day + 1.minute, facility_id: "12")
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/goals"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "sends a signed out visitor to sign in on a write too" do
-      post "/telemetry/settings/goals", params: { goal: { kind: "custom_event", event_name: "x" } }
-
-      expect(response).to redirect_to("/users/sign_in")
-      expect(AhoyDashboard::Goal.count).to be_zero
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/settings/goals"
-
-      expect(response).to have_http_status(:not_found)
-    end
-
-    it "is a 404 for a non-admin trying to write" do
-      sign_in create(:user)
-
-      post "/telemetry/settings/goals", params: { goal: { kind: "custom_event", event_name: "x" } }
-
-      expect(response).to have_http_status(:not_found)
-      expect(AhoyDashboard::Goal.count).to be_zero
-    end
   end
 
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
-    describe "index" do
-      it "renders an empty list" do
-        get "/telemetry/settings/goals"
+    include_examples "a settings record nobody created",
+                     path: "/telemetry/settings/goals", noun: "a goal", changes: { goal: { kind: "custom_event", event_name: "x" } }
 
-        expect(response).to have_http_status(:ok)
-        expect(response.body).to include("No goals yet")
-      end
+    describe "index" do
+      include_examples "an empty settings list", path: "/telemetry/settings/goals", text: "No goals yet"
 
       it "renders every goal in position order with what it counts" do
         create(:dash_goal, event_name: "site_searched", position: 2)
@@ -79,21 +43,11 @@ RSpec.describe "Dashboard goal settings", type: :request do
         create(:dash_goal, event_name: "site_searched")
         create(:dash_goal, event_name: "never_fired")
         traffic!
-        statements = []
-        subscriber = lambda do |*, payload|
-          next if payload[:name] == "SCHEMA" || payload[:cached]
-          next unless payload[:sql].match?(/SELECT COUNT\(\*\).*FROM "ahoy_dashboard_goals"/i)
-
-          statements << payload[:sql]
-        end
-
-        ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
-          get "/telemetry/settings/goals"
-        end
+        statements = captured_sql(/SELECT COUNT\(\*\).*FROM "ahoy_dashboard_goals"/i) { get "/telemetry/settings/goals" }
 
         expect(response).to have_http_status(:ok)
         expect(statements).to be_empty
-        values = Nokogiri::HTML5(response.body).css("tbody tr").map { |row| row.css("td.num").first.text.strip }
+        values = document.css("tbody tr").map { |row| row.css("td.num").first.text.strip }
         expect(values).to eq(%w[1 0])
       end
 
@@ -103,7 +57,7 @@ RSpec.describe "Dashboard goal settings", type: :request do
         get "/telemetry/settings/goals"
 
         expect(response.body).to include("facility_id: 12")
-        expect(Nokogiri::HTML5(response.body).css(".badge").map { |badge| badge.text.squish }).to include("USD")
+        expect(document.css(".badge").map { |badge| badge.text.squish }).to include("USD")
       end
     end
 
@@ -165,13 +119,10 @@ RSpec.describe "Dashboard goal settings", type: :request do
         expect(goal).to be_revenue
       end
 
-      it "puts a new goal at the end of the list" do
-        create(:dash_goal, position: 7)
+      let(:addition) { { goal: { kind: "custom_event", event_name: "later" } } }
 
-        post "/telemetry/settings/goals", params: { goal: { kind: "custom_event", event_name: "later" } }
-
-        expect(AhoyDashboard::Goal.find_by(event_name: "later").position).to eq(8)
-      end
+      include_examples "a settings list that adds at the end",
+                       factory: :dash_goal, path: "/telemetry/settings/goals", noun: "goal", created: { event_name: "later" }
 
       it "drops the trigger the chosen kind does not use" do
         post "/telemetry/settings/goals", params: {
@@ -238,12 +189,6 @@ RSpec.describe "Dashboard goal settings", type: :request do
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("/resources/*")
       end
-
-      it "404s for a goal nobody created" do
-        get "/telemetry/settings/goals/9999/edit"
-
-        expect(response).to have_http_status(:not_found)
-      end
     end
 
     describe "update" do
@@ -304,63 +249,10 @@ RSpec.describe "Dashboard goal settings", type: :request do
         expect(response.body).to include("already called site_searched")
         expect(goal.reload.display_name).to be_nil
       end
-
-      it "404s for a goal nobody created" do
-        patch "/telemetry/settings/goals/9999", params: { goal: { kind: "custom_event", event_name: "x" } }
-
-        expect(response).to have_http_status(:not_found)
-      end
     end
 
     describe "update as a nudge" do
-      it "moves a goal up the list" do
-        first = create(:dash_goal, position: 1)
-        second = create(:dash_goal, position: 2)
-
-        patch "/telemetry/settings/goals/#{second.id}", params: { goal: { nudge: "up" } }
-
-        expect(response).to redirect_to("/telemetry/settings/goals")
-        expect(AhoyDashboard::Goal.ordered.pluck(:id)).to eq([ second.id, first.id ])
-      end
-
-      it "moves a goal down the list" do
-        first = create(:dash_goal, position: 1)
-        second = create(:dash_goal, position: 2)
-
-        patch "/telemetry/settings/goals/#{first.id}", params: { goal: { nudge: "down" } }
-
-        expect(AhoyDashboard::Goal.ordered.pluck(:id)).to eq([ second.id, first.id ])
-      end
-
-      it "numbers a list nobody has ordered yet rather than swapping two zeroes" do
-        first = create(:dash_goal, position: 0)
-        second = create(:dash_goal, position: 0)
-
-        patch "/telemetry/settings/goals/#{second.id}", params: { goal: { nudge: "up" } }
-
-        expect(AhoyDashboard::Goal.ordered.pluck(:id)).to eq([ second.id, first.id ])
-        expect(AhoyDashboard::Goal.ordered.pluck(:position)).to eq([ 1, 2 ])
-      end
-
-      it "does nothing at the top of the list" do
-        goal = create(:dash_goal, position: 1)
-        create(:dash_goal, position: 2)
-
-        patch "/telemetry/settings/goals/#{goal.id}", params: { goal: { nudge: "up" } }
-
-        expect(response).to redirect_to("/telemetry/settings/goals")
-        expect(goal.reload.position).to eq(1)
-      end
-
-      it "does nothing for a direction nobody offered" do
-        goal = create(:dash_goal, position: 1)
-        create(:dash_goal, position: 2)
-
-        patch "/telemetry/settings/goals/#{goal.id}", params: { goal: { nudge: "sideways" } }
-
-        expect(response).to redirect_to("/telemetry/settings/goals")
-        expect(goal.reload.position).to eq(1)
-      end
+      include_examples "a nudgeable settings list", factory: :dash_goal, path: "/telemetry/settings/goals", param: :goal, noun: "goal"
     end
 
     describe "destroy" do
@@ -373,16 +265,6 @@ RSpec.describe "Dashboard goal settings", type: :request do
         expect(AhoyDashboard::Goal.count).to be_zero
       end
 
-      it "404s for a goal nobody created" do
-        delete "/telemetry/settings/goals/9999"
-
-        expect(response).to have_http_status(:not_found)
-      end
-
-      # The foreign key restricts, so this arrives as InvalidForeignKey rather than
-      # as a validation, and without the rescue it is a 500. A funnel that quietly
-      # lost a step still renders and still reports numbers, which is why the
-      # database refuses rather than cascading.
       describe "a goal a funnel is built on" do
         it "refuses, and names the funnels stopping it" do
           goal = create(:dash_goal, event_name: "consult_requested")

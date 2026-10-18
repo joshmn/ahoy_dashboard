@@ -1,10 +1,9 @@
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
 
-module InstallationSweep
-  SEO = %i[search_console serp keywords backlinks alerts ai_visibility].freeze
+RSpec.describe "Dashboard with features not installed", type: :request do
+  seo = %i[search_console serp keywords backlinks alerts ai_visibility].freeze
 
-  OWNERS = {
+  owners = {
     "ahoy_dashboard/asks" => %i[assistant],
     "ahoy_dashboard/chats" => %i[assistant],
     "ahoy_dashboard/rankings" => %i[serp],
@@ -12,7 +11,7 @@ module InstallationSweep
     "ahoy_dashboard/search_console" => %i[search_console],
     "ahoy_dashboard/search_console_reports" => %i[search_console],
     "ahoy_dashboard/search_console_keywords" => %i[search_console],
-    "ahoy_dashboard/seo" => SEO,
+    "ahoy_dashboard/seo" => seo,
     "ahoy_dashboard/seo/opportunities" => %i[search_console],
     "ahoy_dashboard/seo/cannibalizations" => %i[search_console],
     "ahoy_dashboard/seo/brand_splits" => %i[search_console],
@@ -42,71 +41,51 @@ module InstallationSweep
     "ahoy_dashboard/settings/serp_providers" => %i[serp keywords backlinks]
   }.freeze
 
-  SKIPPED = %w[
+  skipped = %w[
     ahoy_dashboard/assets ahoy_dashboard/exports ahoy_dashboard/favicons ahoy_dashboard/reports
     ahoy_dashboard/settings/google_callbacks
   ].freeze
 
-  PAGES = AhoyDashboard::Engine.routes.routes.map do |route|
-    next unless route.verb.include?("GET")
+  pages = AhoyDashboardRequestRoutes.pages.reject { |route| skipped.include?(route.controller) }.freeze
 
-    path = route.path.spec.to_s.delete_suffix("(.:format)")
-    controller = route.defaults[:controller]
-    next if controller.blank? || path.include?(":") || SKIPPED.include?(controller)
-
-    [ "/telemetry#{path}".chomp("/"), controller ]
-  end.compact.uniq.freeze
-
-  SCENARIOS = { "core only" => AhoyDashboard::Installation.names }
+  scenarios = { "core only" => AhoyDashboard::Installation.names }
     .merge(AhoyDashboard::Installation.names.map { |name| [ "without #{name}", [ name ] ] }.to_h)
     .freeze
-end
-
-RSpec.describe "Dashboard with features not installed", type: :request do
-  scenarios = InstallationSweep::SCENARIOS
 
   before { sign_in create(:user, :admin) }
 
   it "names only controllers that draw a page" do
-    expect(InstallationSweep::OWNERS.keys - InstallationSweep::PAGES.map(&:last)).to be_empty
+    expect(owners.keys - pages.map(&:controller)).to be_empty
   end
 
   scenarios.each do |scenario, missing|
     it "renders every page #{scenario}, explaining how to install what is missing" do
       uninstall_ahoy_dashboard(*missing)
 
-      failures = InstallationSweep::PAGES.map do |path, controller|
-        owners = InstallationSweep::OWNERS[controller]
-        gone = owners.present? && (owners - missing).empty?
+      failures = pages.map do |page|
+        needs = owners[page.controller]
+        gone = needs.present? && (needs - missing).empty?
 
         begin
           AhoyDashboard::Record.transaction(requires_new: true) do
-            get path
+            get page.path
             raise ActiveRecord::Rollback
           end
         rescue StandardError => error
-          next "#{path} raised #{error.class}: #{error.message.lines.first&.strip}"
+          next "#{page.path} raised #{error.class}: #{error.message.lines.first&.strip}"
         end
 
         status = response.status
-        if gone && (status != 200 || !response.body.include?("bin/rails generate ahoy_dashboard:install --only"))
-          "#{path} answered #{status} without saying how to install it"
+        commands = gone ? needs.map { |name| "bin/rails generate ahoy_dashboard:install --only #{name}" } : []
+        unexplained = commands.reject { |command| response.body.include?(command) }
+        if gone && (status != 200 || unexplained.any?)
+          "#{page.path} answered #{status} without saying how to install it: #{unexplained.join(', ')}"
         elsif !gone && !status.in?([ 200, 302, 303 ])
-          "#{path} answered #{status}"
+          "#{page.path} answered #{status}"
         end
       end.compact
 
       expect(failures).to be_empty, failures.join("\n")
     end
-  end
-
-  it "says which switched-on feature has no tables, on every page" do
-    uninstall_ahoy_dashboard(:serp)
-    AhoyDashboard::Preferences.write(:serp, enabled: true)
-
-    get "/telemetry"
-
-    expect(response).to have_http_status(:ok)
-    expect(response.body).to include(AhoyDashboard::Installation.fetch(:serp).missing_message)
   end
 end

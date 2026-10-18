@@ -1,11 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/alerts"
 
 RSpec.describe "Dashboard alerts", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
   def headers
     document.css("th").map { |cell| cell.text.squish }
   end

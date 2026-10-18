@@ -1,107 +1,29 @@
-
-
-.tm-stat.active::after {
-  opacity: 1;
-  transform: none;
-}
-
-.tm-stat.active .tm-stat__label {
-  color: var(--t2);
-}
-
-.tm-stat.active .tm-stat__value {
-  opacity: 1;
-}
-
-@include dash-below(940px) {
-  .tm-cmp__label {
-    display: none;
-  }
-}
-
-@media (max-width: 640px) {
-  .tm-chart-controls {
-    display: none;
-  }
-
-  .tm-stat {
-    min-width: 130px;
-    padding: 13px 15px 12px;
-  }
-
-  .tm-stat__value {
-    font-size: $font-size-2xl;
-  }
-}
-
 .tm-journey__find {
   padding: 8px 10px 0;
 }
 
-
-// ---------- what the transcription had to leave out ----------
-// The design's own rule for this bar is `.fn-bar.progress-bar{display:none;…}`,
-// which hides the bars the same stylesheet spends four properties drawing. The
-// transcription drops the rule rather than reproduce a bug, so the rest of it
-// lives here. Two class names, so it still beats Bootstrap's own .progress-bar
-// whatever order the files land in.
 .fn-bar.progress-bar {
   height: 100%;
   border-radius: 5px;
   background: linear-gradient(90deg, rgba(94, 106, 210, 0.75), rgba(94, 106, 210, 0.45));
 }
 
-// The compare control is a link, not a checkbox, because it has to work with the
-// JavaScript off and because which comparison is being made lives in the URL
-// alongside everything else on this screen. The design draws it as a checkbox
-// switch, so the checked state is mapped onto the link's own aria-checked and
-// the drawing is otherwise the design's.
-.cmp .bs-switch i {
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.13);
-  border-radius: 99px;
-  transition: background 0.18s;
-  pointer-events: none;
-}
-
-.cmp[aria-checked="true"] .bs-switch i {
-  background: var(--accent);
-}
-
-.cmp[aria-checked="true"] .bs-switch i::after {
-  transform: translateX(12px);
-  background: #fff;
-}
-
 .cmp:focus-visible {
-  outline: 2px solid rgba(94, 106, 210, 0.65);
+  outline: var(--focus-ring);
   outline-offset: 2px;
   border-radius: 6px;
 }
 
-
-
-// ---------- the card grid ----------
-// Each card loads in a frame of its own, and the frame is a block box between
-// the grid item and the card. h-100 on the card therefore resolved against the
-// frame's own content height rather than against the row, so a card holding
-// three rows stood a couple of hundred pixels short of the one beside it.
 .panel-col > tm-frame {
   height: 100%;
 }
 
-// One height for every panel, whatever it holds. A full card is the 46px head,
-// nine 32px rows in a list padded 7 over and 5 under, and the 41px foot. Short
-// cards grow to it rather than the grid drawing a different shape per card.
 .grid .panel {
   display: flex;
   flex-direction: column;
   min-height: 387px;
 }
 
-// The rows take the room, so a card with two of them puts its foot on the same
-// line as a card with nine rather than floating it up the middle.
 .grid .panel .p-list,
 .grid .panel .empty {
   flex: 1 1 auto;

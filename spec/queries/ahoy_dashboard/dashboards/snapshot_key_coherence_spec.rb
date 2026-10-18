@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Snapshot key and lock coherence" do
   let(:query) { AhoyDashboard::QueryForm.from_params({ period: "30d", filters: "none" }) }
@@ -19,12 +18,7 @@ RSpec.describe "Snapshot key and lock coherence" do
   end
 
   it "acquires advisory locks in PostgreSQL on every call even while Rails query caching is enabled" do
-    acquisitions = []
-    subscriber = lambda do |*, payload|
-      acquisitions << payload[:sql] if payload[:sql].include?("pg_advisory_xact_lock") && !payload[:cached]
-    end
-
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+    acquisitions = captured_sql("pg_advisory_xact_lock") do
       AhoyDashboard::Record.cache do
         2.times { AhoyDashboard::Dashboards::SnapshotLockService.call(key: "snapshot-coherence-spec") { true } }
       end

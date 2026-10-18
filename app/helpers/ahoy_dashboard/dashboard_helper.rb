@@ -6,35 +6,36 @@ module AhoyDashboard::DashboardHelper
   COUNTRY_CODE = /\A[A-Za-z]{2}\z/
   REGIONAL_INDICATOR_OFFSET = 0x1F1E6 - "A".ord
   FAVICON_SIZE = 16
-  MAX_SEARCH_TERM = 100
 
-  # Where applying a filter or picking a segment lands. The dashboard is the
-  # default and the only other surface that asks the same question of the same
-  # filters is explore, so this is an allowlist rather than a path in the URL.
-  DESTINATIONS = { "explore" => :explore_path }.freeze
-  DESTINATION_KEYS = %i[dimension columns saved].freeze
-
-  # The same keys again, prefixed, for the filter dialog, which has a
-  # `dimension` of its own: the one whose values it is listing. Unprefixed the
-  # two meanings are one parameter, so the dialog opened from explore would
-  # scope itself to explore's grouping and then hand that back as the filter's
-  # own.
-  CARRIED_PREFIX = "for_".freeze
-
-  def dash_seo_installed?
-    AhoyDashboard::Seo::Surface.installed?(AhoyDashboard::Seo::Surface::FEATURES)
+  def dash_filter_params(destination: nil, carried: {}, base: query.to_query)
+    params = base.merge(AhoyDashboard::FilterDestination.prefixed(carried))
+    destination.present? ? params.merge(return: destination) : params
   end
 
-  def dash_missing_features
-    AhoyDashboard::Installation.switched_on_without_tables
+  def dash_site_name
+    AhoyDashboard.host || request.host
   end
 
-  def dash_not_installed
-    AhoyDashboard::FeatureState::BADGE
+  def dash_range_hint(drop: AhoyDashboard::RangeHint::DROP_FILTER)
+    AhoyDashboard::RangeHint.call(query.filters, drop: drop)
   end
 
-  def dash_carried_params(carried)
-    carried.to_h.transform_keys { |key| :"#{CARRIED_PREFIX}#{key}" }
+  def dash_snapshot_cache(section, snapshot: nil, &block)
+    cached = snapshot || @presenter.try(:fragment_cache_key)
+
+    cache_if(cached, dash_dashboard_cache_key(section, snapshot: snapshot),
+             expires_in: AhoyDashboard::Dashboards::Snapshot::MAX_AGE, &block)
+  end
+
+  def dash_dashboard_cache_key(section, snapshot: nil)
+    generation = if snapshot
+      [ snapshot.snapshot_key, snapshot.computed_at.iso8601(9) ]
+    elsif @presenter.respond_to?(:fragment_cache_key)
+      @presenter.fragment_cache_key
+    end
+
+    [ "ahoy_dashboard/dashboard", section, generation,
+      request.base_url, request.script_name, I18n.locale, query.to_query ]
   end
 
   CHANNEL_ICONS = {
@@ -53,60 +54,26 @@ module AhoyDashboard::DashboardHelper
     CHANNEL_ICONS.fetch(channel.to_s.strip.downcase, CHANNEL_FALLBACK_ICON)
   end
 
-  # Which glyph a filter category wears in the menu. The icon is what makes a
-  # list of twelve abstract nouns scannable; without one they read as a wall.
-  CATEGORY_ICONS = {
-    "page" => :file, "hostname" => :globe,
-    "source" => :share, "utm" => :share,
-    "location" => :pin,
-    "screen_size" => :monitor, "browser" => :monitor, "os" => :monitor,
-    "goal" => :target, "property" => :layers, "custom" => :layers, "crawler" => :user,
-    "browsed" => :file
-  }.freeze
-
-  def dash_category_icon(category_key)
-    CATEGORY_ICONS.fetch(category_key.to_s, :layers)
-  end
-
-  # A dimension wears its group's glyph. Five groups, five icons, so the filter
-  # dialog's rail reads as five runs rather than fifteen nouns.
   GROUP_ICONS = {
     "Page" => :file, "Source" => :share, "Location" => :pin,
-    "Device" => :monitor, "Behaviour" => :target
+    "Device" => :monitor, "Behaviour" => :target, "Goals" => :target
   }.freeze
 
   def dash_dimension_icon(dimension)
     GROUP_ICONS.fetch(dimension.group.to_s, :layers)
   end
 
-  # One unbroken column of every dimension reads the four ways of asking about a
-  # URL, the five UTM tags and everything about a goal as one list of twenty
-  # nouns. A dimension already knows its group, so the filter dialog's rail puts
-  # the declared groups in their declared order and lets
-  # anything a host app registered under a name of its own follow them.
-  def dash_grouped_dimensions(dimensions = AhoyDashboard::Dimension.filterable)
-    AhoyDashboard::Dimension.grouped(dimensions)
-  end
-
-  # A picker facet wears its dimension's glyph when it has one, and its own
-  # group's when it does not, so the two facets that are not dimensions still
-  # read as part of the same set.
   def dash_picker_icon(facet)
     return dash_dimension_icon(facet.dimension) if facet.dimension?
 
-    GROUP_ICONS.fetch(facet.group.to_s) { AhoyDashboard::PickerFacet::GROUP_ICONS.fetch(facet.group, :layers) }
+    GROUP_ICONS.fetch(facet.group.to_s, :layers)
   end
 
   ICON_SIZE = 14
 
-  # Past this many views the header keeps the first PRIMARY_TABS as tabs and
-  # folds the rest behind one control, because eight tabs do not fit beside a
-  # title at any width worth designing for.
   MAX_TABS = 4
   PRIMARY_TABS = 2
 
-  # The filters already applied, as the filter dialog's box holds them: one
-  # token per group, each carrying what it needs to be said and sent again.
   def dash_filter_tokens(filters)
     filters.groups.map do |group|
       {
@@ -119,12 +86,9 @@ module AhoyDashboard::DashboardHelper
   end
 
   def dash_destination_path(destination, params = {})
-    public_send(DESTINATIONS.fetch(destination.to_s, :root_path), params)
+    public_send(AhoyDashboard::FilterDestination.route(destination), params)
   end
 
-  # The assistant answers in markdown and the answer is model output, so it is
-  # rendered and then stripped back to the tags an answer can need. Raw html in
-  # a reply is not one of them.
   MARKDOWN_TAGS = %w[p br strong em b i code pre ul ol li a h3 h4 h5 blockquote
                      table thead tbody tr th td hr].freeze
   MARKDOWN_ATTRIBUTES = %w[href].freeze
@@ -144,23 +108,12 @@ module AhoyDashboard::DashboardHelper
     fragment.to_html.html_safe
   end
 
-  # The same three states chat_stream_controller.js paints, written once on the
-  # server so the turn does not change what it says the moment the stream opens.
-  def dash_chat_work_label(message)
-    return "Read #{message.looked_at.to_sentence}" if message.looked_at.any?
-    return "Writing" if message.content.present?
-
-    "Reading the data"
-  end
-
   def dash_number(value)
     AhoyDashboard::CompactNumber.call(value)
   end
 
   def dash_ago(time, never: "Never")
-    return never if time.nil?
-
-    "#{time_ago_in_words(time).delete_prefix("about ")} ago"
+    AhoyDashboard::DateFormat.ago(time, never: never)
   end
 
   def dash_dashboard_json(presenter)
@@ -169,11 +122,6 @@ module AhoyDashboard::DashboardHelper
     end
   end
 
-  # A real icon, served from our own host by AhoyDashboard::FaviconService, with the
-  # letter left underneath rather than swapped out: the letter is what shows
-  # while the icon is still coming, if the domain has no icon, if the fetch is
-  # switched off, or if the row names something that is not a website at all.
-  # Same 16px box in every one of those cases, so nothing reflows.
   def dash_favicon_tag(domain)
     letter = dash_initial(domain)
     fetched = AhoyDashboard::FaviconService.domain_for(domain)
@@ -204,19 +152,6 @@ module AhoyDashboard::DashboardHelper
     stripped[/[a-z0-9]/] || UNKNOWN_INITIAL
   end
 
-  # A country code drawn as its flag. Each letter maps to the regional indicator
-  # symbol at the same offset and the browser draws the pair as one glyph, so this
-  # costs no image request and no icon font.
-  #
-  # Windows ships no flag glyphs at all, deliberately, so there the pair falls back
-  # to the two boxed letters. That is the same information rather than a broken
-  # image, which is the reason to do it this way and the reason the size below has
-  # to leave room for two characters.
-  #
-  # Anything that is not two ASCII letters keeps the old lettered chip. Geocoder
-  # can return pseudo-codes like A1 and A2 for anonymous proxies, and a digit has
-  # no regional indicator, so it would otherwise render as a letter beside a
-  # number.
   def dash_flag(country)
     code = AhoyDashboard::Countries.code(country)
     return if code.nil? || code.length != COUNTRY_CODE_LENGTH
@@ -229,34 +164,26 @@ module AhoyDashboard::DashboardHelper
     code.upcase.each_codepoint.map { |point| point + REGIONAL_INDICATOR_OFFSET }.pack("U*")
   end
 
-  # Which chip a dimension's rows get, read in one place so the card and the
-  # details table beside it cannot disagree about whether a country has a flag.
-  def dash_chip_kind(dimension_key)
+  def dash_chip_kind(dimension_key, favicon: true)
     case dimension_key.to_s
-    when "source", "referrer" then :favicon
+    when "source", "referrer" then (:favicon if favicon)
     when "channel" then :channel
     when "country" then :flag
     end
   end
 
-  # A path is read character by character when somebody is checking whether it
-  # is the one they meant, so the dimensions that hold one are set in mono. A
-  # country or a browser is read as a word and stays in the body face.
+  def dash_row_name(label, chip: nil, chip_label: label, mono: false, class_name: nil)
+    parts = [ (dash_row_chip(chip, chip_label) if chip), dash_row_label(label, split: mono) ]
+
+    tag.span(safe_join(parts.compact), class: class_names("rn", { "mono" => mono }, class_name))
+  end
+
   MONO_DIMENSIONS = %w[page entry_page exit_page entry_url referrer].freeze
 
   def dash_mono_dimension?(dimension_key)
     MONO_DIMENSIONS.include?(dimension_key.to_s)
   end
 
-  # A path is long in the middle and different at the end. Cut from the right,
-  # the five facility guides that share a prefix come out as five copies of the
-  # same truncated string, and the .md and .txt mirrors of a page are
-  # indistinguishable from the page. Past SPLIT_OVER the label is drawn as a head
-  # that ellipsises and a tail that never does, so whatever room there is goes to
-  # the middle and the end always shows.
-  #
-  # Only for the dimensions whose values are paths and URLs. A country is short
-  # and a browser name reads from the left.
   SPLIT_OVER = 24
   SPLIT_TAIL = 16
   SPLIT_TAIL_MAX = 24
@@ -282,12 +209,6 @@ module AhoyDashboard::DashboardHelper
     text[cut..-1]
   end
 
-  # The design draws two kinds of thing in front of a row's name and nothing at
-  # all in front of a page: .lc, an 18px box, and .flg, a flag. Both are its own
-  # classes, so a row here lines up with a row there. What goes in the box is
-  # ours: the design puts a coloured letter in it and we put the site's real
-  # icon, fetched and served by us so the admin's browser never tells a third
-  # party which sites send this one traffic. The letter stays underneath.
   def dash_row_chip(kind, label)
     case kind
     when :favicon
@@ -302,23 +223,9 @@ module AhoyDashboard::DashboardHelper
     end
   end
 
-  # The share bar behind a row. Its width is a custom property rather than the
-  # width itself, because the design draws every bar from zero once its list is
-  # on screen: .bar is width 0 and .ready .bar is width var(--w). Emitting the
-  # width directly would paint them full and skip the sweep.
-  #
-  # The inset is how much room the numbers on the right need, and it differs
-  # between a card and the details dialog because the dialog carries a percentage
-  # column the card only shows on hover.
-  # 100px is the design's own inset for a row carrying one number. A card with
-  # four of them needs the bar to stop further left or it runs under the last
-  # column, so the room is worked out from how many there are rather than being
-  # written down again per card.
   BAR_GUTTER = 52
   BAR_COLUMN = 48
 
-  # Joined with no separator: .grp-list:empty is what hides the box when a
-  # pattern matches nothing, and a newline between rows would fill it.
   def dash_pattern_rows(matches)
     safe_join(matches.map { |path, visitors| tag.li(dash_pattern_row(path, visitors)) })
   end
@@ -326,7 +233,7 @@ module AhoyDashboard::DashboardHelper
   def dash_pattern_row(path, visitors)
     safe_join([
       tag.span(path, class: "grp-path"),
-      tag.span("#{number_with_delimiter(visitors)} #{"visitor".pluralize(visitors)}", class: "grp-count")
+      tag.span(AhoyDashboard::Counted.call(visitors, noun: "visitor"), class: "grp-count")
     ])
   end
 
@@ -337,19 +244,25 @@ module AhoyDashboard::DashboardHelper
     tag.span(nil, class: "bar", style: "--w: calc((100% - #{room}px) * #{fraction})", "aria-hidden": "true")
   end
 
-  def dash_tab_split(report)
-    tabs = Array(report.tabs)
+  def dash_tab_split(tabs)
     return [ tabs, [] ] if tabs.size <= MAX_TABS
 
     [ tabs.first(PRIMARY_TABS), tabs.drop(PRIMARY_TABS) ]
   end
 
-  def dash_drilldown_tab(report, query)
-    report.drilldown_tab(query.filters)
+  def dash_details_dialog(key:, title:, frame:, loading: "Loading the full list")
+    dash_dialog(key: key, title: title, close_label: "Close the #{title.downcase} details") do
+      dash_frame_tag(frame) { dash_empty(loading, compact: true, role: "status") }
+    end
   end
 
-  # A category's dialog and the page it loads are the same frame, and
-  # the two are written in different templates, so the id is built here.
+  def dash_details_opener(url, frame:, key:, &block)
+    dash_card_footer(action: true) do
+      dash_button(url, tone: :link, class: "more", "aria-haspopup": "dialog",
+                       data: { tm_frame: frame, action: "dash--modal#open", "dash--modal-key-param": key }, &block)
+    end
+  end
+
   def dash_filter_frame(category)
     "tm_filter_#{category.key}"
   end
@@ -366,9 +279,6 @@ module AhoyDashboard::DashboardHelper
     asset_path((@dash_asset_build ||= AhoyDashboard::Assets.build), path)
   end
 
-  # A frame is a piece of the page that reloads on its own. A link or a GET form
-  # inside one resolves back into it; anything that has to leave says so with
-  # data-tm-frame="_top". Rendered already means no src fetch on connect.
   def dash_frame_tag(id, src: nil, rendered: false, **options, &block)
     tag.tm_frame(
       (capture(&block) if block),
@@ -379,10 +289,9 @@ module AhoyDashboard::DashboardHelper
     )
   end
 
-  def dash_chart_data(data, options, kind: :area)
+  def dash_chart_data(data, options)
     {
       controller: "dash--chart",
-      "dash--chart-kind-value": kind,
       "dash--chart-data-value": data.to_json,
       "dash--chart-options-value": options.to_json
     }
@@ -402,20 +311,5 @@ module AhoyDashboard::DashboardHelper
       "aria-hidden": "true",
       focusable: "false"
     )
-  end
-
-  # A term out of the query string, so it is trimmed and capped and nothing here
-  # can raise on it.
-  def dash_search_term(value)
-    value.to_s.strip[0, MAX_SEARCH_TERM].to_s
-  end
-
-  def dash_link_to_filter(dimension, value, label = nil, **options, &block)
-    key = dimension.respond_to?(:key) ? dimension.key : dimension.to_s
-    path = dashboard_path(query.filter_link_params(key, value))
-
-    return link_to(path, **options, &block) if block
-
-    link_to(label.presence || value.to_s, path, **options)
   end
 end

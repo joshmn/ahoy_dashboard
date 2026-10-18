@@ -1,8 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard funnel card", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
   let(:yesterday) { now - 1.day }
 
   around { |example| travel_to(now) { example.run } }
@@ -12,28 +11,10 @@ RSpec.describe "Dashboard funnel card", type: :request do
   let(:funnel) { create(:dash_funnel, name: "Consults", goals: [ landed, asked ]) }
 
   def traffic!
-    walked = dash_visit(started_at: yesterday, visitor: "walked")
-    dash_page_view(walked, path: "/federal-prison-consultant", at: yesterday)
+    walked = dash_landing("/federal-prison-consultant", at: yesterday, visitor: "walked")
     dash_goal(walked, "consult_requested", at: yesterday + 1.minute)
 
-    looked = dash_visit(started_at: yesterday, visitor: "looked")
-    dash_page_view(looked, path: "/federal-prison-consultant", at: yesterday)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/funnels/#{funnel.id}"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/funnels/#{funnel.id}"
-
-      expect(response).to have_http_status(:not_found)
-    end
+    dash_landing("/federal-prison-consultant", at: yesterday, visitor: "looked")
   end
 
   describe "as an admin" do
@@ -60,8 +41,6 @@ RSpec.describe "Dashboard funnel card", type: :request do
       expect(body.index("/federal-prison-consultant")).to be < body.index("consult_requested")
     end
 
-    # The card is the shape and its numbers. What the whole thing came to is the
-    # summary line, and that is on the details, where the design puts it.
     it "reads the counts and the rate from the top" do
       traffic!
 
@@ -96,10 +75,6 @@ RSpec.describe "Dashboard funnel card", type: :request do
       expect(response.body).to include("drop one of the filters")
     end
 
-    # A funnel is the one card whose shape is the answer, so the details view is
-    # the drawn funnel rather than the list every other dialog uses: a numbered
-    # step with its own bar, and between each pair the line saying how many
-    # carried on and how many did not.
     it "renders the details view into the details frame as the drawn funnel" do
       traffic!
 
@@ -117,11 +92,10 @@ RSpec.describe "Dashboard funnel card", type: :request do
 
     it "counts the drop off in visitors, which is what the step counts are" do
       traffic!
-      skipped = dash_visit(started_at: yesterday, visitor: "skipped")
-      dash_page_view(skipped, path: "/federal-prison-consultant", at: yesterday)
+      dash_landing("/federal-prison-consultant", at: yesterday, visitor: "skipped")
 
       get "/telemetry/funnels/#{funnel.id}", params: { view: "details" }
-      text = Nokogiri::HTML5(response.body).text.squish
+      text = document.text.squish
 
       expect(text).to include("drop off (2 visitors)")
       expect(text).not_to include("sessions")
@@ -132,11 +106,9 @@ RSpec.describe "Dashboard funnel card", type: :request do
 
       get "/telemetry/funnels/#{funnel.id}", params: { view: "details" }
 
-      expect(Nokogiri::HTML5(response.body).text.squish).to include("drop off (1 visitor)")
+      expect(document.text.squish).to include("drop off (1 visitor)")
     end
 
-    # The design's funnel is a drawn shape and a summary line, and nothing else.
-    # What it counts and how is said once, on the settings screen that defines it.
     it "closes with the summary line rather than a note about how it counts" do
       traffic!
 

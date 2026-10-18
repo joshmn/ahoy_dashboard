@@ -4,134 +4,124 @@
 <% display = AhoyDashboard::Settings::Display %>
 <% sorts = AhoyDashboard::SearchConsoleRowsQuery::SORTS.keys %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Search Console rows",
-          lede: if @result.range
-                  "Every row synced from Google, one query on one page per day. #{number_with_delimiter(@result.total_rows)} #{"row".pluralize(@result.total_rows)} from #{display.short_date(@result.range.begin)} to #{display.short_date(@result.range.end)}."
-                else
-                  "Every row synced from Google, one query on one page per day."
-                end %>
+<%= dash_page_head title: "Search Console rows",
+      lede: if @result.range
+              "Every row synced from Google, one query on one page per day. #{number_with_delimiter(@result.total_rows)} #{"row".pluralize(@result.total_rows)} from #{display.short_date(@result.range.begin)} to #{display.short_date(@result.range.end)}."
+            else
+              "Every row synced from Google, one query on one page per day."
+            end %>
 
-    <% if @result.days.any? %>
-      <%= dash_card do %>
-        <%= dash_card_header "By day" do %>
-          <span class="g-hint">Clicks in rows is the rows added up. Google's daily total is usually higher.</span>
-        <% end %>
-
-        <%= dash_table label: "By day", class: "set-table" do %>
-          <thead>
-            <tr>
-              <th scope="col">Day</th>
-              <th scope="col" class="text-end">Rows</th>
-              <th scope="col" class="text-end">Clicks in rows</th>
-              <th scope="col" class="text-end">Clicks that day</th>
-              <th scope="col" class="text-end">Named</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @result.days.each do |day| %>
-              <tr>
-                <th scope="row" class="fw-normal"><%= display.short_date(day.date) %></th>
-                <td class="text-end"><%= number_with_delimiter(day.rows) %></td>
-                <td class="text-end"><%= number_with_delimiter(day.row_clicks) %></td>
-                <td class="text-end">
-                  <% if day.total_clicks.nil? %>
-                    <span class="nil">not pulled</span>
-                  <% else %>
-                    <%= number_with_delimiter(day.total_clicks) %>
-                  <% end %>
-                </td>
-                <td class="text-end">
-                  <% if day.coverage.nil? %>
-                    <span class="nil">&mdash;</span>
-                  <% else %>
-                    <%= "#{(day.coverage * 100).round(1)}%" %>
-                  <% end %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        <% end %>
-      <% end %>
+<% if @result.days.any? %>
+  <%= dash_card do %>
+    <%= dash_card_header "By day" do %>
+      <span class="g-hint">Clicks in rows is the rows added up. Google's daily total is usually higher.</span>
     <% end %>
 
-    <%= dash_card do %>
-      <% sort_items = sorts.map do |key|
-           { label: key.titleize,
-             url: settings_search_console_rows_path(sort: key, q: @result.term.presence),
-             current: key == @result.sort }
-         end %>
-      <%= dash_card_header "Rows" do %>
-        <%= dash_segmented sort_items, label: "Sort by" %>
-        <%= seo_track_form("rows-track") if @result.any? %>
-      <% end %>
-
-      <%= form_with url: settings_search_console_rows_path, method: :get, class: "set-find" do %>
-        <%= hidden_field_tag :sort, @result.sort, id: nil %>
-        <%= dash_search_field :q, @result.term, label: "Find a query or a page", id: "q",
-              placeholder: "Find a query or a page" %>
-        <%= submit_tag "Find", class: dash_button_class, name: nil %>
-        <% if @result.term.present? %>
-          <%= dash_button "Clear", settings_search_console_rows_path(sort: @result.sort) %>
+    <%= dash_table label: "By day", class: "set-table" do %>
+      <thead>
+        <tr>
+          <th scope="col">Day</th>
+          <th scope="col" class="text-end">Rows</th>
+          <th scope="col" class="text-end">Clicks in rows</th>
+          <th scope="col" class="text-end">Clicks that day</th>
+          <th scope="col" class="text-end">Named</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @result.days.each do |day| %>
+          <tr>
+            <th scope="row" class="fw-normal"><%= display.short_date(day.date) %></th>
+            <td class="text-end"><%= number_with_delimiter(day.rows) %></td>
+            <td class="text-end"><%= number_with_delimiter(day.row_clicks) %></td>
+            <td class="text-end">
+              <% if day.total_clicks.nil? %>
+                <span class="nil">not pulled</span>
+              <% else %>
+                <%= number_with_delimiter(day.total_clicks) %>
+              <% end %>
+            </td>
+            <td class="text-end"><%= dash_value(day.coverage && "#{(day.coverage * 100).round(1)}%") %></td>
+          </tr>
         <% end %>
-      <% end %>
-
-      <% if @result.any? %>
-        <%= dash_table label: "Rows", class: "set-table", data: { controller: "dash--check-all" } do %>
-          <thead>
-            <tr>
-              <th scope="col"><%= seo_track_all("rows-track") %></th>
-              <th scope="col">Day</th>
-              <th scope="col">Query</th>
-              <th scope="col">Page</th>
-              <th scope="col">Device</th>
-              <th scope="col">Country</th>
-              <th scope="col" class="text-end">Clicks</th>
-              <th scope="col" class="text-end">Impressions</th>
-              <th scope="col" class="text-end">CTR</th>
-              <th scope="col" class="text-end">Position</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @result.rows.each_with_index do |row, index| %>
-              <tr>
-                <td><%= seo_track_box(row.query, form: "rows-track", index: index) if row.query.present? %></td>
-                <td class="text-nowrap"><%= display.short_date(row.date) %></td>
-                <th scope="row" class="fw-normal">
-                  <% if row.query.present? %>
-                    <%= link_to row.query, search_console_keyword_path(q: row.query),
-                          class: "link-body-emphasis" %>
-                  <% else %>
-                    <span class="nil"><%= AhoyDashboard::SearchConsole::ANONYMIZED_QUERY %></span>
-                  <% end %>
-                </th>
-                <td class="tm-cell-wide">
-                  <%= link_to row.page, row.page, class: "d-block text-truncate mono", rel: "noopener", title: row.page %>
-                </td>
-                <td class="text-nowrap"><%= AhoyDashboard::SearchConsole::Slice::DEVICES.fetch(row.device, "Unknown") %></td>
-                <td class="text-nowrap"><%= AhoyDashboard::SearchConsole::Countries.name(row.country) %></td>
-                <td class="text-end"><%= row.clicks %></td>
-                <td class="text-end"><%= number_with_delimiter(row.impressions) %></td>
-                <td class="text-end"><%= "#{(row.ctr * 100).round(1)}%" %></td>
-                <td class="text-end"><%= row.position.round(1) %></td>
-              </tr>
-            <% end %>
-          </tbody>
-        <% end %>
-
-        <%= dash_pager "Page #{@result.page} of #{@result.pages}", label: "Pages of rows",
-              previous: (settings_search_console_rows_path(page: @result.page - 1, sort: @result.sort, q: @result.term.presence) if @result.page > 1),
-              following: (settings_search_console_rows_path(page: @result.page + 1, sort: @result.sort, q: @result.term.presence) if @result.more?) %>
-      <% elsif @result.term.present? %>
-        <%= dash_empty title: "Nothing matches #{@result.term}",
-              hint: "Try a shorter piece of the query or the URL.",
-              action: { label: "Clear", url: settings_search_console_rows_path(sort: @result.sort), primary: false } %>
-      <% else %>
-        <%= dash_empty title: "Nothing pulled yet",
-              hint: "Rows appear after the first sync.",
-              action: { label: "Go to Search Console", url: settings_google_connection_path } %>
-      <% end %>
+      </tbody>
     <% end %>
-  </section>
-</div>
+  <% end %>
+<% end %>
+
+<%= dash_card do %>
+  <% sort_items = sorts.map do |key|
+       { label: key.titleize,
+         url: settings_search_console_rows_path(sort: key, q: @result.term.presence),
+         current: key == @result.sort }
+     end %>
+  <%= dash_card_header "Rows" do %>
+    <%= dash_segmented sort_items, label: "Sort by" %>
+    <%= seo_track_form("rows-track") if @result.any? %>
+  <% end %>
+
+  <%= form_with url: settings_search_console_rows_path, method: :get, class: "set-find" do %>
+    <%= hidden_field_tag :sort, @result.sort, id: nil %>
+    <%= dash_search_field :q, @result.term, label: "Find a query or a page", id: "q",
+          placeholder: "Find a query or a page" %>
+    <%= submit_tag "Find", class: dash_button_class, name: nil %>
+    <% if @result.term.present? %>
+      <%= dash_button "Clear", settings_search_console_rows_path(sort: @result.sort) %>
+    <% end %>
+  <% end %>
+
+  <% if @result.any? %>
+    <%= dash_table label: "Rows", class: "set-table", data: { controller: "dash--check-all" } do %>
+      <thead>
+        <tr>
+          <th scope="col"><%= seo_track_all("rows-track") %></th>
+          <th scope="col">Day</th>
+          <th scope="col">Query</th>
+          <th scope="col">Page</th>
+          <th scope="col">Device</th>
+          <th scope="col">Country</th>
+          <th scope="col" class="text-end">Clicks</th>
+          <th scope="col" class="text-end">Impressions</th>
+          <th scope="col" class="text-end">CTR</th>
+          <th scope="col" class="text-end">Position</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @result.rows.each_with_index do |row, index| %>
+          <tr>
+            <td><%= seo_track_box(row.query, form: "rows-track", index: index) if row.query.present? %></td>
+            <td class="text-nowrap"><%= display.short_date(row.date) %></td>
+            <th scope="row" class="fw-normal">
+              <% if row.query.present? %>
+                <%= link_to row.query, search_console_keyword_path(q: row.query),
+                      class: "link-body-emphasis" %>
+              <% else %>
+                <span class="nil"><%= AhoyDashboard::SearchConsole::ANONYMIZED_QUERY %></span>
+              <% end %>
+            </th>
+            <td class="tm-cell-wide">
+              <%= link_to row.page, row.page, class: "d-block text-truncate mono", rel: "noopener", title: row.page %>
+            </td>
+            <td class="text-nowrap"><%= AhoyDashboard::SearchConsole::Slice::DEVICES.fetch(row.device, "Unknown") %></td>
+            <td class="text-nowrap"><%= AhoyDashboard::SearchConsole::Countries.name(row.country) %></td>
+            <td class="text-end"><%= row.clicks %></td>
+            <td class="text-end"><%= number_with_delimiter(row.impressions) %></td>
+            <td class="text-end"><%= "#{(row.ctr * 100).round(1)}%" %></td>
+            <td class="text-end"><%= row.position.round(1) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    <% end %>
+
+    <%= dash_pager "Page #{@result.page} of #{@result.pages}", label: "Pages of rows",
+          previous: (settings_search_console_rows_path(page: @result.page - 1, sort: @result.sort, q: @result.term.presence) if @result.page > 1),
+          following: (settings_search_console_rows_path(page: @result.page + 1, sort: @result.sort, q: @result.term.presence) if @result.more?) %>
+  <% elsif @result.term.present? %>
+    <%= dash_empty title: "Nothing matches #{@result.term}",
+          hint: "Try a shorter piece of the query or the URL.",
+          action: { label: "Clear", url: settings_search_console_rows_path(sort: @result.sort), primary: false } %>
+  <% else %>
+    <%= dash_empty title: "Nothing pulled yet",
+          hint: "Rows appear after the first sync.",
+          action: { label: "Go to Search Console", url: settings_google_connection_path } %>
+  <% end %>
+<% end %>

@@ -3,7 +3,6 @@
 module AhoyDashboard
   module Compatibility
     module ClassNames
-      # Rails 6.0 predates class_names. Keep the fallback inside the engine helpers.
       def class_names(*values)
         return super if defined?(super)
 

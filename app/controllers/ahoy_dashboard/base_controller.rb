@@ -1,10 +1,6 @@
 require "csv"
 
 module AhoyDashboard
-  # The analytics dashboard. One admin, no tenants, and nothing here is a page
-  # anybody else is allowed to see: sign in if you are nobody, 404 if you are
-  # somebody the host's authorize lambda says no to. A 404 rather than a 403,
-  # so the dashboard does not confirm it exists to somebody who cannot open it.
   class BaseController < ActionController::Base
     layout :dashboard_layout
 
@@ -12,18 +8,9 @@ module AhoyDashboard
 
     include AhoyDashboard::ErrorScreens
 
-    # The last view the operator was looking at, so opening /telemetry lands on
-    # it rather than on the default range. Stored plainly rather than signed: it
-    # holds a preference and no authority, QueryForm already treats every value
-    # in it as hostile, and signing it would drop the memory on a key rotation
-    # to protect nothing.
     VIEW_COOKIE = "dash_view".freeze
     VIEW_EXPIRY = 90.days
 
-    # Only the dashboard page itself writes the cookie. The report frames, the
-    # realtime poll and the CSV exports all read #query too, and a frame writing
-    # it would remember whatever its own src said rather than what the operator
-    # chose.
     VIEW_CONTROLLER = "ahoy_dashboard/dashboards".freeze
     VIEW_ACTION = "show".freeze
 
@@ -32,12 +19,14 @@ module AhoyDashboard
     ASK_MAX_PATH = 500
     ASK_SCREENS = "ahoy_dashboard/chats".freeze
 
+    LOCAL_PATH = %r{\A/(?![/\\])[^\x00-\x1f\x7f\\]*\z}
+
     before_action :require_admin!
     before_action :never_index
     before_action :set_navigation_availability, if: :seo_navigation?
     after_action :remember_view, if: :dashboard_page?
 
-    helper_method :query, :remembered_view?, :ask_panel, :ask_screen?, :ask_installed?, :palette
+    helper_method :query, :remembered_view?, :ask_panel, :ask_screen?, :ask_installed?, :palette, :seo_navigation?
 
     def cache_store
       AhoyDashboard.config.cache_store || super
@@ -63,10 +52,8 @@ module AhoyDashboard
       end
     end
 
-    # Frame.load extracts only its matching tm-frame. Rendering the surrounding
-    # document also runs the realtime/navigation queries, then discards them.
     def dashboard_layout
-      return false if frame_request? && request.headers["Tm-Frame"].match?(ErrorScreens::FRAME_ID)
+      return false if error_frame_id
 
       @realtime ||= AhoyDashboard::RealtimeQuery.call
       "ahoy_dashboard"
@@ -80,30 +67,21 @@ module AhoyDashboard
     end
 
     def seo_navigation?
-      controller_path.start_with?("ahoy_dashboard/seo") || ErrorPresenter::RAIL_KEYS.key?(controller_path)
+      false
     end
 
     def require_admin!
       return if AhoyDashboard.authorized?(self)
 
-      # Somebody who is not signed in at all is sent somewhere they can be.
-      # Somebody signed in and refused gets the answer an unmounted engine
-      # would give, so the dashboard never confirms it exists to a person who
-      # is not allowed to open it.
       raise ActiveRecord::RecordNotFound if AhoyDashboard.signed_in?(self)
 
       redirect_to AhoyDashboard.sign_in_path(self)
     end
 
-    # An export is the whole answer, however long that is, so it goes out a row
-    # at a time rather than being built into one string first. Content-Length is
-    # unknown by definition, which is what makes it a streamed response.
     def stream_csv(name, rows)
       response.headers["Content-Type"] = "text/csv; charset=utf-8"
       response.headers["Content-Disposition"] =
         ActionDispatch::Http::ContentDisposition.format(disposition: "attachment", filename: name)
-      # A proxy that decides to buffer leaves the browser on nothing until the
-      # last row, which on a long export reads as a hung download.
       response.headers["X-Accel-Buffering"] = "no"
       response.headers.delete("Content-Length")
 
@@ -116,17 +94,6 @@ module AhoyDashboard
       response.headers["X-Robots-Tag"] = "noindex, nofollow"
     end
 
-    def set_seo_back(fallback_label:, fallback_url:)
-      @back = Seo::BackLinkPresenter.new(
-        host: request.host, path: request.path, referer: request.referer, remembered: session[:seo_back],
-        fallback_label: fallback_label, fallback_url: fallback_url
-      )
-      session[:seo_back] = @back.memory
-    end
-
-    # Accept: */* arrives as Mime::ALL, whose symbol is nil, not :all. That is
-    # what most crawlers and agent http clients send, and it is an html page as
-    # far as anything reading these numbers is concerned.
     def request_format
       @request_format ||= begin
         symbol = request.format&.symbol
@@ -148,6 +115,11 @@ module AhoyDashboard
 
     def frame_request?
       request.headers["Tm-Frame"].present?
+    end
+
+    def local_path(value)
+      path = value.to_s
+      path if path.match?(LOCAL_PATH)
     end
 
     def ask_screen?
@@ -180,20 +152,11 @@ module AhoyDashboard
       }
     end
 
-    # What the surface a panel was opened from holds that the query string does
-    # not, so applying a filter comes back to the question that was on screen
-    # rather than to the default one. Read off the prefixed keys, for the reason
-    # written at AhoyDashboard::DashboardHelper::CARRIED_PREFIX.
     def carried
-      AhoyDashboard::DashboardHelper::DESTINATION_KEYS
-        .index_with { |key| params[:"#{AhoyDashboard::DashboardHelper::CARRIED_PREFIX}#{key}"] }
-        .reject { |_key, value| value.blank? }
+      FilterDestination.read(params)
     end
 
     def remember_view
-      # A realtime range is a glance at the last half hour, not a view anybody
-      # wants opened into next week. Skipping the write rather than clearing it
-      # leaves whatever they were looking at before the glance intact.
       return if query.period.realtime?
 
       view = query.to_view

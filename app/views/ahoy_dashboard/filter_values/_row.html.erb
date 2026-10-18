@@ -1,12 +1,8 @@
-<%# One value in the filter dialog. Live, it is a toggle the dialog collects
-    into a filter, and nothing happens until Apply. As a page, with no dialog
-    around it, it is a link that applies the value on its own. %>
 <% typed = local_assigns.fetch(:typed, false) %>
 <% largest = local_assigns.fetch(:largest, 0).to_f %>
 <% visitors = local_assigns[:visitors] %>
 <% mono = dash_mono_dimension?(dimension.key) %>
-<% chip = dash_chip_kind(dimension.key) %>
-<% chip = nil unless chip.in?(%i[flag channel]) %>
+<% chip = dash_chip_kind(dimension.key, favicon: false) %>
 <% body = capture do %>
   <%= dash_check_mark(class: "position-relative fm-row__check") %>
   <% unless typed %>

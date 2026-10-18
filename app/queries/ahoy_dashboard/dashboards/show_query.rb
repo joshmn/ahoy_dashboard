@@ -4,13 +4,7 @@ module AhoyDashboard
 
   module Dashboards
 
-    class ShowQuery
-      class << self
-        def call(**options)
-          new(**options).call
-        end
-      end
-
+    class ShowQuery < AhoyDashboard::Query
       def initialize(query:, cards: true)
         @query = query
         @cards = cards
@@ -29,20 +23,19 @@ module AhoyDashboard
       attr_reader :query, :cards
 
       def card_readings(readings:)
-        reports = Report.cards.reject { |report| report.key == Report::BEHAVIOURS }
-        funnels = Funnel.ordered.limit(Funnels::IndexQuery::PAGE_SIZE).includes(funnel_steps: :goal).to_a
+        funnels = Funnels::IndexQuery.call(query: query)
         search_console_state = FeatureState.for(:search_console)
         goals = Goal.ordered.to_a
         journey = JourneyQuery.new(scope: query.scope)
         headline = HeadlineReading.new(query: query, readings: readings)
 
         {
-          reports: reports.map { |report| ReportQuery.call(query: query, report: report, page_visitors: journey.page_visitors) },
+          reports: Report.grid_cards.map { |report| ReportQuery.call(query: query, report: report, page_visitors: journey.page_visitors) },
           pinned_cards: PinnedQuestionsQuery.call(headline: headline),
           search_console_state: search_console_state,
           search_console: (SearchConsoleQuery.call(range: query.range) if search_console_state.installed?),
-          funnels: funnels.map { |funnel| FunnelQuery.call(scope: query.scope, funnel: funnel) },
-          funnel_count: Funnel.count,
+          funnels: funnels.readings,
+          funnel_count: funnels.total,
           journey: journey.call,
           goal_conversions: GoalsQuery.call(scope: query.scope, limit: GoalConversionsPresenter::ROWS, goals: goals),
           goals: goals

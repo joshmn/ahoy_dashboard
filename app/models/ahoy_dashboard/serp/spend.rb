@@ -19,9 +19,6 @@ module AhoyDashboard
         @reserved = provider.reserve!(units, now: now)
       end
 
-      # The day is written whether or not a provider row exists, so the spend
-      # card reads the same whichever adapter did the work, the sample one
-      # included.
       def settle(spent, used: spent.to_i.positive?)
         return if @settled
 

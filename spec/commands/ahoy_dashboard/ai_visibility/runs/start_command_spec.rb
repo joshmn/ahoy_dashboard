@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe AhoyDashboard::AiVisibility::Runs::StartCommand do
   include ActiveJob::TestHelper

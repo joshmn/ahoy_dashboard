@@ -12,10 +12,9 @@ module AhoyDashboard
           assistant = Assistant.find_or_initialize_by(name: form.name)
           assistant.enabled = form.enabled
           assistant.models = form.model_list
-          submitted = form.submitted_credentials.reject { |_key, value| value.to_s.strip.blank? }
-          assistant.credentials = assistant.credentials.merge(submitted)
+          assistant.credentials = assistant.credentials.merge(form.submitted_credentials)
 
-          return copy_errors(assistant) unless assistant.save
+          return broadcast(:invalid, form.copy_errors_from(assistant)) unless assistant.save
 
           broadcast(:ok, assistant)
         end
@@ -23,14 +22,6 @@ module AhoyDashboard
         private
 
         attr_reader :form
-
-        def copy_errors(assistant)
-          assistant.errors.messages.each do |attribute, messages|
-            messages.each { |message| form.errors.add(attribute, message) }
-          end
-
-          broadcast(:invalid, form)
-        end
       end
     end
   end

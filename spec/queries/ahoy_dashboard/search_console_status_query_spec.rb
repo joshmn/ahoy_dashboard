@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsoleStatusQuery do
   around { |example| travel_to(Time.utc(2026, 8, 12, 18, 0)) { example.run } }
@@ -30,22 +29,12 @@ RSpec.describe AhoyDashboard::SearchConsoleStatusQuery do
     expect(status.impressions).to eq(300)
   end
 
-  # The row count is a full count over a table nothing prunes, so it is the one
-  # thing on this screen that grows. It stays exact, because the screen prints a
-  # precise figure; what it does not do is pay for a second scan to count the
-  # days as well.
   it "reads the day figures and the day count in one pass" do
     create(:dash_search_console_total, date: Date.new(2026, 8, 9), clicks: 4, impressions: 40)
     create(:dash_search_console_row, date: Date.new(2026, 8, 9))
 
-    statements = []
-    subscription = ActiveSupport::Notifications.subscribe("sql.active_record") do |_n, _s, _f, _id, payload|
-      next if payload[:name].in?([ "SCHEMA", "TRANSACTION" ]) || payload[:cached]
-
-      statements << payload[:sql]
-    end
-    status = described_class.call
-    ActiveSupport::Notifications.unsubscribe(subscription)
+    status = nil
+    statements = captured_sql { status = described_class.call }
 
     expect(statements.grep(/ahoy_dashboard_search_console_totals/).size).to eq(1)
     expect(statements.grep(/ahoy_dashboard_search_console_rows/).size).to eq(1)
@@ -63,8 +52,6 @@ RSpec.describe AhoyDashboard::SearchConsoleStatusQuery do
     expect(status.clicks).to eq(7)
   end
 
-  # Three days back is as current as Google gets, so reaching it is caught up
-  # rather than late.
   it "counts the last finished day as caught up" do
     create(:dash_search_console_total, date: Date.new(2026, 8, 9))
 

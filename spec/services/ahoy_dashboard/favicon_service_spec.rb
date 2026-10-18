@@ -1,17 +1,10 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe AhoyDashboard::FaviconService do
   let(:png) { "\x89PNG\r\n\x1a\n".b + "the rest of it".b }
   let(:icon_url) { "https://icons.duckduckgo.com/ip3/google.com.ico" }
 
-  around do |example|
-    previous = Rails.cache
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    example.run
-    Rails.cache = previous
-  end
+  include_context "with a memory cache"
 
   def referred_from!(domain)
     dash_visit(started_at: Time.current, referring_domain: domain)
@@ -42,8 +35,6 @@ RSpec.describe AhoyDashboard::FaviconService do
       expect(a_request(:get, icon_url)).to have_been_made.once
     end
 
-    # A miss that is not cached means every dashboard load re-fetches a domain
-    # that has no icon, which is most of them.
     it "remembers a 404 rather than asking again" do
       stub_request(:get, icon_url).to_return(status: 404)
 
@@ -130,6 +121,23 @@ RSpec.describe AhoyDashboard::FaviconService do
       stub_request(:get, icon_url).to_return(status: 200, body: png)
 
       expect(described_class.call("GOOGLE.COM")).to be_present
+    end
+
+    it "only knows domains that referred a visit recently, so the lookup stays on the time index" do
+      dash_visit(started_at: described_class::DOMAINS_WINDOW.ago - 1.day, referring_domain: "old.example")
+      referred_from!("www.google.com")
+
+      expect(described_class.known_domains).to eq(Set["google.com"])
+    end
+
+    it "keeps the most recently seen domains when there are more than it holds" do
+      stub_const("#{described_class}::MAX_DOMAINS", 2)
+      dash_visit(started_at: 3.days.ago, referring_domain: "oldest.example")
+      dash_visit(started_at: 2.days.ago, referring_domain: "older.example")
+      dash_visit(started_at: 1.day.ago, referring_domain: "newer.example")
+      dash_visit(started_at: 5.days.ago, referring_domain: "newer.example")
+
+      expect(described_class.known_domains).to eq(Set["newer.example", "older.example"])
     end
   end
 

@@ -2,12 +2,15 @@ module AhoyDashboard
   module Serp
     class KeywordPresenter
       include AhoyDashboard::Seo::Exportable
+      include AhoyDashboard::Seo::Formatting
 
       EXPORT_KEY = "rank-keyword".freeze
 
-      Tile = Data.define(:label, :value, :note)
+      Tile = AhoyDashboard::Seo::BasePresenter::Tile
 
       attr_reader :query, :result, :share
+
+      delegate :keyword, :site, to: :result
 
       def initialize(query:, result:, share: nil)
         @query = query
@@ -15,16 +18,8 @@ module AhoyDashboard
         @share = share
       end
 
-      def keyword
-        result.keyword
-      end
-
       def heading
         keyword.query
-      end
-
-      def site
-        result.site
       end
 
       def empty?
@@ -33,7 +28,7 @@ module AhoyDashboard
 
       def summary
         parts = [ result.place.label, range_label.downcase ]
-        parts << "#{helpers.pluralize(result.points.size, 'reading')}"
+        parts << "#{pluralize(result.points.size, 'reading')}"
         parts << "for #{site.name}, not your site" if site.present? && !site.ours?
 
         parts.join(" · ")
@@ -50,16 +45,12 @@ module AhoyDashboard
 
       def tiles
         [
-          Tile.new(label: "Position", value: value_for(result.position), note: change_note),
-          Tile.new(label: "Best", value: value_for(result.best), note: "in this range"),
-          Tile.new(label: "Worst", value: value_for(result.worst), note: "in this range"),
+          Tile.new(label: "Position", value: result.position&.to_s, note: change_note),
+          Tile.new(label: "Best", value: result.best&.to_s, note: "in this range"),
+          Tile.new(label: "Worst", value: result.worst&.to_s, note: "in this range"),
           Tile.new(label: "AI overviews", value: result.overviews.to_s,
                    note: "#{result.citations} cited #{site&.domain}")
         ]
-      end
-
-      def value_for(position)
-        position&.to_s
       end
 
       def change_note
@@ -70,13 +61,7 @@ module AhoyDashboard
       end
 
       def change_tone
-        return nil if result.change.nil? || result.change.zero?
-
-        result.change.positive? ? :good : :bad
-      end
-
-      def chart_kind
-        :line
+        tone_for(result.change)
       end
 
       def chart_data
@@ -85,20 +70,18 @@ module AhoyDashboard
         [ { name: "Position", data: points } ]
       end
 
-      # A reading where the site was nowhere is not position zero and it is not a
-      # missing check either, so it leaves a hole in the line rather than being
-      # drawn at the bottom of the chart.
       def points
-        result.points.map { |point| [ point.at.in_time_zone(zone).iso8601, point.position ] }
+        result.points.map { |point| [ point.at.in_time_zone(time_zone).iso8601, point.position ] }
       end
 
       def readings
-        result.ranked.map { |point| [ AhoyDashboard::SeoHelper.short_date(point.at, zone: zone), point.position ] }
+        result.ranked.map { |point| [ on_label(point.at), point.position ] }
       end
 
       def chart_options
         {
           library: {
+            tmFill: false,
             plugins: {
               tmFormat: { label: "Position", value: "integer", interval: "day", scale: "time",
                           missing: "Not in the results" }
@@ -121,13 +104,27 @@ module AhoyDashboard
       def rivals_note
         return nil if result.run.nil?
 
-        "The top #{rivals.size} results from the check on #{stamp(result.run.checked_at)}."
+        "The top #{rivals.size} results from the check on #{on_label(result.run.checked_at)}."
       end
 
       def citations
         return [] if result.run.nil?
 
         @citations ||= AhoyDashboard::SerpAiCitation.where(run_id: result.run.id).order(:slot).to_a
+      end
+
+      def mine?(domain)
+        Domain.matches_site?(domain, site)
+      end
+
+      def overview_label(point)
+        return "Cited" if point.cited
+
+        "Shown" if point.overview
+      end
+
+      def check_now
+        @check_now ||= CheckNowPresenter.new(keyword: keyword)
       end
 
       def location_options
@@ -153,17 +150,11 @@ module AhoyDashboard
       end
 
       def period_options
-        AhoyDashboard::SeoRange.periods.map do |period|
-          {
-            label: period.label,
-            url: link_for(query.with(period: period.key).to_query),
-            active: period.key == query.period.key
-          }
-        end
+        AhoyDashboard::Seo::Periods.menu(query) { |period| link_for(query.with(period: period.key).to_query) }
       end
 
       def range_label
-        query.period.custom? ? query.range_label : query.period.label
+        query.range_title
       end
 
       def rankings_path
@@ -175,7 +166,7 @@ module AhoyDashboard
       end
 
       def stamp(at)
-        AhoyDashboard::SeoHelper.short_date(at.in_time_zone(zone), zone: zone)
+        on_label(at)
       end
 
       def empty_title
@@ -187,10 +178,6 @@ module AhoyDashboard
           keyword.last_checked_at.blank?
 
         "It was last checked #{stamp(keyword.last_checked_at)}, outside this range. Try a longer date range."
-      end
-
-      def ours?
-        site&.ours?
       end
 
       def export_key
@@ -209,7 +196,9 @@ module AhoyDashboard
         [
           AhoyDashboard::Seo::CsvTable.new(key: "readings", label: "Every reading",
                                            headers: [ "Checked", "Position", "AI", "URL" ]) do
-            rows.map { |point| [ csv_time(point.at), point.position, overview_csv(point), url_csv(point.url) ] }
+            rows.map do |point|
+              [ csv_time(point.at), point.position, overview_label(point), AhoyDashboard::Seo::Formatting.url_path(point.url) ]
+            end
           end,
           AhoyDashboard::Seo::CsvTable.new(key: "rivals", label: "Who else ranked",
                                            headers: [ "Position", "Domain" ]) do
@@ -228,23 +217,6 @@ module AhoyDashboard
         @decorated_keyword ||= SerpKeywordDecorator.new(keyword)
       end
 
-      def overview_csv(point)
-        return "Cited" if point.cited
-        return "Shown" if point.overview
-
-        nil
-      end
-
-      def url_csv(url)
-        return nil if url.blank?
-
-        url.to_s.sub(%r{\Ahttps?://[^/]+}, "").presence || "/"
-      end
-
-      def zone
-        @zone ||= AhoyDashboard.time_zone
-      end
-
       def path(overrides = {})
         link_for(query.to_query.merge(overrides))
       end
@@ -253,10 +225,6 @@ module AhoyDashboard
         routes.rank_keyword_path(
           { at: result.location, site: site&.id }.merge(params).merge(keyword: target.id).compact
         )
-      end
-
-      def helpers
-        ActionController::Base.helpers
       end
 
       def routes

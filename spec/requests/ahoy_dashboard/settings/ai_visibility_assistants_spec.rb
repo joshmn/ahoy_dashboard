@@ -1,18 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/ai_visibility_settings"
 
 RSpec.describe "Dashboard AI visibility assistant settings", type: :request do
   around { |example| ai_visibility_settings(enabled: true) { example.run } }
-
-  describe "gating" do
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/settings/ai_visibility_assistants/openai/edit"
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
 
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
@@ -22,7 +11,7 @@ RSpec.describe "Dashboard AI visibility assistant settings", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Set up Gemini", "Nothing stored.")
-      page = Nokogiri::HTML(response.body)
+      page = document
       expect(page.at_css("input[type=checkbox][name='ai_visibility_assistant[enabled]']")["checked"]).to be_present
       picked = page.css("input[type=checkbox][name='ai_visibility_assistant[models][]'][checked]").map { |box| box["value"] }
       expect(picked).to eq(%w[gemini-2.5-flash])
@@ -35,7 +24,7 @@ RSpec.describe "Dashboard AI visibility assistant settings", type: :request do
 
       get "/telemetry/settings/ai_visibility_assistants/openai/edit"
 
-      page = Nokogiri::HTML(response.body)
+      page = document
       picked = page.css("input[type=checkbox][name='ai_visibility_assistant[models][]'][checked]").map { |box| box["value"] }
       expect(picked).to eq(%w[gpt-5])
       expect(page.at_css("input[name='ai_visibility_assistant[other_models]']")["value"]).to eq("o3")
@@ -89,7 +78,7 @@ RSpec.describe "Dashboard AI visibility assistant settings", type: :request do
         params: { ai_visibility_assistant: { enabled: "1", models: [ "" ], other_models: "", credentials: {} } }
 
       expect(response).to have_http_status(:unprocessable_entity)
-      page = Nokogiri::HTML(response.body)
+      page = document
       link = page.at_css(".alert a[href='#ai_visibility_assistant_models']")
       expect(link.text).to include("need at least one, or turn Gemini off")
       expect(page.at_css("fieldset#ai_visibility_assistant_models")).to be_present

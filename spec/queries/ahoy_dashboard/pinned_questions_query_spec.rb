@@ -1,8 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::PinnedQuestionsQuery do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
@@ -14,7 +13,7 @@ RSpec.describe AhoyDashboard::PinnedQuestionsQuery do
     question = create(:dash_saved_query, pinned: true, params: { "period" => "day" })
     AhoyDashboard::SavedQuery.connection.execute("UPDATE ahoy_dashboard_saved_queries SET params = '[]'::jsonb WHERE id = #{question.id}")
 
-    expect(described_class.call(questions: [question.reload])).to eq([])
+    expect(described_class.call(questions: [ question.reload ])).to eq([])
   end
 
   it "propagates a database query failure instead of silently dropping the card" do
@@ -24,9 +23,11 @@ RSpec.describe AhoyDashboard::PinnedQuestionsQuery do
     connection.transaction(requires_new: true) do
       connection.execute("ALTER TABLE ahoy_visits RENAME COLUMN visitor_token TO unavailable_visitor_token")
 
-      expect { described_class.call(questions: [question]) }.to raise_error(ActiveRecord::StatementInvalid)
+      expect { described_class.call(questions: [ question ]) }.to raise_error(ActiveRecord::StatementInvalid)
       raise ActiveRecord::Rollback
     end
+  ensure
+    AhoyDashboard.visit.reset_column_information
   end
 
   def card(period: "day")
@@ -44,7 +45,7 @@ RSpec.describe AhoyDashboard::PinnedQuestionsQuery do
 
     result = card
 
-    expect([result.value, result.change]).to eq([2, 0])
+    expect([ result.value, result.change ]).to eq([ 2, 0 ])
   end
 
   def bounced(at, name)
@@ -52,8 +53,7 @@ RSpec.describe AhoyDashboard::PinnedQuestionsQuery do
   end
 
   def browsed(at, name)
-    visit = dash_visit(started_at: at, visitor: name)
-    dash_page_view(visit, path: "/", at: at)
+    visit = dash_landing(at: at, visitor: name)
     dash_page_view(visit, path: "/next", at: at + 1.minute)
   end
 
@@ -85,8 +85,7 @@ RSpec.describe AhoyDashboard::PinnedQuestionsQuery do
 
   it "counts only what the question's filters let through" do
     someone(now.change(hour: 9), "home reader")
-    visit = dash_visit(started_at: now.change(hour: 10), visitor: "faq reader")
-    dash_page_view(visit, path: "/going-in/faq", at: now.change(hour: 10))
+    dash_landing("/going-in/faq", at: now.change(hour: 10), visitor: "faq reader")
     question = create(:dash_saved_query, pinned: true, params: {
       "period" => "day", "metric" => "visitors",
       "filters" => [ { "dimension" => "page", "operator" => "is", "value" => "/going-in/faq" } ]
@@ -98,7 +97,7 @@ RSpec.describe AhoyDashboard::PinnedQuestionsQuery do
   it "ends the sparkline at the hour that is still filling in" do
     someone(now.change(hour: 9), "one")
 
-    expect([card.series.size, card.series[9]]).to eq([15, 1.0])
+    expect([ card.series.size, card.series[9] ]).to eq([ 15, 1.0 ])
   end
 
   it "reads a finished question over the whole range before it" do
@@ -110,9 +109,14 @@ RSpec.describe AhoyDashboard::PinnedQuestionsQuery do
   describe "sharing current totals with the sparkline" do
     let(:separate_queries) do
       Class.new(described_class) do
+        def self.readings
+          @readings ||= []
+        end
+
         private
 
         def reading_for(form)
+          self.class.readings << form
           [ stat_for(form), nil ]
         end
       end
@@ -138,23 +142,14 @@ RSpec.describe AhoyDashboard::PinnedQuestionsQuery do
 
         expect(described_class.call(questions: [ question ])).to eq(expected)
       end
+      expect(separate_queries.readings.size).to eq(periods.size * 3)
     end
 
     it "reads the current count and sparkline together plus one comparison count" do
       question = create(:dash_saved_query, pinned: true, params: { "period" => "day", "metric" => "visitors" })
-      statements = []
-      subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
-        next if payload[:name].in?([ "SCHEMA", "TRANSACTION" ]) || payload[:cached]
-        next unless payload[:sql].match?(/\bFROM\s+"?ahoy_visits\b/i)
+      statements = captured_sql(/\bFROM\s+"?ahoy_visits\b/i, uncached: true) { described_class.call(questions: [ question ]) }
 
-        statements << payload[:sql]
-      end
-
-      ActiveRecord::Base.uncached { described_class.call(questions: [ question ]) }
-
-      expect([statements.size, statements.count { |sql| sql.include?("grouping sets") }]).to eq([2, 1])
-    ensure
-      ActiveSupport::Notifications.unsubscribe(subscriber)
+      expect([ statements.size, statements.count { |sql| sql.include?("grouping sets") } ]).to eq([ 2, 1 ])
     end
   end
 end

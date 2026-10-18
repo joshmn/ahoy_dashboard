@@ -1,14 +1,3 @@
-<%# The picker, drawn as the command menu.
-
-    One of these per form, rendered once beside the fields rather than once per
-    field, because it is a dialog and the field that opened it is whichever one
-    was clicked. The controller sits on this element and binds its own document
-    listener for the openers, the same way the filter dialog does, so a field
-    anywhere on the page can reach it without being inside it.
-
-    scope decides which facets are on offer: a segment's value can be any
-    filterable dimension, a goal's can be an event name, a page path or a
-    property key. %>
 <% scope = local_assigns.fetch(:scope, AhoyDashboard::PickerFacet::FILTER) %>
 
 <div class="cmdk"
@@ -35,7 +24,7 @@
       <kbd>esc</kbd>
     </div>
 
-    <div class="cmdk-list" role="listbox" data-dash--picker-target="list">
+    <div class="cmdk-list" role="listbox">
       <%= render "ahoy_dashboard/pickers/panel",
             scope: scope, facet: nil, options: [], term: "" %>
     </div>

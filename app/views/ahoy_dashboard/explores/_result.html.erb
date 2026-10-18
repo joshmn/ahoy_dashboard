@@ -6,40 +6,34 @@
     <span class="g-hint"><%= presenter.summary %></span>
   <% end %>
 
-<%# A plain GET, so finding a row works with the JavaScript off and the result is
-    a shareable URL. The narrowing is SQL rather than a pass over the rows already
-    on screen, because the page somebody is standing on is not the answer. %>
   <%= form_with url: explore_path, method: :get, class: "set-find",
         html: { role: "search", "aria-label": "Find a row" } do %>
     <%= render "ahoy_dashboard/shared/query_fields" %>
-    <% @explore.to_query.except(:q, :page).each do |name, value| %>
-      <%= hidden_field_tag name, value, id: nil %>
-    <% end %>
+    <%= dash_hidden_fields explore.to_query.except(:q, :page) %>
 
     <%= dash_search_field :q, presenter.term, id: "tm-explore-search",
           label: "Find a #{presenter.label_column.downcase}",
           placeholder: "Find a #{presenter.label_column.downcase}" %>
     <%= dash_button "Find", type: "submit" %>
 
-    <% if @explore.searching? %>
+    <% if explore.searching? %>
       <%= dash_button "Clear", presenter.clear_search_path %>
     <% end %>
   <% end %>
 
-  <% if @explore.searching? && !presenter.empty? %>
+  <% if explore.searching? && !presenter.empty? %>
     <p class="ex-note" role="status">
       Rows matching &ldquo;<%= presenter.term %>&rdquo;. The numbers and the chart still cover the whole range.
     </p>
   <% end %>
 
   <% if presenter.empty? %>
-    <% if @explore.searching? %>
+    <% if explore.searching? %>
       <%= dash_empty title: "Nothing matches that",
             hint: "No #{presenter.label_column.downcase} in this range contains \"#{presenter.term}\".",
             action: { label: "Clear the search", url: presenter.clear_search_path, primary: false } %>
     <% else %>
-      <%= dash_empty title: "Nothing here for this range",
-            hint: query.filters.any? ? "Try a wider date range, or remove a filter." : "Try a wider date range." %>
+      <%= dash_empty title: "Nothing here for this range", hint: dash_range_hint(drop: "remove a filter") %>
     <% end %>
   <% else %>
     <%= dash_table label: "#{presenter.heading.presence || 'Result'}, scrolls sideways", class: "ex-table", region: true do %>
@@ -59,10 +53,8 @@
           <tr>
             <th scope="row" class="w-100">
               <%= link_to row.filter_path, class: "ex-label", title: row.display_label do %>
-                <span class="<%= class_names("rn", "mono" => mono, "d-none d-sm-flex" => presenter.columns_chosen?) %>">
-                  <%= dash_row_chip(chip, row.label) if chip %>
-                  <%= dash_row_label(row.display_label, split: mono) %>
-                </span>
+                <%= dash_row_name row.display_label, chip: chip, chip_label: row.label, mono: mono,
+                      class_name: ("d-none d-sm-flex" if presenter.columns_chosen?) %>
                 <% if presenter.columns_chosen? %>
                   <span class="<%= class_names("d-sm-none text-nowrap flex-shrink-0", "font-monospace small" => mono) %>"><%= row.display_label %></span>
                 <% end %>

@@ -1,10 +1,6 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::AiVisibility::AnswerDecorator, type: :decorator do
-  def decorate(answer)
-    described_class.new(answer)
-  end
-
   describe "#served_differently?" do
     it "is true when the answer came back from another model" do
       answer = build(:dash_ai_answer, model: "gpt-4.1", served_model: "gpt-4.1-2025-04-14")

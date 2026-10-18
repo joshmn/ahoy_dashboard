@@ -15,14 +15,14 @@ module AhoyDashboard
           return broadcast(:invalid, form) if form.invalid?
 
           keyword.assign_attributes(form.record_attributes)
-          return copy_errors unless keyword.valid?
+          return broadcast(:invalid, form.copy_errors_from(keyword)) unless keyword.valid?
 
           outcome = SerpKeyword.transaction { save }
 
           broadcast(:ok, outcome)
         rescue ActiveRecord::RecordNotUnique
-          form.errors.add(:base, KeywordForm::DUPLICATE_MESSAGE)
-          broadcast(:duplicate, form)
+          form.add_duplicate_error
+          broadcast(:invalid, form)
         end
 
         private
@@ -56,7 +56,7 @@ module AhoyDashboard
 
         def sync_targets
           wanted = form.chosen_site_ids
-          keyword.keyword_targets.where.not(site_id: wanted).destroy_all
+          keyword.keyword_targets.where.not(site_id: wanted).delete_all
 
           attached = 0
           backfilled = 0
@@ -70,14 +70,6 @@ module AhoyDashboard
           end
 
           { attached: attached, backfilled: backfilled }
-        end
-
-        def copy_errors
-          keyword.errors.messages.each do |attribute, messages|
-            messages.each { |message| form.errors.add(attribute, message) }
-          end
-
-          broadcast(:invalid, form)
         end
       end
     end

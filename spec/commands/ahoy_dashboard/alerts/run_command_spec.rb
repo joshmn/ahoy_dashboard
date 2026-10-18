@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/alerts"
 
 RSpec.describe AhoyDashboard::Alerts::RunCommand do
   let(:keyword) { create(:dash_serp_keyword) }
@@ -63,8 +62,6 @@ RSpec.describe AhoyDashboard::Alerts::RunCommand do
   end
 
   describe "how often a rule has fired" do
-    include ActiveSupport::Testing::TimeHelpers
-
     before do
       serp_reading(keyword, position: 6, at: 26.hours.ago)
       serp_reading(keyword, position: 14, at: 2.hours.ago)
@@ -113,7 +110,7 @@ RSpec.describe AhoyDashboard::Alerts::RunCommand do
   end
 
   it "reports a new comparison once a newer check comes in" do
-    drop = create(:dash_alert_rule, key: "big_drop", name: "Dropped several places", threshold: 5)
+    drop = create(:dash_alert_rule, key: "big_drop", threshold: 5)
     serp_reading(keyword, position: 6, at: 50.hours.ago)
     serp_reading(keyword, position: 14, at: 26.hours.ago)
     described_class.call(rules: [ drop ])

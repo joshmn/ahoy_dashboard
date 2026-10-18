@@ -1,7 +1,6 @@
 module AhoyDashboard
   module Seo
     module Alerts
-      # Evaluating every live rule now rather than waiting for the schedule.
       class RunsController < BaseController
         def create
           AhoyDashboard::Alerts::RunJob.perform_later

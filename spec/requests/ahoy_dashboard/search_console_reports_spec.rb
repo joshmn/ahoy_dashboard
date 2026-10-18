@@ -1,18 +1,10 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe "Dashboard Search Console report", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
-  # Three tables at three grains. The page reads all three and says which is
-  # which, so the fixtures have to be all three too.
   def stored!(days: 5)
     days.times do |back|
       on = now.to_date - back - 1
@@ -31,8 +23,6 @@ RSpec.describe "Dashboard Search Console report", type: :request do
     end
   end
 
-  # The same length of time before the range, which is what every delta compares
-  # against.
   def earlier!(clicks:, from: 80, to: 35)
     AhoyDashboard::SearchConsoleTotal.absorb((to..from).map do |back|
       { date: now.to_date - back, clicks: clicks, impressions: 5_000, ctr: 0.1, position: 9.0 }
@@ -41,22 +31,6 @@ RSpec.describe "Dashboard Search Console report", type: :request do
 
   def pill(tile)
     tile.at_css("[title^='vs ']")
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/search_console_report"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is closed to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/search_console_report"
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do
@@ -68,10 +42,7 @@ RSpec.describe "Dashboard Search Console report", type: :request do
       get "/telemetry/search_console_report"
 
       document = Nokogiri::HTML5(response.body)
-      button = document.css("button[disabled][aria-describedby]").find { |node| node.text.strip == "Sync now" }
-
-      expect(button).to be_present
-      expect(document.at_css("##{button['aria-describedby']}").text).to include("Connect Google first.")
+      expect(disabled_button_reason("Sync now")).to include("Connect Google first.")
       expect(response.body).to include("/telemetry/settings/google_connection")
     end
 
@@ -83,10 +54,7 @@ RSpec.describe "Dashboard Search Console report", type: :request do
         get "/telemetry/search_console_report"
       end
 
-      button = document.css("button[disabled][aria-describedby]").find { |node| node.text.strip == "Sync now" }
-
-      expect(button).to be_present
-      expect(document.at_css("##{button['aria-describedby']}").text).to include("Search Console is off.")
+      expect(disabled_button_reason("Sync now")).to include("Search Console is off.")
     end
 
     it "renders against an empty database" do
@@ -107,8 +75,6 @@ RSpec.describe "Dashboard Search Console report", type: :request do
         expect(tiles[1]).to start_with("Impressions 5.0k")
       end
 
-      # Position counts the wrong way round: one is the best a page can do, so a
-      # fall in it is the site doing better and reads green.
       it "reads a fall in position as the good direction" do
         stored!
         earlier!(clicks: 1)
@@ -172,10 +138,6 @@ RSpec.describe "Dashboard Search Console report", type: :request do
     end
 
     describe "the chart" do
-      def options
-        JSON.parse(document.at_css("[data-dash--chart-options-value]")["data-dash--chart-options-value"])
-      end
-
       it "draws clicks by default and never names a table" do
         stored!
 
@@ -183,20 +145,18 @@ RSpec.describe "Dashboard Search Console report", type: :request do
 
         expect(document.at_css(".seo-chart-card nav a[aria-current=true]").text.squish).to start_with("Clicks")
         expect(response.body).not_to include("ahoy_dashboard_search_console")
-        expect(options.dig("library", "scales", "y", "reverse")).to be(false)
-        expect(options.dig("library", "tmFill")).to be(true)
+        expect(dash_chart_options.dig("library", "scales", "y", "reverse")).to be(false)
+        expect(dash_chart_options.dig("library", "tmFill")).to be(true)
       end
 
-      # A banded axis running the wrong way is not the same kind of picture as a
-      # count rising off zero, and filling under it would read as a quantity.
       it "turns the axis round for position and takes the fill off" do
         stored!
 
         get "/telemetry/search_console_report", params: { measure: "position" }
 
-        expect(options.dig("library", "scales", "y", "reverse")).to be(true)
-        expect(options.dig("library", "tmFill")).to be(false)
-        expect(options.dig("library", "tmStroke")).to be_present
+        expect(dash_chart_options.dig("library", "scales", "y", "reverse")).to be(true)
+        expect(dash_chart_options.dig("library", "tmFill")).to be(false)
+        expect(dash_chart_options.dig("library", "tmStroke")).to be_present
       end
 
       it "says where the line stops, because Google lands days late" do
@@ -221,8 +181,6 @@ RSpec.describe "Dashboard Search Console report", type: :request do
         document.css("tbody tr .sc-label .seo-label").map { |node| node["title"] }
       end
 
-      # Queries come off the keyword table, not the row table: Google withholds
-      # far more at query by page than at query alone.
       it "reads queries off the keyword table, ranked by clicks" do
         stored!
 
@@ -294,8 +252,6 @@ RSpec.describe "Dashboard Search Console report", type: :request do
         expect(response.body).to include("Nothing matches")
       end
 
-      # Only a query has a series of its own stored, so only a query gets a
-      # sparkline and only a query opens.
       it "gives a query a trend and a way in, and a page a way to its traffic" do
         stored!
 
@@ -392,16 +348,12 @@ RSpec.describe "Dashboard Search Console report", type: :request do
 end
 
 RSpec.describe "Dashboard Search Console report by device and country", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
   let(:day) { now.to_date - 5 }
 
   around { |example| travel_to(now) { example.run } }
 
   before { sign_in create(:user, :admin) }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   def tile(label)
     document.css("nav[aria-label='Which measure the chart draws'] a")

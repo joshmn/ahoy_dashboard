@@ -1,10 +1,6 @@
 module AhoyDashboard
   module Settings
-    # What the schedule is doing. Reads the registry against the rows the jobs
-    # write themselves, so it is the one screen that answers "is this stale
-    # because nothing is scheduled, or because the last run failed" without
-    # anybody going to a log.
-    class JobRunsController < AhoyDashboard::BaseController
+    class JobRunsController < AhoyDashboard::Settings::BaseController
       def index
         @presenter = JobRunPresenter.call
       end

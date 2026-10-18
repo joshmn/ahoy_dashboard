@@ -2,12 +2,7 @@ require "rails_helper"
 
 RSpec.describe AhoyDashboard::AiVisibility::Clients::AnthropicClient do
   let(:endpoint) { "https://api.anthropic.com/v1/messages" }
-  let(:transport) { AhoyDashboard::LLM::Transport.new(sleeper: ->(_seconds) { }) }
-  let(:client) { described_class.new(api_key: "sk-ant-test", model: "claude-opus-5", transport: transport) }
-
-  def frame(type, payload = {})
-    "event: #{type}\ndata: #{JSON.generate(payload.merge("type" => type))}\n\n"
-  end
+  let(:client) { described_class.new(api_key: "sk-ant-test", model: "claude-opus-5", transport: quiet_transport) }
 
   def streamed(message)
     blocks = Array(message["content"]).each_with_index.map do |block, index|
@@ -26,15 +21,15 @@ RSpec.describe AhoyDashboard::AiVisibility::Clients::AnthropicClient do
       else []
       end
 
-      frame("content_block_start", "index" => index, "content_block" => opened) +
-        deltas.map { |delta| frame("content_block_delta", "index" => index, "delta" => delta) }.join +
-        frame("content_block_stop", "index" => index)
+      anthropic_frame("content_block_start", "index" => index, "content_block" => opened) +
+        deltas.map { |delta| anthropic_frame("content_block_delta", "index" => index, "delta" => delta) }.join +
+        anthropic_frame("content_block_stop", "index" => index)
     end
 
-    frame("message_start", "message" => { "model" => message["model"], "content" => [], "usage" => {} }) +
+    anthropic_frame("message_start", "message" => { "model" => message["model"], "content" => [], "usage" => {} }) +
       blocks.join +
-      frame("message_delta", "delta" => { "stop_reason" => message["stop_reason"] }, "usage" => { "output_tokens" => 1 }) +
-      frame("message_stop")
+      anthropic_frame("message_delta", "delta" => { "stop_reason" => message["stop_reason"] }, "usage" => { "output_tokens" => 1 }) +
+      anthropic_frame("message_stop")
   end
 
   def cite(url, title)
@@ -58,7 +53,7 @@ RSpec.describe AhoyDashboard::AiVisibility::Clients::AnthropicClient do
     stub = stub_request(:post, endpoint)
       .with(headers: { "x-api-key" => "sk-ant-test", "anthropic-version" => "2023-06-01" }) { |request|
         sent = JSON.parse(request.body)
-        sent["model"] == "claude-opus-5" && sent["max_tokens"] == described_class::MAX_TOKENS && sent["stream"] == true &&
+        sent["model"] == "claude-opus-5" && sent["max_tokens"] == 64_000 && sent["stream"] == true &&
           sent["tools"] == [ { "type" => "web_search_20260209", "name" => "web_search", "max_uses" => 5 } ] &&
           sent["messages"] == [ { "role" => "user", "content" => "who helps?" } ] &&
           !sent.key?("thinking") && !sent.key?("fallbacks")
@@ -91,16 +86,30 @@ RSpec.describe AhoyDashboard::AiVisibility::Clients::AnthropicClient do
     end
   end
 
+  it "asks an older model for no more than it can write" do
+    body = { "model" => "claude-opus-4-1", "stop_reason" => "end_turn", "content" => [ { "type" => "text", "text" => "Hi." } ] }
+    stub = stub_request(:post, endpoint)
+      .with { |request| JSON.parse(request.body)["max_tokens"] == 8_192 }
+      .to_return(status: 200, body: streamed(body))
+
+    described_class.new(api_key: "sk-ant-test", model: "claude-opus-4-1", transport: quiet_transport).ask("who helps?")
+
+    expect(stub).to have_been_made
+  end
+
+  it "raises rather than recording an answer the context window cut off" do
+    cut = { "stop_reason" => "model_context_window_exceeded", "content" => [ { "type" => "text", "text" => "Federal" } ] }
+    stub_request(:post, endpoint).to_return(status: 200, body: streamed(cut))
+
+    expect { client.ask("x") }.to raise_error(AhoyDashboard::AiVisibility::Error, "claude's answer ran past 64000 tokens and was cut off")
+  end
+
   it "resumes a paused turn by sending the paused content back as the assistant turn" do
     paused = { "model" => "claude-opus-5", "stop_reason" => "pause_turn", "content" => search_turn }
     finished = { "model" => "claude-opus-5", "stop_reason" => "end_turn", "content" => [
       { "type" => "text", "text" => "Done.", "citations" => [ cite("https://rival.example/", "Rival") ] }
     ] }
-    requests = []
-    stub_request(:post, endpoint).to_return do |request|
-      requests << JSON.parse(request.body)
-      { status: 200, body: streamed(requests.size == 1 ? paused : finished) }
-    end
+    requests = stub_llm_replies(endpoint, streamed(paused), streamed(finished))
 
     reply = client.ask("who helps?")
 

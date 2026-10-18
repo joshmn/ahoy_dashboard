@@ -1,17 +1,5 @@
 import { Controller } from "../runtime/controllers.js"
-
-// The list you pick an import out of.
-//
-// Everything it does is local, because everything it works on is already on the
-// page: a hundred and fifty rows the server sent in one go. Searching hides
-// rows rather than asking again, and sorting reorders the ones that are here.
-// That is the opposite of the place picker, and for the opposite reason — there
-// the rows on screen are a window onto a quarter of a million, here they are
-// the whole list.
-//
-// Ticking boxes in bulk fires nothing of its own, so it says so on the way out:
-// the cost in the corner is worked out by another controller listening for a
-// change on the form.
+import { plural } from "../runtime/text.js"
 
 export default class extends Controller {
   static targets = ["search", "row", "body", "shown", "empty", "sort", "clear"]
@@ -36,7 +24,7 @@ export default class extends Controller {
     if (this.hasClearTarget) this.clearTarget.hidden = term.length === 0
     if (this.hasShownTarget) {
       this.shownTarget.textContent = shown === rows.length
-        ? `${rows.length} ${rows.length === 1 ? "query" : "queries"}`
+        ? `${rows.length} ${plural(rows.length, "query", "queries")}`
         : `${shown} of ${rows.length}`
     }
   }
@@ -57,9 +45,6 @@ export default class extends Controller {
     this.tick(false)
   }
 
-  // What is on screen, not what exists. Somebody who has searched for "prison"
-  // and pressed select all means those, and ticking the hundred rows they
-  // cannot see would be the last thing they notice.
   tick(on) {
     this.rowTargets.forEach((row) => {
       if (row.hidden) return
@@ -79,7 +64,6 @@ export default class extends Controller {
       button.setAttribute("aria-pressed", String(button === event.currentTarget))
     })
 
-    // Position is a rank, so smaller is better. Everything else is a count.
     const sign = key === "position" ? 1 : -1
 
     this.rowTargets

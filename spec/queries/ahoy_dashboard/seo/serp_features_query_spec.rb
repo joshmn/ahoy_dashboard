@@ -113,4 +113,21 @@ RSpec.describe AhoyDashboard::Seo::SerpFeaturesQuery do
     expect(result).to be_any
     expect(result).to be_unreadable
   end
+
+  it "leaves out a place the keyword no longer searches, the way Rankings does" do
+    reading(typed({ "type" => "ai_overview" }))
+    gone = create(:dash_serp_run, keyword: keyword, location: "gb", checked_at: 1.day.ago)
+    reading(typed({ "type" => "people_also_ask" }), run: gone)
+
+    rows = described_class.call(site: nil, range: range).rows
+
+    expect(rows.map { |row| [ row.query, row.location ] }).to eq([ [ "first step act cheat sheet", "us" ] ])
+  end
+
+  it "reads one latest run per search and place" do
+    reading(typed({ "type" => "people_also_ask" }), run: create(:dash_serp_run, keyword: keyword, checked_at: 3.days.ago))
+    reading(typed({ "type" => "ai_overview" }))
+
+    expect(sole_item(described_class.call(site: nil, range: range).rows).keys).to eq([ "ai_overview" ])
+  end
 end

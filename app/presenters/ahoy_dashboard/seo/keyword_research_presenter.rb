@@ -9,6 +9,13 @@ module AhoyDashboard
       }.freeze
 
       EASY = "easy".freeze
+      LISTED_QUESTIONS = 14
+
+      STEPS = { disabled: :keyword_research, unsupported: :keyword_provider, unconfigured: :provider_credentials }.freeze
+
+      delegate :questions, :seed, :location, :language, :lookups, to: :result
+      delegate :refusal, :setup_notice, to: :gate
+      delegate :reason, :fix, to: :gate, prefix: :lookup
 
       def initialize(only: nil, **options)
         super(**options)
@@ -28,7 +35,11 @@ module AhoyDashboard
       end
 
       def tracking_phrases
-        (rows + questions.first(14)).map(&:query)
+        (rows + listed_questions).map(&:query)
+      end
+
+      def listed_questions
+        questions.first(LISTED_QUESTIONS)
       end
 
       def tiles
@@ -45,10 +56,6 @@ module AhoyDashboard
 
       def rows
         easy_only? ? easy_wins : result.rows
-      end
-
-      def questions
-        result.questions
       end
 
       def clusters
@@ -92,9 +99,7 @@ module AhoyDashboard
       end
 
       def position_label(row)
-        return row.position.to_s if row.tracked?
-
-        "Shown" if row.seen?
+        csv_position(row)&.to_s
       end
 
       def cpc_value(row)
@@ -107,18 +112,6 @@ module AhoyDashboard
 
       def fetched_value
         result.fetched_at ? when_label(result.fetched_at) : DASH
-      end
-
-      def seed
-        result.seed
-      end
-
-      def location
-        result.location
-      end
-
-      def language
-        result.language
       end
 
       def place
@@ -141,35 +134,8 @@ module AhoyDashboard
         ::AhoyDashboard::KeywordIdea::Lookup.new(**picked)
       end
 
-      def lookups
-        result.lookups
-      end
-
       def country_options
-        names = keyword_countries
-        names = names.merge(place_country => place.country_name) unless names.key?(place_country)
-
-        names.sort_by { |_code, name| name }.map { |code, name| [ name, code ] }
-      end
-
-      def enabled?
-        ::AhoyDashboard::Keywords.enabled?
-      end
-
-      def available?
-        ::AhoyDashboard::Keywords.available?
-      end
-
-      def setup_notice
-        case refusal
-        when :disabled then AhoyDashboard::SetupNotice.call(:keyword_research)
-        when :unsupported then AhoyDashboard::SetupNotice.call(:keyword_provider, url: providers_path)
-        when :unconfigured then AhoyDashboard::SetupNotice.call(:provider_credentials, url: providers_path)
-        end
-      end
-
-      def refusal
-        memo(:refusal) { ::AhoyDashboard::Keywords.refusal }
+        ::AhoyDashboard::Serp::Location.country_options(keyword_countries, keep: [ place_country ])
       end
 
       def invented?
@@ -199,20 +165,8 @@ module AhoyDashboard
         "Enter a phrase above to look up related searches with their volume and difficulty."
       end
 
-      def provider
-        ::AhoyDashboard::Keywords.provider
-      end
-
       def lookup_path
         routes.seo_keyword_research_lookups_path
-      end
-
-      def lookup_reason
-        refusal && ::AhoyDashboard::Keywords.refusal_message(refusal)
-      end
-
-      def lookup_fix
-        refusal && refusal != :disabled ? { label: "Search provider", url: providers_path } : nil
       end
 
       def lookup_hint
@@ -247,7 +201,7 @@ module AhoyDashboard
             end
           end,
           CsvTable.new(key: "questions", label: "Questions", headers: [ "Question", "Volume" ]) do
-            questions.first(14).map { |row| [ row.query, row.volume ] }
+            listed_questions.map { |row| [ row.query, row.volume ] }
           end,
           CsvTable.new(key: "clusters", label: "Clusters", headers: [ "Cluster", "Ideas", "Volume" ]) do
             clusters.map { |cluster| [ cluster.name, cluster.terms, cluster.volume ] }
@@ -262,6 +216,10 @@ module AhoyDashboard
       end
 
       private
+
+      def gate
+        memo(:gate) { ProviderGate.new(::AhoyDashboard::Keywords, steps: STEPS, providers_path: providers_path) }
+      end
 
       def carried
         picked.merge(only: (EASY if easy_only?)).compact

@@ -4,6 +4,8 @@ module AhoyDashboard
     MAX_TAGS = 20
     MAX_TAG_LENGTH = 40
 
+    MONTH = 30.days
+
     DURATIONS = {
       "daily" => 1.day,
       "weekly" => 1.week,
@@ -17,12 +19,12 @@ module AhoyDashboard
     enum :source, { manual: 0, search_console: 1 }, validate: true
 
     has_many :keyword_targets, class_name: "AhoyDashboard::SerpKeywordTarget", foreign_key: :keyword_id,
-             inverse_of: :keyword, dependent: :destroy
+             inverse_of: :keyword, dependent: :delete_all
     has_many :sites, through: :keyword_targets
     has_many :runs, class_name: "AhoyDashboard::SerpRun", foreign_key: :keyword_id,
-             inverse_of: :keyword, dependent: :destroy
+             inverse_of: :keyword, dependent: :delete_all
     has_many :checks, class_name: "AhoyDashboard::SerpCheck", foreign_key: :keyword_id,
-             inverse_of: :keyword, dependent: :destroy
+             inverse_of: :keyword, dependent: :delete_all
 
     normalizes :query, with: ->(value) { value.to_s.strip.squeeze(" ").presence }
     normalizes :engine, :device, :language, with: ->(value) { value.to_s.strip.downcase.presence }
@@ -96,24 +98,24 @@ module AhoyDashboard
       last_checked_at.blank? || next_check_at <= now
     end
 
+    def plan
+      Serp::KeywordPlan.new(pages: pages, place_count: Array(locations).size, frequency: frequency)
+    end
+
     def cost_units(adapter_class = Serp.adapter_class)
-      adapter_class.cost_units(pages: pages) * locations.size
+      plan.per_check(adapter_class)
     end
 
     def monthly_units(adapter_class = Serp.adapter_class)
       return 0 unless enabled?
 
-      (cost_units(adapter_class) * (30.days.to_f / DURATIONS.fetch(frequency).to_i)).ceil
+      plan.monthly_units(adapter_class)
     end
 
     def monthly_checks
       return 0 unless enabled?
 
-      (Array(locations).size * pages.to_i * (30.days.to_f / DURATIONS.fetch(frequency).to_i)).ceil
-    end
-
-    def target_for(site)
-      keyword_targets.detect { |target| target.site_id == site.id }
+      plan.monthly_checks
     end
 
     def search_identity(values = attributes.symbolize_keys)
@@ -124,10 +126,6 @@ module AhoyDashboard
       return false if new_record?
 
       search_identity(SEARCH_FIELDS.index_with { |field| attribute_in_database(field) }) != search_identity
-    end
-
-    def to_param
-      id.to_s
     end
 
     private

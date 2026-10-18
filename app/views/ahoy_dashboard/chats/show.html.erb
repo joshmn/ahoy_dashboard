@@ -27,27 +27,8 @@
 
     <%= render "ahoy_dashboard/chats/thread", chat: @chat %>
 
-    <%= form_with url: chat_messages_path(@chat), method: :post, class: "chat-ask",
-          data: { "dash--chat-ask-target": "form" } do %>
-      <div class="chat-ask__row">
-        <%= label_tag "message_content", "Ask about the data", class: "visually-hidden" %>
-        <%= text_area_tag "message[content]", nil, id: "message_content", rows: 1,
-              class: "chat-ask__inp",
-              placeholder: "Ask about traffic, searches or rankings",
-              autocomplete: "off", autofocus: available, disabled: !available,
-              data: { "dash--chat-ask-target": "input",
-                      action: "input->dash--chat-ask#grow" },
-              "aria-describedby": "chat_ask_hint" %>
-        <button type="submit" class="chat-send" aria-label="Ask" aria-describedby="chat_ask_hint"
-                <%= "disabled" unless available %>
-                data-dash--chat-ask-target="send">
-          <%= dash_icon(:up, size: 15) %>
-        </button>
-      </div>
-
-      <p class="chat-ask-hint small text-body-tertiary" id="chat_ask_hint">
-        <%= available ? "Enter to send, Shift+Enter for a new line." : AhoyDashboard::Settings::Display.assistant_notice %>
-      </p>
-    <% end %>
+    <%= render "ahoy_dashboard/chats/composer", url: chat_messages_path(@chat), id: "message_content",
+          label: "Ask about the data", placeholder: "Ask about traffic, searches or rankings",
+          available: available, autofocus: available %>
   <% end %>
 </section>

@@ -1,13 +1,8 @@
 module AhoyDashboard
   module Seo
-    # People who already knew the name, kept apart from people who did not.
-    #
-    # Worth doing because the two move for completely different reasons and a
-    # combined line hides both. Brand search follows whatever else is going on:
-    # a mention somewhere, a mailout, somebody being talked about. Everything
-    # else is the part any of this work is actually trying to move. Pooled
-    # together, a good week of brand traffic can cover a bad month of the rest.
     class BrandSplitQuery
+      TERMS_PER_SIDE = 15
+
       Point = Data.define(:on, :brand_clicks, :other_clicks, :brand_impressions, :other_impressions) do
         def clicks
           brand_clicks + other_clicks
@@ -55,10 +50,6 @@ module AhoyDashboard
           brand.impressions + other.impressions
         end
 
-        def brand_share
-          share_of(brand.clicks)
-        end
-
         def matched?
           brand.clicks.positive? || brand.impressions.positive?
         end
@@ -68,10 +59,6 @@ module AhoyDashboard
         new(**options).call
       end
 
-      # The pattern is a guess off the host until somebody says otherwise, which
-      # is right often enough to be useful and wrong often enough that it has to
-      # be editable on the page. A site called after a common word cannot be
-      # split this way at all and the page has to be able to say so.
       def initialize(range:, terms: nil, slice: AhoyDashboard::SearchConsole::Slice.new, property_totals: nil)
         @range = range
         @slice = slice
@@ -81,7 +68,7 @@ module AhoyDashboard
 
       def call
         Result.new(range: range, terms: terms, points: points,
-                   brand: side("Brand", brand_rows), other: side("Everything else", other_rows),
+                   brand: side("Brand", true), other: side("Everything else", false),
                    property_clicks: property_totals.clicks)
       end
 
@@ -109,27 +96,18 @@ module AhoyDashboard
         slice.apply(AhoyDashboard::SearchConsoleKeyword.in_range(range))
       end
 
-      def branded
-        matchers.empty? ? scope.none : scope.where(matching, *matchers)
-      end
-
-      def unbranded
-        matchers.empty? ? scope : scope.where.not(matching, *matchers)
+      def classification
+        @classification ||= Arel.sql(
+          matchers.empty? ? "false::boolean" : AhoyDashboard::SearchConsoleKeyword.sanitize_sql_array([ matching, *matchers ])
+        )
       end
 
       def daily_rows
-        @daily_rows ||= begin
-          predicate = matchers.empty? ? "false::boolean" : AhoyDashboard::SearchConsoleKeyword.sanitize_sql_array([matching, *matchers])
-          classification = Arel.sql(predicate)
-          scope.group(:date, classification)
-            .pluck(:date, classification, Arel.sql("sum(clicks)"), Arel.sql("sum(impressions)"),
-                   Arel.sql("sum(position * impressions)"))
-        end
+        @daily_rows ||= scope.group(:date, classification).pluck(:date, classification, *SearchConsole::Sums::ALL)
       end
 
       def points
         both = daily_rows          .each_with_object({}) do |(on, brand, clicks, impressions), found|
-            # SQL WHERE matching and WHERE NOT matching both omit NULL.
             next if brand.nil?
 
             sides = found[on] ||= {}
@@ -145,35 +123,35 @@ module AhoyDashboard
         end
       end
 
-      def brand_rows
-        rows_for(branded)
-      end
-
-      def other_rows
-        rows_for(unbranded)
-      end
-
-      def rows_for(relation)
-        relation.group(:query)
-          .select(
-            "query",
-            "sum(clicks) as clicks",
-            "sum(impressions) as impressions",
-            "sum(position * impressions) / nullif(sum(impressions), 0) as position"
+      def leading
+        @leading ||= begin
+          ranked = scope.group(:query, classification).select(
+            "query", "#{classification} AS branded", "#{SearchConsole::Sums::CLICKS} AS clicks",
+            "#{SearchConsole::Sums::IMPRESSIONS} AS impressions", "#{SearchConsole::Sums::POSITION} AS position",
+            "row_number() over (partition by #{classification} order by #{SearchConsole::Sums::RANKING}, query) AS side_rank"
           )
-          .order(Arel.sql("sum(clicks) desc, sum(impressions) desc"))
-          .limit(15)
-          .map { |row| Term.new(query: row.query, clicks: row.clicks.to_i, impressions: row.impressions.to_i, position: row.position.to_f.round(1)) }
+
+          AhoyDashboard::SearchConsoleKeyword.from(ranked, :leading_terms)
+            .where("side_rank <= ?", TERMS_PER_SIDE).order(:side_rank)
+            .pluck(Arel.sql("branded, query, clicks, impressions, position"))
+            .group_by(&:first)
+        end
       end
 
-      def side(name, rows)
-        readings = daily_rows.select { |row| row[1] == (name == "Brand") }
-        clicks = readings.sum { |row| row[2].to_i }
-        impressions = readings.sum { |row| row[3].to_i }
-        weight = readings.sum { |row| row[4].to_f }
-        position = impressions.zero? ? 0.0 : (weight / impressions).round(1)
+      def terms_for(branded)
+        leading.fetch(branded, []).map do |_branded, query, clicks, impressions, position|
+          Term.new(query: query, clicks: clicks.to_i, impressions: impressions.to_i, position: position.to_f.round(1))
+        end
+      end
 
-        Side.new(name: name, clicks: clicks, impressions: impressions, position: position, terms: rows)
+      def side(name, branded)
+        readings = daily_rows.select { |row| row[1] == branded }
+        totals = SearchConsole::Totals.from(clicks: readings.sum { |row| row[2].to_i },
+                                            impressions: readings.sum { |row| row[3].to_i },
+                                            weight: readings.sum { |row| row[4].to_f }, places: 1)
+
+        Side.new(name: name, clicks: totals.clicks, impressions: totals.impressions, position: totals.position,
+                 terms: terms_for(branded))
       end
     end
   end

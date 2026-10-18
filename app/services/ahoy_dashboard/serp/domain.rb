@@ -19,6 +19,12 @@ module AhoyDashboard
 
         link_host == domain_host || (match_subdomains && link_host.end_with?(".#{domain_host}"))
       end
+
+      def self.matches_site?(link, site)
+        return false if site.nil?
+
+        matches?(link, site.domain, match_subdomains: site.match_subdomains)
+      end
     end
   end
 end

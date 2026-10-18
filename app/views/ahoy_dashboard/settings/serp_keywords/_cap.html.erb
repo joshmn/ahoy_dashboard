@@ -1,0 +1,8 @@
+<% if plan.capped? %>
+  <p class="kw-cost-hint">
+    Your cap is <%= number_with_delimiter(plan.cap) %> a month, and <%= number_with_delimiter(plan.remaining) %> are left.
+  </p>
+  <p class="kw-over" data-dash--keyword-form-target="over" <%= "hidden" unless over %>>
+    That is more than what is left of your cap this month.
+  </p>
+<% end %>

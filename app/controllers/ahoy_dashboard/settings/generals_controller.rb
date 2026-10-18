@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class GeneralsController < AhoyDashboard::BaseController
+    class GeneralsController < AhoyDashboard::Settings::BaseController
       def edit
         @form = AhoyDashboard::GeneralSettingsForm.current(request_host: request.host)
       end
@@ -10,10 +10,7 @@ module AhoyDashboard
 
         AhoyDashboard::GeneralSettings::UpdateCommand.call(form: @form) do
           on(:ok) { redirect_to edit_settings_general_path, notice: "Saved." }
-          on(:invalid) do |form|
-            @form = form
-            render :edit, status: :unprocessable_entity
-          end
+          on(:invalid) { |form| rejected(form) }
         end
       end
 

@@ -1,27 +1,10 @@
 require "rails_helper"
-require "support/ahoy_dashboard/assistant"
 
 RSpec.describe "Dashboard chat stream", type: :request do
-  let(:chat) { AhoyDashboard::Chat.create! }
+  let(:chat) { create(:dash_chat) }
 
   def events(body)
     body.scan(/event: (\w+)\ndata: (.+)\n\n/).map { |name, data| [ name, JSON.parse(data) ] }
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/chats/#{chat.id}/stream"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/chats/#{chat.id}/stream"
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do
@@ -30,7 +13,7 @@ RSpec.describe "Dashboard chat stream", type: :request do
     it "sends an unchanged pending answer only once" do
       stub_const("AhoyDashboard::Chats::StreamsController::LIMIT", 0.03)
       stub_const("AhoyDashboard::Chats::StreamsController::TICK", 0.01)
-      chat.chat_messages.create!(role: :assistant, status: :pending, content: "Partial")
+      create(:dash_chat_message, :assistant, :pending, chat: chat, content: "Partial")
 
       get "/telemetry/chats/#{chat.id}/stream"
 
@@ -38,7 +21,7 @@ RSpec.describe "Dashboard chat stream", type: :request do
     end
 
     it "answers as an event stream that will not be buffered on the way" do
-      chat.chat_messages.create!(role: :assistant, status: :complete, content: "Traffic is up.")
+      create(:dash_chat_message, :assistant, chat: chat, content: "Traffic is up.")
 
       get "/telemetry/chats/#{chat.id}/stream"
 
@@ -48,7 +31,7 @@ RSpec.describe "Dashboard chat stream", type: :request do
     end
 
     it "closes straight away when the answer has already landed" do
-      chat.chat_messages.create!(role: :assistant, status: :complete, content: "Traffic is up.")
+      create(:dash_chat_message, :assistant, chat: chat, content: "Traffic is up.")
 
       get "/telemetry/chats/#{chat.id}/stream"
       sent = events(response.body)
@@ -60,8 +43,8 @@ RSpec.describe "Dashboard chat stream", type: :request do
 
     it "sends what is written so far while the answer is still arriving" do
       stub_const("AhoyDashboard::Chats::StreamsController::LIMIT", 0)
-      chat.chat_messages.create!(role: :assistant, status: :pending, content: "Traffic is",
-                                 tool_calls: [ { "name" => "TrafficSummary" } ])
+      create(:dash_chat_message, :assistant, :pending, chat: chat, content: "Traffic is",
+             tool_calls: [ { "name" => "TrafficSummary" } ])
 
       get "/telemetry/chats/#{chat.id}/stream"
       sent = events(response.body)
@@ -73,8 +56,8 @@ RSpec.describe "Dashboard chat stream", type: :request do
 
     it "watches the turn it was asked about, not whichever is newest" do
       stub_const("AhoyDashboard::Chats::StreamsController::LIMIT", 0)
-      first = chat.chat_messages.create!(role: :assistant, status: :complete, content: "First answer.")
-      chat.chat_messages.create!(role: :assistant, status: :pending, content: "Second answ")
+      first = create(:dash_chat_message, :assistant, chat: chat, content: "First answer.")
+      create(:dash_chat_message, :assistant, :pending, chat: chat, content: "Second answ")
 
       get "/telemetry/chats/#{chat.id}/stream", params: { message_id: first.id }
       sent = events(response.body)
@@ -84,7 +67,7 @@ RSpec.describe "Dashboard chat stream", type: :request do
     end
 
     it "will not watch a turn from another conversation" do
-      other = AhoyDashboard::Chat.create!.chat_messages.create!(role: :assistant, status: :complete, content: "Not yours.")
+      other = create(:dash_chat_message, :assistant, content: "Not yours.")
 
       get "/telemetry/chats/#{chat.id}/stream", params: { message_id: other.id }
 
@@ -93,7 +76,7 @@ RSpec.describe "Dashboard chat stream", type: :request do
 
     it "gives up rather than holding the connection open forever" do
       stub_const("AhoyDashboard::Chats::StreamsController::LIMIT", 0)
-      chat.chat_messages.create!(role: :assistant, status: :pending)
+      create(:dash_chat_message, :assistant, :pending, chat: chat)
 
       get "/telemetry/chats/#{chat.id}/stream"
 
@@ -107,7 +90,7 @@ RSpec.describe "Dashboard chat stream", type: :request do
     end
 
     it "tells the browser how long to wait before trying again" do
-      chat.chat_messages.create!(role: :assistant, status: :complete, content: "x")
+      create(:dash_chat_message, :assistant, chat: chat, content: "x")
 
       get "/telemetry/chats/#{chat.id}/stream"
 

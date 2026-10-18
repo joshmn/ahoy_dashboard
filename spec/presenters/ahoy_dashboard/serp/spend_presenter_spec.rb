@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe AhoyDashboard::Serp::SpendPresenter do
   let(:zone) { AhoyDashboard.time_zone }
@@ -8,8 +7,7 @@ RSpec.describe AhoyDashboard::Serp::SpendPresenter do
   def spend(used:, cap: 500, checks: 0, backlinks: 0, searches: 0, name: "serpapi", provider: :saved)
     record = provider == :saved ? build(:dash_serp_provider, :serpapi, monthly_cap_units: cap) : nil
     forecast = AhoyDashboard::Serp::ForecastQuery::Result.new(checks: checks, backlinks: backlinks,
-                                                              searches: searches, through: now.end_of_month,
-                                                              days_left: 11)
+                                                              searches: searches, through: now.end_of_month)
 
     AhoyDashboard::Serp::SpendQuery::Result.new(
       name: name, provider: record, cap: cap, used: used, days: [], totals: {}, forecast: forecast,
@@ -53,7 +51,7 @@ RSpec.describe AhoyDashboard::Serp::SpendPresenter do
   end
 
   it "warns at the rule's threshold, not its own number" do
-    create(:dash_alert_rule, key: "spend_near_cap", name: "Nearing the monthly cap", threshold: 50)
+    create(:dash_alert_rule, key: "spend_near_cap", threshold: 50)
 
     expect(presenter(used: 300).threshold).to eq(50)
     expect(presenter(used: 300).warning?).to be(true)

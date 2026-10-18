@@ -1,11 +1,9 @@
 require "rails_helper"
-require "support/ahoy_dashboard/alerts"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe AhoyDashboard::Alerts::DigestQuery do
   let(:zone) { AhoyDashboard.time_zone }
   let(:window) { AhoyDashboard::Alerts::Digests::Window.new(period: :daily, starts_on: Date.new(2026, 9, 18), ends_on: Date.new(2026, 9, 18)) }
-  let(:rule) { create(:dash_alert_rule, key: "off_page_one", name: "Fell off page one", severity: :high) }
+  let(:rule) { create(:dash_alert_rule, key: "off_page_one", severity: :high) }
 
   def result(limit: AhoyDashboard::Alerts::Digests::ROW_LIMIT)
     described_class.call(window: window, limit: limit)
@@ -34,17 +32,15 @@ RSpec.describe AhoyDashboard::Alerts::DigestQuery do
   it "breaks equal-time duplicates by id and only hydrates the retained events" do
     fired(at: "2026-09-18 09:00", headline: "Earlier wording")
     newest = fired(at: "2026-09-18 09:00", headline: "Latest wording")
-    loaded = []
-    subscriber = ->(_name, _started, _finished, _id, payload) { loaded << payload[:record_count] if payload[:class_name] == "AhoyDashboard::AlertEvent" }
-
-    digest = ActiveSupport::Notifications.subscribed(subscriber, "instantiation.active_record") { result }
+    digest = nil
+    loaded = instantiated(AhoyDashboard::AlertEvent) { digest = result }
 
     expect(digest).to have_attributes(events: [ newest ], total: 1)
-    expect(loaded.sum).to eq(1)
+    expect(loaded).to eq(1)
   end
 
   it "keeps two rules that fired on the same search" do
-    lost = create(:dash_alert_rule, key: "lost_from_results", name: "Lost from the results", severity: :high)
+    lost = create(:dash_alert_rule, key: "lost_from_results", severity: :high)
     fired(at: "2026-09-18 04:00")
     fired(at: "2026-09-18 04:00", rule: lost)
 
@@ -52,7 +48,7 @@ RSpec.describe AhoyDashboard::Alerts::DigestQuery do
   end
 
   it "puts high severity first" do
-    overtaken = create(:dash_alert_rule, key: "overtaken", name: "Overtaken by a rival", severity: :medium)
+    overtaken = create(:dash_alert_rule, key: "overtaken", severity: :medium)
     medium = fired(at: "2026-09-18 09:00", rule: overtaken, subject: "a medium one (us)")
     high = fired(at: "2026-09-18 04:00", subject: "z high one (us)")
 
@@ -105,7 +101,7 @@ RSpec.describe AhoyDashboard::Alerts::DigestQuery do
   end
 
   it "counts an alert that came off sample data without any checks behind it" do
-    backlinks = create(:dash_alert_rule, key: "backlinks_lost", name: "Referring domains lost")
+    backlinks = create(:dash_alert_rule, key: "backlinks_lost")
     fired(at: "2026-09-18 07:00", rule: backlinks, subject: "example.com", sample_data: true)
     fired(at: "2026-09-18 08:00", rule: backlinks, subject: "example.org")
 
@@ -114,14 +110,14 @@ RSpec.describe AhoyDashboard::Alerts::DigestQuery do
 
   it "counts the rank tracking rules that are on apart from the rest" do
     rule
-    create(:dash_alert_rule, key: "job_failed", name: "A job failed")
-    create(:dash_alert_rule, key: "big_drop", name: "Dropped several places", enabled: false)
+    create(:dash_alert_rule, key: "job_failed")
+    create(:dash_alert_rule, key: "big_drop", enabled: false)
 
     expect(result).to have_attributes(rules_on: 2, rank_rules_on: 1)
   end
 
   describe "without rank tracking installed" do
-    let(:jobs) { create(:dash_alert_rule, key: "job_failed", name: "A job failed", severity: :high) }
+    let(:jobs) { create(:dash_alert_rule, key: "job_failed", severity: :high) }
 
     before do
       rule

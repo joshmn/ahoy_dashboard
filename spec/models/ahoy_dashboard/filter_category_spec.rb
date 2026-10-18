@@ -1,14 +1,10 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::FilterCategory do
   def reachable_from
     described_class::ALL.flat_map { |category| category.dimension_keys.map { |key| [ key, category.key ] } }
   end
 
-  # The invariant that rots first. A dimension in no category cannot be filtered
-  # from the UI at all, which makes it a dimension that does not really exist, and
-  # one in two categories is two menu items that write the same filter.
   describe "covering the dimensions" do
     it "reaches every filterable dimension from exactly one category" do
       claims = reachable_from.group_by(&:first).transform_values { |pairs| pairs.map(&:last) }
@@ -21,7 +17,7 @@ RSpec.describe AhoyDashboard::FilterCategory do
     end
 
     it "reaches an allowlisted custom property too" do
-      AhoyDashboard::Property.create!(key: "facility_id")
+      create(:dash_property, key: "facility_id")
 
       expect(AhoyDashboard::Dimension.filterable.map(&:key)).to include("prop:facility_id")
       expect(described_class.find("property").dimension_keys).to eq([ "prop:facility_id" ])
@@ -51,7 +47,6 @@ RSpec.describe AhoyDashboard::FilterCategory do
   describe "the registry" do
     it "reads out of a frozen list" do
       expect(described_class::ALL).to be_frozen
-      expect(described_class.all).to eq(described_class::ALL)
     end
 
     it "finds by key" do
@@ -87,7 +82,7 @@ RSpec.describe AhoyDashboard::FilterCategory do
     end
 
     it "puts it back once the allowlist holds something" do
-      AhoyDashboard::Property.create!(key: "term")
+      create(:dash_property, key: "term")
 
       expect(described_class.surfaced.map(&:key)).to include("property")
     end

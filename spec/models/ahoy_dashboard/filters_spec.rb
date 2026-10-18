@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Filters do
   def from(list)
@@ -71,8 +70,6 @@ RSpec.describe AhoyDashboard::Filters do
       expect(filters.map { |filter| filter.dimension.key }).to eq([ "prop:page.section-Id" ])
     end
 
-    # People edit this URL by hand and paste it to each other. Nothing here is
-    # allowed to raise, whatever shape the parameter arrives in.
     it "never raises on rubbish" do
       [
         {},

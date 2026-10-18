@@ -3,11 +3,8 @@ module AhoyDashboard
     FIELDS = %i[name pinned].freeze
     QUESTION_FIELD = "saved_query[params]".freeze
 
-    attribute :name, :string
+    attribute :name, TRIMMED
     attribute :pinned, :boolean, default: false
-    # The question itself, as the query string carries it. Not typed into the
-    # form: it comes off whichever Explore was open when Save was pressed, so
-    # the record and the URL cannot disagree.
     attribute :params, default: -> { {} }
 
     validates :name, presence: true
@@ -17,16 +14,16 @@ module AhoyDashboard
       new(name: record.name, pinned: record.pinned, params: record.params)
     end
 
-    def name
-      super().to_s.strip.presence
-    end
-
     def question
       AhoyDashboard::SavedQuery.clean(params)
     end
 
     def record_attributes
       { name: name, pinned: pinned, params: question }
+    end
+
+    def add_duplicate_error
+      errors.add(:name, "is already taken")
     end
 
     def question_fields(prefix = QUESTION_FIELD)

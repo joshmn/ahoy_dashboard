@@ -1,24 +1,16 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Cached analytics" do
   let(:range) { dash_day_range(2026, 8, 10) }
   let(:scope) { dash_scope(range: range) }
   let(:country) { AhoyDashboard::Dimension.find("country") }
 
-  around do |example|
-    previous = Rails.cache
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    example.run
-  ensure
-    Rails.cache = previous
-  end
+  include_context "with a memory cache"
 
   def visit(country:, visitor:)
-    record = dash_visit(started_at: range.begin + 1.hour, country: country, visitor: visitor)
-    dash_page_view(record, path: "/#{country}")
+    dash_landing("/#{country}", at: range.begin + 1.hour, country: country, visitor: visitor)
   end
 
   def countries
@@ -63,7 +55,7 @@ RSpec.describe "Cached analytics" do
   end
 
   context "goal conversions" do
-    let!(:goal) { AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "purchased") }
+    let!(:goal) { create(:dash_goal, event_name: "purchased") }
     let!(:visitor) { dash_visit(started_at: range.begin + 1.hour, visitor: "buyer") }
 
     before do

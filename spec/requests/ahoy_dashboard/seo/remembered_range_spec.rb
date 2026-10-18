@@ -1,10 +1,6 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard seo remembered range", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
   def range_button
     document.at_css("#tm-seo-period-button, #tm-rankings-period-button")
   end

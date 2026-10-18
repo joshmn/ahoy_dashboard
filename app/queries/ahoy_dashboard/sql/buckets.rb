@@ -1,21 +1,5 @@
 module AhoyDashboard
   module Sql
-    # Grouping a timestamp column into buckets, and handing back every bucket in
-    # the range whether or not anything landed in it.
-    #
-    # This exists so the gem carries no date-grouping library. Two things here are
-    # easy to get wrong and are the reason it is one service with its own specs
-    # rather than a line inside a query:
-    #
-    #   - A day is not 86,400 seconds. In a zone that shifts, one day a year is 23
-    #     hours and one is 25, so the series steps by calendar arithmetic and
-    #     never by adding seconds.
-    #   - Postgres truncates a week to Monday. A dashboard week starts Sunday, so
-    #     the column is walked back by its day-of-week first.
-    #
-    # Both directions have to agree: the SQL decides which bucket a row falls in,
-    # and the series decides which buckets exist. A mismatch is a chart with a
-    # column of zeros beside a column holding everything.
     module Buckets
       UNITS = {
         minute: "minute", five_minutes: "hour", fifteen_minutes: "hour",
@@ -29,9 +13,6 @@ module AhoyDashboard
         hour: 1.hour, day: 1.day, week: 1.week, month: 1.month
       }.freeze
 
-      # minute and hour stay instants. day, week and month come back as dates,
-      # because that is what they are: the bucket is a day in the operator's zone,
-      # not a moment in UTC that happens to start one.
       DATES = %i[day week month].freeze
 
       class << self
@@ -45,8 +26,6 @@ module AhoyDashboard
           Arel.sql(DATES.include?(interval) ? "#{truncated}::date" : "#{truncated} AT TIME ZONE #{quote(zone.tzinfo.name)}")
         end
 
-        # Every bucket the range touches, in order, starting at the bucket the
-        # range begins inside rather than at the range's own first moment.
         def series(range, interval, zone = AhoyDashboard.time_zone)
           finish = range.end.in_time_zone(zone)
           cursor = truncate(range.begin.in_time_zone(zone), interval)
@@ -60,9 +39,6 @@ module AhoyDashboard
           out
         end
 
-        # The counts, keyed the way the series is keyed, with every empty bucket
-        # present. Anything the database returned outside the range is dropped: a
-        # row can only be in a bucket the chart is not drawing by accident.
         def fill(counts, range, interval, zone = AhoyDashboard.time_zone, default: 0)
           found = counts.map { |key, value| [ key_for(key, zone), value ] }.to_h
 
@@ -87,8 +63,6 @@ module AhoyDashboard
 
         private
 
-        # advance rather than addition, so a day across a clock change is still
-        # one day and a month is still a month whatever its length.
         def step(time, interval)
           case interval
           when :minute then time.advance(minutes: 1)
@@ -100,8 +74,6 @@ module AhoyDashboard
           end
         end
 
-        # Postgres counts Sunday as 0, which is already the offset back to the
-        # start of a Sunday week.
         def day_of_week(local)
           "EXTRACT(DOW FROM #{local})::integer"
         end
@@ -110,8 +82,6 @@ module AhoyDashboard
           "INTERVAL '1 minute' * (FLOOR(EXTRACT(MINUTE FROM #{local}) / #{step})::integer * #{step})"
         end
 
-        # A date comes back for day, week and month and a time for the rest, and
-        # the chart wants one kind of key read in the dashboard's own zone.
         def key_for(key, zone)
           return zone.local(key.year, key.month, key.day) if key.is_a?(Date) && !key.is_a?(DateTime)
 

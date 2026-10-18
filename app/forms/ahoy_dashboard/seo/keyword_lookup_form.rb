@@ -1,7 +1,7 @@
 module AhoyDashboard
   module Seo
     class KeywordLookupForm < AhoyDashboard::Form
-      LANGUAGE = /\A[a-z]{2,3}(-[a-z0-9]{2,4})?\z/i
+      FIELDS = %i[seed location country city language].freeze
 
       attribute :seed, :string
       attribute :location, :string
@@ -13,10 +13,6 @@ module AhoyDashboard
       validate :place_readable
       validate :language_readable
 
-      def self.from_params(params)
-        new(params.permit(:seed, :location, :country, :city, :language).to_h)
-      end
-
       def seed_value
         seed.to_s.strip
       end
@@ -27,6 +23,10 @@ module AhoyDashboard
 
       def language_value
         language.to_s.strip.downcase.presence || Keywords.language
+      end
+
+      def lookup_params
+        { seed: seed_value, location: location_value, language: language_value }
       end
 
       def place
@@ -63,7 +63,7 @@ module AhoyDashboard
       end
 
       def language_readable
-        return if language_value.match?(LANGUAGE)
+        return if language_value.match?(SearchOptionsForm::LANGUAGE)
 
         errors.add(:base, "#{language_value.inspect} is not a language code. Use one like en or es.")
       end

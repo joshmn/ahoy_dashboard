@@ -1,10 +1,7 @@
 module AhoyDashboard
-  # Everything the top of the dashboard needs: the tiles, the chart payload the
-  # chart element carries, and every menu in the bar as a list of links that
-  # carry the rest of the current view along with them.
   class DashboardPresenter
     PERCENT_METRICS = %w[bounce_rate scroll_depth].freeze
-    DEFAULT_EXPORT = "pages".freeze
+    PREVIOUS_PERIOD = "previous_period".freeze
 
     INTERVAL_LABELS = {
       minute: "Minute",
@@ -18,7 +15,7 @@ module AhoyDashboard
 
     COMPARISON_LABELS = {
       nil => "No comparison",
-      "previous_period" => "Previous period",
+      PREVIOUS_PERIOD => "Previous period",
       "year_over_year" => "Year over year"
     }.freeze
 
@@ -35,36 +32,6 @@ module AhoyDashboard
       def short
         metric.short
       end
-    end
-
-    # Reads as a [label, value] pair as well as an object, because the menus in
-    # the bar destructure it and the links want the path off it.
-    Option = Data.define(:label, :value, :params, :path, :active) do
-      def active?
-        active
-      end
-      def to_ary
-        [ label, value ]
-      end
-
-      delegate :first, :last, :[], :each, :size, to: :to_ary
-    end
-
-    # The pill on a tile asks the metric whether up is the good direction. A
-    # bounce rate falling ten percent is good news.
-    def self.delta_for(stat, phrase: nil)
-      phrase = phrase.presence || "the previous period"
-      return AhoyDashboard::Delta.fresh.merge(title: "None to compare with: #{phrase}") if fresh?(stat)
-
-      delta = AhoyDashboard::Delta.percent(stat.change, inverted: stat.metric&.inverted?)
-      return if delta.nil?
-
-      against = stat.metric.compact(stat.comparison_value) unless stat.comparison_value.nil?
-      delta.merge(title: against ? "vs #{against}, #{phrase}" : "vs #{phrase}")
-    end
-
-    def self.fresh?(stat)
-      !stat.comparison_value.nil? && stat.comparison_value.to_f.zero? && stat.value.to_f.positive?
     end
 
     attr_reader :query, :stats, :series, :comparison_series, :realtime
@@ -86,11 +53,9 @@ module AhoyDashboard
           value: stat.value,
           display: stat.metric.compact(stat.value),
           full: stat.metric.format(stat.value),
-          # Compact, because this is what the tile already prints. The long form
-          # here meant a metric switch silently rewrote "vs 1.1k" as "vs 1,100".
           comparison_display: (stat.metric.compact(stat.comparison_value) if stat.comparison_value),
           change: stat.change,
-          delta: self.class.delta_for(stat, phrase: comparison_phrase),
+          delta: delta_for(stat),
           active: stat.metric.key == query.metric.key,
           path: dashboard_path(query.with(metric: stat.metric.key).to_query)
         )
@@ -114,11 +79,6 @@ module AhoyDashboard
       }
     end
 
-    # What the chart draws flags for. The drawing hangs each one on the bucket
-    # that holds it, so a range grouped by week puts a Tuesday deploy on the week
-    # that holds it rather than dropping it. The stamp carries the zone the same
-    # way the bucket keys beside it do, so the two are compared as moments and a
-    # browser somewhere else does not shift a flag onto the day before.
     def annotations
       AhoyDashboard::AnnotationDecorator.wrap(annotation_records).map do |note|
         at = note.local_time
@@ -137,10 +97,6 @@ module AhoyDashboard
       { url: dashboard_path(params), from: query.range.begin.to_date.iso8601, to: query.range.end.to_date.iso8601 }
     end
 
-    def period_label
-      query.period_label
-    end
-
     def range_label
       query.range_label
     end
@@ -151,6 +107,18 @@ module AhoyDashboard
       COMPARISON_LABELS.fetch(query.comparison&.to_s, COMPARISON_LABELS[nil])
     end
 
+    def comparing?
+      query.comparison.present?
+    end
+
+    def comparison_switch_label
+      comparing? ? comparison_label : COMPARISON_LABELS[PREVIOUS_PERIOD]
+    end
+
+    def comparison_switch_path
+      routes.root_path(query.with(comparison: (PREVIOUS_PERIOD unless comparing?)).to_query)
+    end
+
     def comparison_phrase
       return @comparison_phrase if defined?(@comparison_phrase)
 
@@ -159,16 +127,6 @@ module AhoyDashboard
 
     def running?
       query.period.running?(query.range)
-    end
-
-    def interval_label
-      INTERVAL_LABELS.fetch(query.interval, query.interval.to_s.humanize)
-    end
-
-    def period_options
-      AhoyDashboard::Period::ALL.map do |period|
-        option(period.label, period.key, { period: period.key }, query.period.key == period.key)
-      end
     end
 
     def interval_options
@@ -189,38 +147,6 @@ module AhoyDashboard
       end
     end
 
-    def crawler_toggle_path
-      dashboard_path(query.crawler_toggle_params)
-    end
-
-    def include_crawlers?
-      query.include_crawlers?
-    end
-
-    def internal_toggle_path
-      dashboard_path(query.internal_toggle_params)
-    end
-
-    def include_internal?
-      query.include_internal?
-    end
-
-    def filters_defaulted?
-      query.defaulted?
-    end
-
-    def default_clear_path
-      dashboard_path(query.default_clear_params)
-    end
-
-    def export_path(report_key = DEFAULT_EXPORT)
-      routes.export_path(report_key, query.to_query)
-    end
-
-    def report_path(report_key, overrides = {})
-      routes.report_path(report_key, query.to_query.merge(overrides))
-    end
-
     def as_json(*)
       {
         metric: query.metric.key,
@@ -238,6 +164,21 @@ module AhoyDashboard
 
     attr_reader :annotation_records
 
+    def delta_for(stat)
+      phrase = comparison_phrase.presence || "the previous period"
+      return AhoyDashboard::Delta.fresh.merge(title: "None to compare with: #{phrase}") if fresh?(stat)
+
+      delta = AhoyDashboard::Delta.percent(stat.change, inverted: stat.metric&.inverted?)
+      return if delta.nil?
+
+      against = stat.metric.compact(stat.comparison_value) unless stat.comparison_value.nil?
+      delta.merge(title: against ? "vs #{against}, #{phrase}" : "vs #{phrase}")
+    end
+
+    def fresh?(stat)
+      !stat.comparison_value.nil? && stat.comparison_value.to_f.zero? && stat.value.to_f.positive?
+    end
+
     def tile_json(tile)
       {
         key: tile.key,
@@ -254,9 +195,6 @@ module AhoyDashboard
       }
     end
 
-    # Chart.js draws no tooltip of its own here. The Stimulus controller reads
-    # this block and paints an HTML one, which is the only way to get the
-    # dashboard's own surface, border and type into it.
     def chart_format
       {
         label: query.metric.label,
@@ -274,9 +212,6 @@ module AhoyDashboard
       Array(pairs).map { |time, value| [ time, value ] }
     end
 
-    # The comparison is drawn over the current range rather than beside it, so
-    # its values are hung off the current buckets. A comparison longer than the
-    # range has nowhere to put its tail and it is dropped.
     def comparison_points
       @comparison_points ||= begin
         times = series.map(&:first)
@@ -303,9 +238,8 @@ module AhoyDashboard
     end
 
     def option(label, value, overrides, active)
-      params = query.with(overrides).to_query
-
-      Option.new(label: label, value: value, params: params, path: dashboard_path(params), active: active)
+      AhoyDashboard::MenuOption.new(label: label, value: value, path: dashboard_path(query.with(overrides).to_query),
+                                    active: active)
     end
 
     def dashboard_path(params)

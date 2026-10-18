@@ -28,16 +28,6 @@ FactoryBot.define do
     text { "Some answer." }
     asked_at { Time.current }
 
-    trait :mentioned do
-      mentioned { true }
-    end
-
-    trait :cited do
-      mentioned { true }
-      cited { true }
-      position { 1 }
-    end
-
     trait :failed do
       status { "failed" }
       text { nil }

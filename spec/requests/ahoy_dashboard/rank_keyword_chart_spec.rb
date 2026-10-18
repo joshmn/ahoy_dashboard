@@ -1,10 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard rank keyword chart", type: :request do
   before { AhoyDashboard::Preferences.write(:site, time_zone: "America/Chicago") }
-
-  include ActiveSupport::Testing::TimeHelpers
 
   let(:now) { ActiveSupport::TimeZone["America/Chicago"].local(2026, 8, 20, 9, 0) }
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
@@ -26,18 +23,6 @@ RSpec.describe "Dashboard rank keyword chart", type: :request do
     follow_redirect! while response.redirect?
   end
 
-  def chart
-    Nokogiri::HTML5(response.body).at_css("[data-dash--chart-options-value]")
-  end
-
-  def format
-    JSON.parse(chart["data-dash--chart-options-value"]).dig("library", "plugins", "tmFormat")
-  end
-
-  def points
-    JSON.parse(chart["data-dash--chart-data-value"]).first["data"]
-  end
-
   it "hands the chart a check the site was missing from as a gap, not a dropped point" do
     reading(at: now - 4.days, position: 8)
     reading(at: now - 3.days, position: 6)
@@ -46,8 +31,8 @@ RSpec.describe "Dashboard rank keyword chart", type: :request do
 
     open_keyword
 
-    expect(points.map(&:last)).to eq([ 8, 6, nil, 4 ])
-    expect(format["missing"]).to eq("Not in the results")
+    expect(dash_chart_points.map(&:last)).to eq([ 8, 6, nil, 4 ])
+    expect(dash_chart_plugin("tmFormat")["missing"]).to eq("Not in the results")
   end
 
   it "places the points by date, so a long wait between checks reads as one" do
@@ -57,8 +42,8 @@ RSpec.describe "Dashboard rank keyword chart", type: :request do
 
     open_keyword(period: "30d")
 
-    expect(format["scale"]).to eq("time")
-    expect(points.map(&:first)).to eq([
+    expect(dash_chart_plugin("tmFormat")["scale"]).to eq("time")
+    expect(dash_chart_points.map(&:first)).to eq([
       "2026-07-31T09:00:00-05:00", "2026-08-17T09:00:00-05:00", "2026-08-18T09:00:00-05:00"
     ])
   end
@@ -70,8 +55,8 @@ RSpec.describe "Dashboard rank keyword chart", type: :request do
 
     open_keyword
 
-    expect(points.map(&:first)).to all(end_with("-05:00"))
-    expect(points.first.first).to eq("2026-08-17T09:00:00-05:00")
+    expect(dash_chart_points.map(&:first)).to all(end_with("-05:00"))
+    expect(dash_chart_points.first.first).to eq("2026-08-17T09:00:00-05:00")
   end
 
   it "leaves the readings as text below three ranked readings however many misses there were" do
@@ -81,7 +66,7 @@ RSpec.describe "Dashboard rank keyword chart", type: :request do
 
     open_keyword
 
-    expect(chart).to be_nil
+    expect(dash_chart).to be_nil
     expect(response.body).to include("The chart starts at the third.")
   end
 end

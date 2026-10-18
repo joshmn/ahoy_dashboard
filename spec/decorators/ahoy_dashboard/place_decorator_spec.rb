@@ -2,12 +2,7 @@ require "rails_helper"
 
 RSpec.describe AhoyDashboard::PlaceDecorator, type: :decorator do
   def place(name, **rest)
-    create(:dash_place, name: name, label: name.split(",").first,
-                        depth: name.split(",").size - 1, **rest)
-  end
-
-  def decorate(record)
-    described_class.new(record)
+    create(:dash_place, name: name, **rest)
   end
 
   describe "#readable" do
@@ -26,11 +21,5 @@ RSpec.describe AhoyDashboard::PlaceDecorator, type: :decorator do
     it "has nothing above it at the top" do
       expect(decorate(place("United States")).parent_readable).to eq("")
     end
-  end
-
-  it "keeps building urls off the record rather than off itself" do
-    record = place("United States", code: 2840)
-
-    expect(decorate(record).to_param).to eq("2840")
   end
 end

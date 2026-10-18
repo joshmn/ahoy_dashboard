@@ -1,6 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
-require "support/ahoy_dashboard/reports"
 
 RSpec.describe AhoyDashboard::ReportMailer do
   let(:digest) do
@@ -24,8 +22,7 @@ RSpec.describe AhoyDashboard::ReportMailer do
   before do
     2.times do |n|
       at = dash_time(2026, 8, 10, 9)
-      visit = dash_visit(started_at: at, visitor: "v#{n}")
-      dash_page_view(visit, path: "/going-to-federal-prison", at: at)
+      dash_landing("/going-to-federal-prison", at: at, visitor: "v#{n}")
     end
 
     earlier = dash_time(2026, 8, 9, 9)

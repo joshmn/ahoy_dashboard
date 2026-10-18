@@ -1,6 +1,8 @@
 module AhoyDashboard
   module Seo
     class VisibilityPresenter < BasePresenter
+      delegate :contributors, :dead, to: :result
+
       def tiles
         [
           Tile.new(label: "Visibility", value: index_label, note: change_label, tone: tone_for(result.change)),
@@ -13,11 +15,11 @@ module AhoyDashboard
       end
 
       def index_label
-        result.index.nil? ? DASH : "#{result.index.round(1)}"
+        decimal(result.index)
       end
 
       def point_label(point)
-        point.nil? ? DASH : point.index.round(1).to_s
+        decimal(point&.index)
       end
 
       def change_label
@@ -41,16 +43,8 @@ module AhoyDashboard
         result.points.map { |point| [ on_label(point.on), point.index ] }
       end
 
-      def contributors
-        result.contributors
-      end
-
-      def dead
-        result.dead
-      end
-
       def places?
-        memo(:places) { (result.contributors + result.dead).map(&:location).uniq.many? }
+        memo(:places) { (contributors + dead).map(&:location).uniq.many? }
       end
 
       def table_cols
@@ -81,7 +75,7 @@ module AhoyDashboard
       end
 
       def earned
-        memo(:earned) { result.contributors.sum(&:points).to_f }
+        memo(:earned) { contributors.sum(&:points).to_f }
       end
 
       def ceiling_note
@@ -100,11 +94,11 @@ module AhoyDashboard
         ]
       end
 
-      private
-
       def place_label(row)
         Serp::Location.parse(row.location).label
       end
+
+      private
 
       def contributor_headers
         [ "Search", ("Place" if places?), "Position", "Click rate", "Points", "Share" ].compact

@@ -13,11 +13,6 @@ module AhoyDashboard
         chat = AhoyDashboard::Chat.find(params[:chat_id])
         open_stream
 
-        # The row is written by Sidekiq, in another process, and this loop asks the
-        # same question a few hundred times. Said outright rather than left to
-        # whatever the executor happened to hand this thread: a poll that reads
-        # its own cached first answer would sit there showing what the page said
-        # when it opened, and it is a query per tick either way.
         AhoyDashboard::ChatMessage.uncached { watch(chat) }
       rescue ActionController::Live::ClientDisconnected, IOError, Errno::EPIPE
         nil

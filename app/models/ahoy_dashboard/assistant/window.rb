@@ -1,15 +1,9 @@
 module AhoyDashboard
   module Assistant
-    # What the model asked for, cut the way the dashboard cuts it. Every tool
-    # reads its range, its label and its link out of one QueryForm, so an answer
-    # and the screen the link opens cannot disagree about which days they mean.
     class Window
       class UnknownPeriod < StandardError; end
 
       MAX_DAYS = 365
-      DEFAULT_PERIOD = "30d".freeze
-      CUSTOM = "custom".freeze
-      DATE = "%Y-%m-%d".freeze
       DAY = "day".freeze
 
       def self.call(**options)
@@ -17,20 +11,21 @@ module AhoyDashboard
       end
 
       def self.keys
-        AhoyDashboard::Period::ALL.map(&:key) - [ CUSTOM ]
+        AhoyDashboard::Period::ALL.map(&:key) - [ AhoyDashboard::Period::CUSTOM_KEY ]
       end
 
       def self.described
-        AhoyDashboard::Period::ALL.reject { |period| period.key == CUSTOM }
+        AhoyDashboard::Period::ALL.reject { |period| period.key == AhoyDashboard::Period::CUSTOM_KEY }
           .map { |period| { key: period.key, means: period.label } }
       end
 
-      def initialize(period: nil, from: nil, to: nil, days: nil, interval: nil, slice: Slice.new)
+      def initialize(period: nil, from: nil, to: nil, days: nil, interval: nil, compare: nil, slice: Slice.new)
         @asked = period.to_s.strip.presence
         @from = parse(from)
         @to = parse(to)
         @days = days
         @interval = interval.to_s.strip.presence
+        @compare = compare
         @slice = slice
       end
 
@@ -81,16 +76,11 @@ module AhoyDashboard
 
       def params
         window = dates || named || counted
-        interval = @interval || (DAY if window[:period] == CUSTOM)
+        interval = @interval || (DAY if window[:period] == AhoyDashboard::Period::CUSTOM_KEY)
 
-        { interval: interval }.merge(slice.form_params).merge(window)
+        { interval: interval, comparison: @compare }.merge(slice.form_params).merge(window)
       end
 
-      # Two dates beat a named period, because somebody asking about a particular
-      # week means that week and not the menu item nearest it. One date on its
-      # own reads as the day it names rather than an open ended range: an
-      # unbounded window here is nearly always a typo, and it would quietly
-      # answer about the whole record.
       def dates
         return nil if from.nil? && to.nil?
 
@@ -98,7 +88,7 @@ module AhoyDashboard
         last = to || from
         first, last = last, first if first > last
 
-        { period: CUSTOM, from: first.strftime(DATE), to: last.strftime(DATE) }
+        custom(first: first, last: last)
       end
 
       def named
@@ -109,18 +99,23 @@ module AhoyDashboard
       end
 
       def counted
-        return { period: DEFAULT_PERIOD } if @days.blank?
+        return { period: AhoyDashboard::Period::DEFAULT_KEY } if @days.blank?
 
         span = @days.to_i.clamp(1, MAX_DAYS)
         last = Time.current.in_time_zone(AhoyDashboard.time_zone).to_date
 
-        { period: CUSTOM, from: (last - (span - 1)).strftime(DATE), to: last.strftime(DATE) }
+        custom(first: last - (span - 1), last: last)
+      end
+
+      def custom(first:, last:)
+        { period: AhoyDashboard::Period::CUSTOM_KEY, from: first.strftime(AhoyDashboard::Period::DATE_FORMAT),
+          to: last.strftime(AhoyDashboard::Period::DATE_FORMAT) }
       end
 
       def parse(value)
         return nil if value.blank?
 
-        Date.strptime(value.to_s.strip, DATE)
+        Date.strptime(value.to_s.strip, AhoyDashboard::Period::DATE_FORMAT)
       rescue ArgumentError, TypeError, RangeError
         nil
       end

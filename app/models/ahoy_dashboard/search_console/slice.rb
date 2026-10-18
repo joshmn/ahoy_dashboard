@@ -1,5 +1,7 @@
 module AhoyDashboard
   module SearchConsole
+    Slice = Data.define(:device, :country)
+
     class Slice
       UNKNOWN = "".freeze
 
@@ -10,18 +12,17 @@ module AhoyDashboard
       ALL_DEVICES = "All devices".freeze
       ALL_COUNTRIES = "All countries".freeze
 
-      attr_reader :device, :country
-
-      def self.from_params(params)
-        new(device: params[:device], country: params[:country])
+      class << self
+        def from_params(params)
+          new(device: params[:device], country: params[:country])
+        end
       end
 
       def initialize(device: nil, country: nil)
         device = device.to_s.strip.downcase
         country = country.to_s.strip.downcase
 
-        @device = device if DEVICES.key?(device)
-        @country = country if country.match?(COUNTRY_FORMAT)
+        super(device: (device if DEVICES.key?(device)), country: (country if country.match?(COUNTRY_FORMAT)))
       end
 
       def any?
@@ -44,16 +45,8 @@ module AhoyDashboard
         relation.where(ahoy_visits: { country: [ letters, AhoyDashboard::Countries::NAMES[letters] ].compact })
       end
 
-      def to_h
-        { device: device, country: country }
-      end
-
       def to_query
         to_h.compact
-      end
-
-      def with(**overrides)
-        self.class.new(**to_h.merge(overrides))
       end
 
       def device_label
@@ -75,16 +68,6 @@ module AhoyDashboard
 
       def cache_key
         [ device, country ].map(&:to_s).join("/")
-      end
-
-      def ==(other)
-        other.is_a?(Slice) && other.to_h == to_h
-      end
-
-      alias eql? ==
-
-      def hash
-        to_h.hash
       end
     end
   end

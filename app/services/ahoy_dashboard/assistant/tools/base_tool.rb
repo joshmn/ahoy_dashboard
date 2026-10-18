@@ -17,10 +17,6 @@ module AhoyDashboard
         GROUP_HELP = "Optional. Filters with the same number are alternatives joined by or.".freeze
 
         class << self
-          def tool_name
-            name.demodulize.underscore
-          end
-
           def feature
             nil
           end
@@ -34,9 +30,6 @@ module AhoyDashboard
             @label || tool_name.humanize.downcase
           end
 
-          # Declared in one place and poured into each tool's own schema, so the
-          # five tools that read a window cannot drift into asking for it in
-          # five different shapes.
           def window_params(schema)
             schema.string :period, description: PERIOD_HELP, required: false, enum: Window.keys
             schema.string :from, description: FROM_HELP, required: false, format: "date"
@@ -64,8 +57,12 @@ module AhoyDashboard
           @slice = slice
         end
 
-        def name
-          self.class.tool_name
+        def execute(**arguments)
+          answer(**arguments)
+        rescue Window::UnknownPeriod => e
+          unknown_period(e)
+        rescue Slice::InvalidFilters => e
+          invalid_filters(e)
         end
 
         private
@@ -128,6 +125,10 @@ module AhoyDashboard
 
         def rounded(value, places = 2)
           value.to_f.round(places)
+        end
+
+        def row_limit(value)
+          value.to_i.clamp(1, 50)
         end
 
         def routes

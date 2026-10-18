@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/reports"
 
 RSpec.describe AhoyDashboard::Reports::Digests do
   before { AhoyDashboard::Preferences.write(:site, time_zone: "America/Chicago") }
@@ -46,13 +45,24 @@ RSpec.describe AhoyDashboard::Reports::Digests do
     end
   end
 
-  # The alert email and this one have to cut the same days, or two emails on one
-  # morning disagree about the same week.
+  describe ".mailer" do
+    it "is the one the host names" do
+      expect([ described_class.mailer, described_class.parent_mailer ]).to eq([ TrafficReportMailer, ApplicationMailer ])
+    end
+
+    it "falls back to the engine's own when the host names none" do
+      report_settings(mailer: nil, parent_mailer: "") do
+        expect([ described_class.mailer, described_class.parent_mailer ])
+          .to eq([ AhoyDashboard::ReportMailer, ActionMailer::Base ])
+      end
+    end
+  end
+
   describe ".last_window" do
     let(:now) { zone.parse("2026-09-16 08:00") }
 
     it "matches the alert email, period for period" do
-      described_class::PERIODS.each do |period|
+      AhoyDashboard::Digests::PERIODS.each do |period|
         ours = described_class.last_window(period, now: now)
         theirs = AhoyDashboard::Alerts::Digests.last_window(period, now: now)
 
@@ -82,8 +92,6 @@ RSpec.describe AhoyDashboard::Reports::Digests do
         .to eq([ Date.new(2026, 8, 31), Date.new(2026, 9, 6) ])
     end
 
-    # July is 31 days and August is 31, but February is not, and a month held up
-    # against "the 31 days before it" is being compared to nothing anybody names.
     it "is the calendar month before, however long that month is" do
       window = previous(:monthly, now: zone.parse("2026-04-03 08:00"))
 

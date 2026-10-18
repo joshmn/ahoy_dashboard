@@ -1,12 +1,5 @@
 module AhoyDashboard
   module Alerts
-    # Evaluate every live rule, write what it found, hand each one to the
-    # notifier if there is one.
-    #
-    # The write comes first and the delivery second, always. An event that was
-    # found is on the screen whether or not anything could be sent, which is what
-    # makes switching a rule on with no notifier configured a useful thing to do
-    # rather than a silent no-op.
     class RunCommand < AhoyDashboard::Command
       Outcome = Data.define(:fired, :delivered, :repeats)
 
@@ -17,7 +10,7 @@ module AhoyDashboard
       def call
         return broadcast(:disabled) unless Alerts.enabled?
 
-        live = (rules || AhoyDashboard::AlertRule.live.available.to_a).select(&:available?)
+        live = (rules || AhoyDashboard::AlertRule.live.available.to_a).select { |rule| rule.defined? && rule.available? }
         return broadcast(:nothing_on) if live.empty?
 
         verdicts = Evaluator.call(rules: live)
@@ -34,9 +27,6 @@ module AhoyDashboard
 
       attr_reader :rules
 
-      # Never raises into the caller. A notifier that blows up must not take the
-      # sweep that fired it down with it, and the failure belongs on the event so
-      # somebody can see it on the screen rather than only in a log.
       def deliver(event)
         return false unless Alerts.deliverable?
 
@@ -48,10 +38,6 @@ module AhoyDashboard
         false
       end
 
-      # The unique index on rule and check is what stops a position that stays
-      # down sending the same sentence every hour. A repeat is counted and
-      # dropped rather than raising, because a rule firing again on something it
-      # already reported is the normal case, not an error.
       def record(verdicts)
         fired = []
         repeats = 0

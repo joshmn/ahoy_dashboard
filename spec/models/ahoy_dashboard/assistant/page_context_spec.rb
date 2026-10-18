@@ -10,8 +10,6 @@ RSpec.describe AhoyDashboard::Assistant::PageContext do
     expect(context("/telemetry/rankings")["does"]).to include("results page")
   end
 
-  # Every telemetry path starts with the dashboard's, so the longest match has
-  # to win or a settings screen reads as the dashboard.
   it "does not read a settings screen as the dashboard" do
     expect(context("/telemetry/settings/serp_keywords")["screen"]).to eq("rank tracking")
   end
@@ -97,10 +95,8 @@ RSpec.describe AhoyDashboard::Assistant::PageContext do
 
   describe "hidden traffic" do
     it "says it is excluded and names what hides it" do
-      AhoyDashboard::Exclusion.create!(name: "Datacenters",
-                                       filters: [ { "dimension" => "asn", "operator" => "contains", "value" => "AMAZON" } ])
-      AhoyDashboard::Exclusion.create!(name: "Switched off", enabled: false,
-                                       filters: [ { "dimension" => "country", "operator" => "is", "value" => "FR" } ])
+      dash_exclusion("Datacenters", [ "asn", "contains", "AMAZON" ])
+      dash_exclusion("Switched off", [ "country", "is", "FR" ], enabled: false)
       read = context("/telemetry", period: "7d")
 
       expect(read["hidden_traffic"]).to eq("excluded")
@@ -111,8 +107,7 @@ RSpec.describe AhoyDashboard::Assistant::PageContext do
     end
 
     it "says it is shown when the screen shows it, and names nothing" do
-      AhoyDashboard::Exclusion.create!(name: "Datacenters",
-                                       filters: [ { "dimension" => "asn", "operator" => "contains", "value" => "AMAZON" } ])
+      dash_exclusion("Datacenters", [ "asn", "contains", "AMAZON" ])
       read = context("/telemetry", period: "7d", internal: "1")
 
       expect(read["hidden_traffic"]).to eq("shown")

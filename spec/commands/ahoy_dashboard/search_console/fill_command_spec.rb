@@ -1,17 +1,10 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsole::FillCommand do
-  let(:account) do
-    create(:dash_google_account, :with_property, access_token: "good", expires_at: 30.minutes.from_now)
-  end
+  let(:account) { create(:dash_google_account, :with_property) }
   let(:url) { analytics_url }
   let(:queue) { AhoyDashboard::SearchConsole::FillQueue }
   let(:days) { [ Date.new(2026, 7, 3), Date.new(2026, 7, 4), Date.new(2026, 7, 5) ] }
-
-  def stub_days(rows: [], status: 200)
-    stub_request(:post, url).to_return(status: status, body: analytics_body(rows).to_json, headers: json_headers)
-  end
 
   def fill
     described_class.call(account: account)
@@ -35,7 +28,7 @@ RSpec.describe AhoyDashboard::SearchConsole::FillCommand do
 
     it "asks for the oldest day first and takes it off the queue" do
       queue.start!(days)
-      stub_days
+      stub_analytics
 
       result = fill[:ok]
 
@@ -47,7 +40,7 @@ RSpec.describe AhoyDashboard::SearchConsole::FillCommand do
 
     it "asks for one day, not the window around it" do
       queue.start!(days)
-      stub_days
+      stub_analytics
 
       fill
 
@@ -59,13 +52,9 @@ RSpec.describe AhoyDashboard::SearchConsole::FillCommand do
 
     it "writes all three grains of the day, the same as the nightly run" do
       queue.start!([ Date.new(2026, 7, 3) ])
-      stub_request(:post, url)
-        .to_return(status: 200, body: analytics_body([ [ %w[halfway house desktop usa], 2, 30, 0.06, 4.0 ] ]).to_json,
-                   headers: json_headers)
-        .to_return(status: 200, body: analytics_body([ [ %w[halfway house desktop usa], 2, 30, 0.06, 4.0 ] ]).to_json,
-                   headers: json_headers)
-        .to_return(status: 200, body: analytics_body([ [ %w[desktop usa], 2, 30, 0.06, 4.0 ] ]).to_json,
-                   headers: json_headers)
+      stub_analytics([ [ %w[halfway house desktop usa], 2, 30, 0.06, 4.0 ] ],
+                     [ [ %w[halfway house desktop usa], 2, 30, 0.06, 4.0 ] ],
+                     [ [ %w[desktop usa], 2, 30, 0.06, 4.0 ] ])
 
       fill
 
@@ -76,7 +65,7 @@ RSpec.describe AhoyDashboard::SearchConsole::FillCommand do
 
     it "clears the queue once the last day lands" do
       queue.start!([ Date.new(2026, 7, 3) ])
-      stub_days
+      stub_analytics
 
       result = fill[:ok]
 
@@ -86,7 +75,7 @@ RSpec.describe AhoyDashboard::SearchConsole::FillCommand do
 
     it "takes a day Google had nothing for off the queue rather than asking again forever" do
       queue.start!(days)
-      stub_days(rows: [])
+      stub_analytics
 
       fill
 
@@ -95,7 +84,7 @@ RSpec.describe AhoyDashboard::SearchConsole::FillCommand do
 
     it "writes down that a day with nothing on it was scanned, so it is never offered again" do
       queue.start!(days)
-      stub_days(rows: [])
+      stub_analytics
 
       fill
 
@@ -106,7 +95,7 @@ RSpec.describe AhoyDashboard::SearchConsole::FillCommand do
 
     it "does not mark a day scanned when Google never answered for it" do
       queue.start!(days)
-      stub_request(:post, url).to_return(status: 429, body: "quota", headers: json_headers)
+      stub_analytics_refusal(429, body: "quota")
 
       fill
 
@@ -115,7 +104,7 @@ RSpec.describe AhoyDashboard::SearchConsole::FillCommand do
 
     it "does not touch Last synced, because it did not pull the recent week" do
       queue.start!(days)
-      stub_days
+      stub_analytics
 
       fill
 
@@ -124,7 +113,7 @@ RSpec.describe AhoyDashboard::SearchConsole::FillCommand do
 
     it "leaves the day on the queue when Google refuses, so pressing the button again picks it up" do
       queue.start!(days)
-      stub_request(:post, url).to_return(status: 429, body: "quota", headers: json_headers)
+      stub_analytics_refusal(429, body: "quota")
 
       expect(fill).to have_key(:rate_limited)
       expect(queue.load.next_date).to eq(Date.new(2026, 7, 3))
@@ -133,7 +122,7 @@ RSpec.describe AhoyDashboard::SearchConsole::FillCommand do
 
     it "passes the reason on rather than writing a second, worse version of it" do
       queue.start!(days)
-      stub_request(:post, url).to_return(status: 429, body: "quota", headers: json_headers)
+      stub_analytics_refusal(429, body: "quota")
 
       fill
 

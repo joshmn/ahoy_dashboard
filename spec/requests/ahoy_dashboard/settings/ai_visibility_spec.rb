@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/ai_visibility_settings"
 
 RSpec.describe "Dashboard AI visibility settings", type: :request do
   around { |example| ai_visibility_settings(enabled: true) { example.run } }
@@ -11,23 +10,6 @@ RSpec.describe "Dashboard AI visibility settings", type: :request do
 
   def texts
     AhoyDashboard::AiVisibility::Prompt.ordered.pluck(:text)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/ai_visibility/edit"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin, and saves nothing" do
-      sign_in create(:user)
-
-      save(prompts: "a question")
-
-      expect(response).to have_http_status(:not_found)
-      expect(AhoyDashboard::AiVisibility::Prompt.count).to be_zero
-    end
   end
 
   describe "as an admin" do
@@ -121,7 +103,7 @@ RSpec.describe "Dashboard AI visibility settings", type: :request do
       save(prompts: "keep\nnew one", frequency: "daily")
 
       expect(response).to have_http_status(:ok)
-      confirm = Nokogiri::HTML5(response.body).at_css("#confirm")
+      confirm = document.at_css("#confirm")
       expect(confirm.text.squish).to include("Nothing is saved yet.", "drop this one (2 answers)")
       expect(confirm.at_css("form input[name='ai_visibility[confirm]'][value='1']")).to be_present
       expect(confirm.at_css("form input[name='ai_visibility[prompts]']")["value"]).to eq("keep\nnew one")

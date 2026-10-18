@@ -2,6 +2,8 @@ module AhoyDashboard
   module Serp
     class RankOverviewQuery
       Row = Data.define(:keyword, :location, :current, :previous, :best, :worst, :count) do
+        include Placed
+
         def position
           current&.position
         end
@@ -34,10 +36,6 @@ module AhoyDashboard
 
         def cited?
           current&.ai_overview_cited.present?
-        end
-
-        def place
-          Location.parse(location)
         end
       end
 
@@ -73,7 +71,7 @@ module AhoyDashboard
           ranked: rows.count(&:ranked?),
           top_three: rows.count { |row| row.ranked? && row.position <= 3 },
           top_ten: rows.count { |row| row.ranked? && row.position <= 10 },
-          median: median(rows), overviews: rows.count(&:overview?), cited: rows.count(&:cited?)
+          median: Median.of(rows.map(&:position)), overviews: rows.count(&:overview?), cited: rows.count(&:cited?)
         )
       end
 
@@ -89,7 +87,7 @@ module AhoyDashboard
       def grouped
         return {} if site.nil?
 
-        history = SerpCheck.where(site_id: site.id, status: SerpCheck.statuses[:success])
+        history = SerpCheck.success.where(site_id: site.id)
           .in_range(range)
           .for_tag(tag)
           .at_current_places
@@ -104,8 +102,6 @@ module AhoyDashboard
               "rows between unbounded preceding and unbounded following) as history_first_id"
           )
 
-        # Keep the original first-seen group order when display sort keys tie,
-        # without materializing the older checks used by the aggregates.
         SerpCheck.from(history, :ahoy_dashboard_serp_checks)
           .where("history_recency <= 2")
           .includes(:keyword)
@@ -121,16 +117,6 @@ module AhoyDashboard
           previous: checks[-2], best: current[:history_best], worst: current[:history_worst],
           count: current[:history_count]
         )
-      end
-
-      def median(rows)
-        positions = rows.map(&:position).select { |value| value }.sort
-        return nil if positions.empty?
-
-        middle = positions.size / 2
-        return positions[middle] if positions.size.odd?
-
-        ((positions[middle - 1] + positions[middle]) / 2.0).round(1)
       end
     end
   end

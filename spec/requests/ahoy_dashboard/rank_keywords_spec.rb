@@ -1,10 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard rank keyword", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
   let(:keyword) { create(:dash_serp_keyword, query: "visiting hours") }
 
@@ -22,22 +19,6 @@ RSpec.describe "Dashboard rank keyword", type: :request do
              domain: domain, checked_at: at)
     end
     run
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/rank_keyword", params: { keyword: keyword.id }
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/rank_keyword", params: { keyword: keyword.id }
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do
@@ -108,6 +89,27 @@ RSpec.describe "Dashboard rank keyword", type: :request do
       get "/telemetry/rank_keyword", params: { keyword: keyword.id }
 
       expect(response.body).to include("Who else ranked", "bop.gov", "justice.gov")
+    end
+
+    it "marks a subdomain of a site that matches subdomains as yours" do
+      site.update!(match_subdomains: true)
+      reading(position: 2, domains: %w[bop.gov blog.example.com])
+
+      get "/telemetry/rank_keyword", params: { keyword: keyword.id }
+      rivals = document.at_css("[aria-label='Who else ranked']")
+      yours = rivals.css("tbody tr").select { |row| row.at_css(".badge")&.text == "You" }
+
+      expect(yours.map { |row| row.at_css(".t-main .seo-label").text.squish }).to eq([ "blog.example.com" ])
+    end
+
+    it "does not mark a subdomain as yours when the site matches its own domain only" do
+      reading(position: 2, domains: %w[blog.example.com example.com])
+
+      get "/telemetry/rank_keyword", params: { keyword: keyword.id }
+      rivals = document.at_css("[aria-label='Who else ranked']")
+      yours = rivals.css("tbody tr").select { |row| row.at_css(".badge")&.text == "You" }
+
+      expect(yours.map { |row| row.at_css(".t-main .seo-label").text.squish }).to eq([ "example.com" ])
     end
 
     it "lists who the overview quoted" do

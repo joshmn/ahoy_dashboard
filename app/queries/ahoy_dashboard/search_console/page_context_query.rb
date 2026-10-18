@@ -31,7 +31,7 @@ module AhoyDashboard
 
       def country_codes
         SearchConsoleTotal.in_range(range).where.not(country: Slice::UNKNOWN)
-          .group(:country).order(Arel.sql("sum(clicks) desc, sum(impressions) desc"), :country).pluck(:country)
+          .group(:country).order(Sums::RANKING, :country).pluck(:country)
       end
 
       def stored_span

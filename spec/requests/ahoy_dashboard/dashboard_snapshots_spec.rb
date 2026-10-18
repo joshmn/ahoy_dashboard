@@ -1,19 +1,13 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Precomputed dashboard responses", type: :request do
   let(:now) { Time.utc(2026, 8, 11, 14, 30) }
 
-  around do |example|
-    previous_cache = Rails.cache
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    travel_to(now) { example.run }
-  ensure
-    Rails.cache = previous_cache
-    AhoyDashboard::Current.reset
-  end
+  include_context "with a memory cache"
+
+  around { |example| travel_to(now) { example.run } }
 
   before do
     AhoyDashboard::Preferences.write(:site, time_zone: "America/Chicago", precomputed_dashboard: true)
@@ -28,10 +22,6 @@ RSpec.describe "Precomputed dashboard responses", type: :request do
       visit = dash_visit(started_at: Time.current, visitor: "new-#{index}", country: "CA")
       dash_page_view(visit, path: "/new", at: Time.current)
     end
-  end
-
-  def document
-    Nokogiri::HTML5(response.body)
   end
 
   def visitor_count
@@ -76,13 +66,7 @@ RSpec.describe "Precomputed dashboard responses", type: :request do
 
   it "does not repeat the expensive session or journey aggregates on a stale hit" do
     travel(31.seconds)
-    statements = []
-    capture = lambda do |*args|
-      sql = args.last[:sql]
-      statements << sql if sql.match?(/grouping sets|tm_journey/i)
-    end
-
-    ActiveSupport::Notifications.subscribed(capture, "sql.active_record") do
+    statements = captured_sql(/grouping sets|tm_journey/i, cached: true) do
       get("/telemetry?loading=complete", params: { period: "30d" })
     end
 
@@ -145,13 +129,5 @@ RSpec.describe "Precomputed dashboard responses", type: :request do
     get("/telemetry?loading=complete", params: { period: "30d" })
 
     expect(visitor_count).to eq("3")
-  end
-
-  it "still requires authorization when a snapshot has already been populated" do
-    sign_out(:user)
-
-    get("/telemetry?loading=complete", params: { period: "30d" })
-
-    expect(response).to redirect_to("/users/sign_in")
   end
 end

@@ -1,18 +1,13 @@
 module AhoyDashboard
   module Settings
-    class GoalsController < AhoyDashboard::BaseController
+    class GoalsController < AhoyDashboard::Settings::BaseController
       before_action :set_goal, only: [ :edit, :update, :destroy ]
 
       helper_method :event_names, :property_keys
 
       def index
-        @goals = AhoyDashboard::Goal.ordered.to_a
+        @goals = AhoyDashboard::GoalDecorator.wrap(AhoyDashboard::Goal.ordered.to_a)
         @conversions = conversions
-        # Deleting asks in the row rather than in a dialog, so the thing being
-        # deleted stays on screen while the question is answered. A parameter on
-        # the index rather than a verb of its own, and the link works with the
-        # JavaScript off because it is a page.
-        @confirming = params[:confirm].presence
       end
 
       def new
@@ -22,10 +17,9 @@ module AhoyDashboard
       def create
         @form = AhoyDashboard::GoalForm.new(goal_params)
 
-        AhoyDashboard::Goals::CreateCommand.call(form: @form) do
+        AhoyDashboard::Records::SaveCommand.call(record: AhoyDashboard::Goal.new, form: @form, append: true) do
           on(:ok) { redirect_to settings_goals_path, notice: "Goal saved." }
           on(:invalid) { |form| rejected(form, :new) }
-          on(:duplicate) { |form| rejected(form, :new) }
         end
       end
 
@@ -33,17 +27,14 @@ module AhoyDashboard
         @form = AhoyDashboard::GoalForm.from_record(@goal)
       end
 
-      # A nudge is this goal's position and nothing else, so it is the same
-      # update as any other edit to the goal rather than a resource of its own.
       def update
         return move if nudge.present?
 
         @form = AhoyDashboard::GoalForm.new(goal_params)
 
-        AhoyDashboard::Goals::UpdateCommand.call(goal: @goal, form: @form) do
+        AhoyDashboard::Records::SaveCommand.call(record: @goal, form: @form) do
           on(:ok) { redirect_to settings_goals_path, notice: "Goal saved." }
-          on(:invalid) { |form| rejected(form, :edit) }
-          on(:duplicate) { |form| rejected(form, :edit) }
+          on(:invalid) { |form| rejected(form) }
         end
       end
 
@@ -65,15 +56,8 @@ module AhoyDashboard
       end
 
       def move
-        AhoyDashboard::Goals::MoveCommand.call(goal: @goal, direction: nudge) do
-          on(:ok) { redirect_to settings_goals_path }
-          on(:nothing_to_do) { redirect_to settings_goals_path }
-        end
-      end
-
-      def rejected(form, template)
-        @form = form
-        render template, status: :unprocessable_entity
+        AhoyDashboard::Records::MoveCommand.call(record: @goal, direction: nudge)
+        redirect_to settings_goals_path
       end
 
       def nudge
@@ -84,9 +68,6 @@ module AhoyDashboard
         params.require(:goal).permit(*AhoyDashboard::GoalForm::FIELDS)
       end
 
-      # How each goal has actually been doing, keyed by name, so the list is not
-      # only a set of definitions. A goal that has never fired still gets a row
-      # and reads zero, which is an answer rather than an absence.
       def conversions
         rows = AhoyDashboard::GoalsQuery.call(scope: query.scope, limit: @goals.size.clamp(1, 1_000)).rows
 
@@ -99,8 +80,6 @@ module AhoyDashboard
         @event_names ||= AhoyDashboard::EventNamesQuery.call(scope: query.scope)
       end
 
-      # PropertyKeysQuery already unions the allowlist with what it discovers, in
-      # the operator's chosen order.
       def property_keys
         @property_keys ||= AhoyDashboard::PropertyKeysQuery.call(scope: query.scope)
       end

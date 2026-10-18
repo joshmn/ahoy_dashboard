@@ -109,8 +109,8 @@ A failed run shows its error. Under the table, "Recent runs" keeps the last 100 
 
 "Ran" means the job finished without raising. Several jobs catch their own failures and record them somewhere more useful, so "Ran" isn't always "worked":
 
-- Search Console: a sync that hit a quota or a refused token is "Ran" here. The real result is on Settings, Search Console.
-- Backlinks: a failed paid request is only in the log.
+- Search Console: a sync that hit Google's quota is "Ran" here. A refused token, a lost permission or Google not answering is "Failed". Either way, the message on Settings, Search Console says what to do.
+- Backlinks: a sync that hit the provider's quota, or had its login refused, is "Ran" and only in the log. Any other failed request is "Failed".
 - Rank checks: the dispatcher only enqueues checks, so it shows "Ran" even when every check fails. Failed checks show on Settings, Search provider as "Last error" for auth and quota problems, and in the log otherwise.
 - Alert emails: a failed email makes the job fail, so it does show as "Failed".
 

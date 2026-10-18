@@ -1,17 +1,14 @@
 module AhoyDashboard
   module Seo
     module KeywordResearches
-      # Fetching a seed. Its own resource rather than a mode of the report,
-      # because every row of the answer costs money and reading the cache does
-      # not: opening the page must never spend anything.
       class LookupsController < BaseController
         def create
-          form = KeywordLookupForm.from_params(params)
+          form = KeywordLookupForm.new(params.permit(*KeywordLookupForm::FIELDS).to_h)
           seed = form.seed_value
 
           return redirect_to(seo_keyword_research_path(seed: seed.presence), alert: form.message) if form.invalid?
 
-          picked = { seed: seed, location: form.location_value, language: form.language_value }
+          picked = form.lookup_params
 
           blocker = AhoyDashboard::Keywords.refusal
           if blocker

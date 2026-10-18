@@ -2,10 +2,10 @@
 <% carried = local_assigns.fetch(:carried, {}) %>
 <% collect = local_assigns.fetch(:collect, false) %>
 <% eager = collect || local_assigns.fetch(:eager, false) %>
-<% returning = destination.present? ? { return: destination } : {} %>
-<% base = query.to_query.except(:filters).merge(dash_carried_params(carried)).merge(returning)
+<% full = dash_filter_params(destination: destination, carried: carried) %>
+<% base = dash_filter_params(destination: destination, carried: carried, base: query.to_query.except(:filters))
      .merge(collect ? { collect: "1" } : {}) %>
-<% content_for :dash_palette_search, facet_search_path(query.to_query.merge(dash_carried_params(carried)).merge(returning)) unless collect %>
+<% content_for :dash_palette_search, facet_search_path(full) unless collect %>
 
 <%= dash_dialog key: "filter", id: "tm-filter-modal", title: (collect ? "Add filters" : "Filter"),
       close_label: "Close the filters", class: "fm",
@@ -13,7 +13,7 @@
                         data: { action: "dash--filter-modal#expand", "dash--filter-modal-target": "expander" }),
       data: {
         controller: "dash--filter-modal",
-        "dash--filter-modal-contents-value": (filter_dialog_path(query.to_query.merge(dash_carried_params(carried)).merge(returning)) unless eager),
+        "dash--filter-modal-contents-value": (filter_dialog_path(full) unless eager),
         "dash--filter-modal-url-value": filter_values_path(base),
         "dash--filter-modal-apply-value": (dash_destination_path(destination, query.to_query.except(:filters).merge(carried)) unless collect),
         "dash--filter-modal-tokens-value": (collect ? [] : dash_filter_tokens(query.filters)).to_json,
@@ -31,7 +31,7 @@
             <li class="fm-scope-item" hidden data-dash--filter-modal-target="scope">
               <%= dash_badge tone: :success, class: "border border-success-subtle d-inline-flex flex-wrap align-items-center gap-1 mw-100 fm-scope" do %>
                 <span data-dash--filter-modal-target="scopeName"></span>
-                <%= dash_select nil, AhoyDashboard::Filter::OPERATORS.map { |operator, label| [ label, operator ] },
+                <%= dash_select nil, AhoyDashboard::Filter.operator_options,
                       label: "How it should match", id: "tm-filter-operator", class: "w-auto fm-scope__op",
                       data: { "dash--filter-modal-target": "operator", action: "change->dash--filter-modal#operate" } %>
                 <span class="d-inline-flex flex-wrap align-items-center gap-1 min-w-0" data-dash--filter-modal-target="scopeValues" hidden></span>
@@ -73,7 +73,7 @@
   <% else %>
     <%= dash_dialog_body data: { "dash--filter-modal-target": "loading" }, "aria-busy": "false" do %>
       <p role="status" data-dash--filter-modal-target="loadingStatus">Loading filters…</p>
-      <%= link_to "Open filters as a page", filter_values_path(query.to_query.merge(dash_carried_params(carried)).merge(returning)), data: { tm_frame: "_top" } %>
+      <%= link_to "Open filters as a page", filter_values_path(full), data: { tm_frame: "_top" } %>
       <%= dash_button "Try again", hidden: true, data: { "dash--filter-modal-target": "retry", action: "dash--filter-modal#retry" } %>
     <% end %>
   <% end %>

@@ -1,8 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Assistant::Window do
-  around { |example| travel_to(AhoyDashboard.time_zone.local(2026, 8, 21, 14, 30)) { example.run } }
+  around { |example| travel_to(dash_time(2026, 8, 21, 14, 30)) { example.run } }
 
   def dates(window)
     [ window.range.begin.to_date, window.range.end.to_date ]
@@ -109,8 +108,7 @@ RSpec.describe AhoyDashboard::Assistant::Window do
     end
 
     it "says hidden traffic is left out and names the exclusions doing it" do
-      AhoyDashboard::Exclusion.create!(name: "Datacenters",
-                                       filters: [ { "dimension" => "asn", "operator" => "contains", "value" => "AMAZON" } ])
+      dash_exclusion("Datacenters", [ "asn", "contains", "AMAZON" ])
       read = described_class.call(period: "7d").to_h
 
       expect(read[:hidden_traffic]).to eq("excluded")
@@ -129,7 +127,7 @@ RSpec.describe AhoyDashboard::Assistant::Window do
 end
 
 RSpec.describe AhoyDashboard::Assistant::Tools::Trend do
-  around { |example| travel_to(AhoyDashboard.time_zone.local(2026, 8, 21, 14, 30)) { example.run } }
+  around { |example| travel_to(dash_time(2026, 8, 21, 14, 30)) { example.run } }
 
   it "hands back the window's own total, which the daily points do not add up to" do
     token = SecureRandom.uuid
@@ -151,12 +149,7 @@ RSpec.describe AhoyDashboard::Assistant::Tools::Trend do
 
   it "gets a count metric's points and independent total in one analytics statement" do
     %w[visitors visits pageviews].each do |metric|
-      statements = []
-      recorder = ->(*args) do
-        payload = args.last
-        statements << payload[:sql] if payload[:name] != "SCHEMA" && payload[:sql].match?(/\b(?:FROM|JOIN)\s+"?ahoy_(?:visits|events)\b/i)
-      end
-      ActiveSupport::Notifications.subscribed(recorder, "sql.active_record") do
+      statements = captured_sql(/\b(?:FROM|JOIN)\s+"?ahoy_(?:visits|events)\b/i, cached: true) do
         result = described_class.new.execute(metric: metric, days: 7)
         expect(result).not_to have_key(:error)
       end

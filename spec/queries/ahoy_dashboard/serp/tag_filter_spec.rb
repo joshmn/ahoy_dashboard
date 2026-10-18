@@ -1,9 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Rank queries read one tag at a time" do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:range) { (now - 7.days)..now }
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
   let(:rival) { create(:dash_serp_site, name: "Them", domain: "rival.com") }

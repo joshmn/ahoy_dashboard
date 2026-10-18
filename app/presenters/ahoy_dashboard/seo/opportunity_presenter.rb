@@ -3,6 +3,8 @@ module AhoyDashboard
     class OpportunityPresenter < BasePresenter
       LISTED = 30
 
+      delegate :rows, to: :result
+
       def tracking_phrases
         (listed + striking + under_performing).map(&:query)
       end
@@ -15,10 +17,6 @@ module AhoyDashboard
           Tile.new(label: "Striking distance", value: number(result.striking_count), note: "eleven to twenty", tone: nil),
           Tile.new(label: "Below expected", value: number(result.under_performing_count), note: "fewer clicks than the position gets", tone: nil)
         ]
-      end
-
-      def rows
-        result.rows
       end
 
       def listed
@@ -72,7 +70,7 @@ module AhoyDashboard
                                   "Landing page" ]) do
             listed.map do |row|
               [ row.query, row.clicks, row.impressions, row.position, csv_percent(row.ctr), row.upside, row.band,
-                (path_of(row.page) if row.page.present?) ]
+                Formatting.url_path(row.page) ]
             end
           end,
           CsvTable.new(key: "striking", label: "Striking distance",

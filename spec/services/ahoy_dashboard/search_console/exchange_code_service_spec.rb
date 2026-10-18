@@ -1,9 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsole::ExchangeCodeService do
-  let(:token_url) { AhoyDashboard::SearchConsole::TOKEN_URL }
-
   it "makes no call while the integration is off in test" do
     expect(AhoyDashboard::SearchConsole).not_to be_enabled
     expect { described_class.call(code: "abc") }.to raise_error(AhoyDashboard::SearchConsole::AuthError)

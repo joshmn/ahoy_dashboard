@@ -18,4 +18,15 @@ RSpec.describe AhoyDashboard::NavigationAvailabilityQuery do
 
     expect(described_class.call).to include(:rivals)
   end
+
+  it "counts only results pages that were saved from a successful fetch" do
+    create(:dash_serp_run_page, status: :failed)
+    create(:dash_serp_run_page, response: nil)
+
+    expect(described_class.call).not_to include(:run_pages)
+
+    create(:dash_serp_run_page)
+
+    expect(described_class.call).to include(:run_pages)
+  end
 end

@@ -1,69 +1,27 @@
-import { Controller } from "../runtime/controllers.js"
-
-// Picking somewhere to search from, by drilling or by typing.
-//
-// Every panel is the server's answer. Typing does not hide rows: the list is a
-// quarter of a million places and the forty on screen are a window onto it, so
-// a search that only looked at those forty would answer with whatever happened
-// to be listed.
-//
-// Where it is standing is one parent, not a stack. Going back needs the
-// grandparent's code, which the panel's own back button carries, and its label,
-// which is the current label with its first part dropped: inside "Illinois,
-// United States" the way out is "United States". So nothing has to be
-// remembered across loads.
-
-const OPEN = "open"
-const LOCK = "tm-lock"
-const MARKED = "act"
-const DEBOUNCE_MS = 220
+import { CommandDialog, DEBOUNCE_MS } from "../runtime/command_dialog.js"
 
 const rest = (label) => label.split(",").slice(1).join(",").trim()
 const first = (label) => label.split(",")[0].trim()
 
-export default class extends Controller {
-  static targets = ["panel", "input", "list", "item", "back"]
+export default class extends CommandDialog {
+  static targets = ["panel", "input", "item", "back"]
   static values = { url: String }
 
   connect() {
-    this.index = -1
+    super.connect()
     this.row = null
     this.parent = ""
     this.label = ""
 
     this.onOpener = (event) => this.adopt(event)
-    this.onKey = (event) => this.key(event)
-
     document.addEventListener("click", this.onOpener)
-    document.addEventListener("keydown", this.onKey)
-  }
-
-  // Nothing announces a frame load, so the first row is marked when the rows
-  // arrive. Debounced to the end of the batch, or every row in the new panel
-  // would mark itself in turn.
-  itemTargetConnected() {
-    clearTimeout(this.marker)
-    this.marker = setTimeout(() => this.mark(0), 0)
   }
 
   disconnect() {
-    clearTimeout(this.timer)
-    clearTimeout(this.marker)
+    super.disconnect()
     document.removeEventListener("click", this.onOpener)
-    document.removeEventListener("keydown", this.onKey)
-    document.body.classList.remove(LOCK)
   }
 
-  get isOpen() {
-    return this.hasPanelTarget && !this.panelTarget.hidden
-  }
-
-  get visible() {
-    return this.itemTargets.filter((item) => !item.hidden)
-  }
-
-  // A row's own button names the row it fills in. Named rather than found by
-  // walking up, because the dialog lives beside the form and not inside the row.
   adopt(event) {
     const opener = event.target.closest?.("[data-tm-place]")
     if (!opener) return
@@ -79,10 +37,7 @@ export default class extends Controller {
   show(parent, label) {
     if (!this.hasPanelTarget) return
 
-    this.panelTarget.hidden = false
-    this.panelTarget.classList.add(OPEN)
-    document.body.classList.add(LOCK)
-
+    this.reveal()
     this.inputTarget.value = ""
     this.load(parent, label)
     this.inputTarget.focus()
@@ -92,11 +47,7 @@ export default class extends Controller {
     event?.preventDefault()
     if (!this.isOpen) return
 
-    this.panelTarget.hidden = true
-    this.panelTarget.classList.remove(OPEN)
-    document.body.classList.remove(LOCK)
-    this.mark(-1)
-
+    this.conceal()
     this.row?.querySelector("[data-tm-place]")?.focus()
     this.row = null
   }
@@ -119,10 +70,6 @@ export default class extends Controller {
     this.inputTarget.focus()
   }
 
-  // Writing back is the whole point. The two hidden fields are the wire format
-  // the form already had, so a place picked here saves exactly as a place typed
-  // in by hand does, and the rest is what the row shows and where the next row
-  // starts from.
   choose(event) {
     event.preventDefault()
     if (!this.row) return
@@ -168,41 +115,11 @@ export default class extends Controller {
     this.inputTarget.placeholder = this.label ? `Search inside ${first(this.label)}…` : "Pick a country…"
     if (this.hasBackTarget) this.backTarget.hidden = !this.parent
 
-    frame.setAttribute("src", url.pathname + url.search)
+    this.swap(frame, url.pathname + url.search)
   }
 
-  mark(position) {
-    const items = this.visible
-    this.index = items.length === 0 ? -1 : Math.max(0, Math.min(position, items.length - 1))
-
-    this.itemTargets.forEach((item) => {
-      item.classList.remove(MARKED)
-      item.setAttribute("aria-selected", "false")
-    })
-
-    const current = items[this.index]
-    if (!current) return
-
-    current.classList.add(MARKED)
-    current.setAttribute("aria-selected", "true")
-    current.scrollIntoView({ block: "nearest" })
-  }
-
-  move(step) {
-    const items = this.visible
-    if (items.length === 0) return
-
-    this.mark((this.index + step + items.length) % items.length)
-  }
-
-  key(event) {
-    if (!this.isOpen) return
-
+  keyed(event) {
     switch (event.key) {
-      case "Escape":
-        event.preventDefault()
-        this.close()
-        break
       case "ArrowLeft":
         if (!this.parent || this.inputTarget.selectionStart > 0) return
         event.preventDefault()
@@ -214,21 +131,6 @@ export default class extends Controller {
         if (!open) return
         event.preventDefault()
         open.click()
-        break
-      }
-      case "ArrowDown":
-        event.preventDefault()
-        this.move(1)
-        break
-      case "ArrowUp":
-        event.preventDefault()
-        this.move(-1)
-        break
-      case "Enter": {
-        const current = this.visible[this.index]
-        if (!current) return
-        event.preventDefault()
-        current.click()
         break
       }
     }

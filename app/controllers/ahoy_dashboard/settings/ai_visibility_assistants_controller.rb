@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class AiVisibilityAssistantsController < AhoyDashboard::BaseController
+    class AiVisibilityAssistantsController < AhoyDashboard::Settings::BaseController
       requires_installed :ai_visibility
 
       before_action :set_name
@@ -15,10 +15,7 @@ module AhoyDashboard
 
         AhoyDashboard::AiVisibility::Assistants::SaveCommand.call(form: @form) do
           on(:ok) { redirect_to edit_settings_ai_visibility_path, notice: "#{@form.label} saved." }
-          on(:invalid) do |form|
-            @form = form
-            render :edit, status: :unprocessable_entity
-          end
+          on(:invalid) { |form| rejected(form) }
         end
       end
 
@@ -31,7 +28,7 @@ module AhoyDashboard
 
       def set_secret
         @secret = AhoyDashboard::Settings::StoredSecretPresenter.ai_visibility(@name)
-        @removing = @secret if @secret.stored? && params[:remove] == @secret.key.to_s
+        @removing = @secret if @secret.removing?(params[:remove])
       end
 
       def record

@@ -1,13 +1,10 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::SerpKeyword do
   let(:site) { create(:dash_serp_site) }
 
   def tracked(**attributes)
-    keyword = create(:dash_serp_keyword, **attributes)
-    create(:dash_serp_keyword_target, keyword: keyword, site: site)
-    keyword
+    create(:dash_serp_keyword, :tracked, site: site, **attributes)
   end
 
   describe "tags" do
@@ -94,6 +91,20 @@ RSpec.describe AhoyDashboard::SerpKeyword do
 
     expect { create(:dash_serp_keyword, query: "visiting hours") }
       .to raise_error(ActiveRecord::RecordNotUnique)
+  end
+
+  it "refuses a second copy of the same search that differs only by capitals" do
+    create(:dash_serp_keyword, query: "Visiting Hours")
+
+    expect { create(:dash_serp_keyword, query: "visiting hours") }
+      .to raise_error(ActiveRecord::RecordNotUnique)
+  end
+
+  it "still tracks the same words on another device" do
+    create(:dash_serp_keyword, query: "Visiting Hours", device: "desktop")
+
+    expect { create(:dash_serp_keyword, query: "visiting hours", device: "mobile") }
+      .to change(described_class, :count).by(1)
   end
 
   describe ".due" do

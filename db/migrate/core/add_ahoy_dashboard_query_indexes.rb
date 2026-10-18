@@ -27,8 +27,6 @@ class AddAhoyDashboardQueryIndexes < ActiveRecord::Migration[6.0]
       named = existing.find { |index| index.name == definition[:name] }
       check_definition!(named, definition) if named
 
-      # A failed concurrent build leaves its name occupied by an invalid index.
-      # Only clean up our own matching name; another index may belong to the host.
       if named && !valid_index?(named)
         remove_index definition[:table], name: named.name, algorithm: :concurrently
       end
@@ -78,9 +76,6 @@ class AddAhoyDashboardQueryIndexes < ActiveRecord::Migration[6.0]
     select_value("SELECT i.indnkeyatts = i.indnatts FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE i.indrelid = #{quote(index.table)}::regclass AND c.relname = #{quote(index.name)}")
   end
 
-  # PostgreSQL adds parentheses and a text cast to the JSON key when reporting
-  # predicates. Normalize those decorations outside quoted tokens only: crawler
-  # and Crawler are different keys, as are case-sensitive quoted identifiers.
   def predicate(value)
     value.to_s.split(/('(?:[^']|'')*'|"(?:[^"]|"")*")/).map do |token|
       if token.start_with?("'")

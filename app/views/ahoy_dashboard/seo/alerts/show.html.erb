@@ -5,9 +5,7 @@
         controls: dash_button_to("Check now", @presenter.run_path, reason: @presenter.run_reason, method: :post) %>
 
   <% if (notice = @presenter.notice) %>
-    <%= dash_card class: "seo-notice-card" do %>
-      <%= dash_empty compact: true, **notice %>
-    <% end %>
+    <%= dash_empty_card card_class: "seo-notice-card", compact: true, **notice %>
   <% end %>
 
   <% if (sample = @presenter.sample_notice) %>
@@ -45,7 +43,7 @@
           <% @presenter.events.each do |event| %>
             <tr>
               <td class="small text-body-secondary"><%= @presenter.when_label(event.fired_at) %></td>
-              <td><%= dash_badge event.severity.capitalize, tone: @presenter.severity_tone(event.severity.to_sym) %></td>
+              <td><%= dash_badge event.severity_label, tone: event.severity_tone %></td>
               <td>
                 <div class="t-main"><%= seo_label(event.headline) %></div>
                 <% if @presenter.sample_data?(event) %>
@@ -56,13 +54,8 @@
               <td class="small text-body-secondary"><%= seo_label(event.rule.name) %></td>
               <% if sent %>
                 <td>
-                  <% if event.delivered? %>
-                    <%= dash_badge "Sent", tone: :success %>
-                  <% elsif event.delivery_error.present? %>
-                    <%= dash_badge "Failed", tone: :danger, title: event.delivery_error %>
-                  <% else %>
-                    <%= dash_badge "Not sent" %>
-                  <% end %>
+                  <%= dash_badge event.sent_label, tone: event.sent_tone,
+                        title: (event.delivery_error if event.delivery == :failed) %>
                 </td>
               <% end %>
             </tr>
@@ -78,11 +71,11 @@
       <%= dash_card_footer do %><%= @presenter.subject_note %><% end %>
     <% else %>
       <%= dash_empty compact: true, title: "No alerts in this range",
-            hint: @presenter.enabled? && @presenter.rules.any?(&:enabled) ? "Nothing crossed a rule's threshold." : "Alerts show here once a rule is on and something crosses its threshold." %>
+            hint: @presenter.enabled? && @presenter.live.any? ? "Nothing crossed a rule's threshold." : "Alerts show here once a rule is on and something crosses its threshold." %>
     <% end %>
   <% end %>
 
-  <% live = @presenter.rules.select(&:enabled) %>
+  <% live = @presenter.live %>
   <%= dash_card class: "mt-3" do %>
     <%= dash_card_header "Rules that are on" do %>
       <span class="g-hint"><%= live.size %> of <%= @presenter.rules.size %></span>
@@ -105,9 +98,7 @@
             <tr>
               <td>
                 <div class="t-main">
-                  <%= link_to @presenter.edit_rule_path(rule), class: "seo-link min-w-0", data: { tm_frame: "_top" } do %>
-                    <%= seo_label(rule.name) %>
-                  <% end %>
+                  <%= seo_link(rule.name, @presenter.edit_rule_path(rule)) %>
                 </div>
               </td>
               <td class="text-body-secondary"><%= @presenter.condition_for(rule) %></td>

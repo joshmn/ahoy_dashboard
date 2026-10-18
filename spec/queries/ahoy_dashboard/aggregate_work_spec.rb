@@ -1,35 +1,16 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Ahoy dashboard aggregate work" do
   let(:range) { dash_day_range(2026, 8, 10) }
   let(:scope) { dash_scope(range: range) }
 
-  def analytics_sql
-    statements = []
-    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
-      next if payload[:name].in?([ "SCHEMA", "TRANSACTION" ]) || payload[:cached]
-      next unless payload[:sql].match?(/\b(?:FROM|JOIN)\s+"?ahoy_(?:visits|events)\b/i)
-
-      statements << payload[:sql]
-    end
-    ActiveRecord::Base.uncached { yield }
-    statements
-  ensure
-    ActiveSupport::Notifications.unsubscribe(subscriber)
-  end
-
   before do
-    # One session crosses midnight; both of its pages and its final event still
-    # belong to the visit that started on the tenth.
-    long = dash_visit(started_at: dash_time(2026, 8, 10, 23, 55), visitor: "returning", country: "US")
-    dash_page_view(long, path: "/a")
+    long = dash_landing("/a", at: dash_time(2026, 8, 10, 23, 55), visitor: "returning", country: "US")
     dash_page_view(long, path: "/b", at: dash_time(2026, 8, 11, 0, 5))
     dash_goal(long, AhoyDashboard::ENGAGEMENT, path: "/a", scroll_depth: 40,
               engagement_time: 30, at: dash_time(2026, 8, 11, 0, 6))
 
-    bounced = dash_visit(started_at: dash_time(2026, 8, 10, 9), visitor: "returning", country: "US")
-    dash_page_view(bounced, path: "/a")
+    dash_landing("/a", at: dash_time(2026, 8, 10, 9), visitor: "returning", country: "US")
 
     unbrowsed = dash_visit(started_at: dash_time(2026, 8, 10, 10), visitor: "searcher", country: nil)
     dash_goal(unbrowsed, "site_searched")
@@ -38,15 +19,13 @@ RSpec.describe "Ahoy dashboard aggregate work" do
     dash_page_view(bot, path: "/a", crawler: "GPTBot")
     dash_visit(started_at: dash_time(2026, 8, 10, 12), visitor: "no events", country: "CA")
 
-    anonymous = dash_visit(started_at: dash_time(2026, 8, 10, 13), visitor_token: nil, country: "GB")
-    dash_page_view(anonymous, path: "/anonymous")
+    dash_landing("/anonymous", at: dash_time(2026, 8, 10, 13), visitor_token: nil, country: "GB")
 
-    previous = dash_visit(started_at: dash_time(2026, 8, 9, 9), visitor: "previous")
-    dash_page_view(previous, path: "/a")
+    dash_landing("/a", at: dash_time(2026, 8, 9, 9), visitor: "previous")
   end
 
   describe "selected top stats" do
-    it "matches the full strip exactly, including comparisons, under each scope variant" do
+    it "matches the full strip exactly, including comparisons, under each scope variant", :equivalence do
       comparison = dash_scope(range: dash_day_range(2026, 8, 9))
       variants = [
         scope,
@@ -111,7 +90,7 @@ RSpec.describe "Ahoy dashboard aggregate work" do
       end
       expect(statements.size).to eq(3)
 
-      AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "site_searched", display_name: "Searched")
+      create(:dash_goal, event_name: "site_searched", display_name: "Searched")
       converted = Ahoy::Visit.where(visitor_token: "returning").order(:started_at).last
       dash_goal(converted, "site_searched", at: dash_time(2026, 8, 11, 0, 7))
       goal_filtered = dash_scope(range: range, filters: dash_filters([ "goal", "is", "Searched" ]))
@@ -134,6 +113,36 @@ RSpec.describe "Ahoy dashboard aggregate work" do
       end
     end
 
+    it "reads views per visit off the session pass with the numbers the two separate counts gave", :equivalence do
+      create(:dash_goal, event_name: "site_searched", display_name: "Searched")
+      wide = dash_day_range(2026, 8, 9).begin..dash_time(2026, 8, 11).end_of_day
+      variants = [
+        dash_scope(range: wide),
+        dash_scope(range: wide, include_crawlers: true),
+        dash_scope(range: wide, filters: dash_filters([ "country", "is", "US" ])),
+        dash_scope(range: wide, filters: dash_filters([ "goal", "is", "Searched" ])),
+        dash_scope(range: wide, filters: dash_filters([ "exit_page", "is", "/b" ])),
+        dash_scope(range: range)
+      ]
+
+      variants.product(%i[day hour]).each do |current, interval|
+        bucket = AhoyDashboard::Sql::Buckets.sql(AhoyDashboard::TimeseriesQuery::VISIT_START, interval)
+        views = AhoyDashboard::Sql::Buckets.fill(current.pageviews.group(bucket).count, current.range, interval)
+        visits = AhoyDashboard::Sql::Buckets.fill(current.visits.group(bucket).count, current.range, interval)
+        expected = visits.map do |time, count|
+          [ time, count.zero? ? 0.0 : (views[time].to_f / count).round(2) ]
+        end
+        actual = nil
+
+        statements = analytics_sql do
+          actual = AhoyDashboard::TimeseriesQuery.call(scope: current, metric: "views_per_visit", interval: interval)
+        end
+
+        expect(actual).to eq(expected), "#{current.filters.to_a.map(&:dimension).map(&:key)} #{interval}"
+        expect(statements.size).to eq(1)
+      end
+    end
+
     it "retains full-session ratios under a page filter and fills empty buckets" do
       filtered = dash_scope(
         range: range.begin..dash_time(2026, 8, 11).end_of_day,
@@ -148,9 +157,8 @@ RSpec.describe "Ahoy dashboard aggregate work" do
   end
 
   describe "headline stats with a chart" do
-    it "preserves every metric, bucket, comparison and filter independently of the shared scan" do
-      returning = dash_visit(started_at: dash_time(2026, 8, 9, 15), visitor: "returning")
-      dash_page_view(returning, path: "/a")
+    it "preserves every metric, bucket, comparison and filter independently of the shared scan", :equivalence do
+      dash_landing("/a", at: dash_time(2026, 8, 9, 15), visitor: "returning")
       wide = dash_day_range(2026, 8, 9).begin..range.end
       variants = [
         dash_scope(range: wide),
@@ -176,7 +184,7 @@ RSpec.describe "Ahoy dashboard aggregate work" do
     end
 
     it "shares the total and buckets and only scans engagement separately" do
-      %w[visitors views_per_visit bounce_rate visit_duration].each do |metric|
+      %w[visitors visits views_per_visit bounce_rate visit_duration].each do |metric|
         statements = analytics_sql do
           AhoyDashboard::TopStatsQuery.with_series(scope: scope, metric: metric)
         end
@@ -187,7 +195,7 @@ RSpec.describe "Ahoy dashboard aggregate work" do
     end
 
     it "retains separate event-time and filtered-page calculations" do
-      %w[visits pageviews scroll_depth].each do |metric|
+      %w[pageviews scroll_depth].each do |metric|
         statements = analytics_sql { AhoyDashboard::TopStatsQuery.with_series(scope: scope, metric: metric) }
         expect(statements.size).to eq(3), metric
       end
@@ -214,9 +222,8 @@ RSpec.describe "Ahoy dashboard aggregate work" do
   end
 
   describe "count series with range totals" do
-    it "matches the separate reads for each count metric, range, filter, and bucket size" do
-      returning = dash_visit(started_at: dash_time(2026, 8, 9, 15), visitor: "returning")
-      dash_page_view(returning, path: "/a")
+    it "matches the separate reads for each count metric, range, filter, and bucket size", :equivalence do
+      dash_landing("/a", at: dash_time(2026, 8, 9, 15), visitor: "returning")
       wide = dash_day_range(2026, 8, 9).begin..range.end
       variants = [
         dash_scope(range: wide),
@@ -250,12 +257,12 @@ RSpec.describe "Ahoy dashboard aggregate work" do
   end
 
   describe "breakdown projections and session facts" do
-    it "counts all matching groups in the paged aggregate without changing the answer" do
+    it "counts all matching groups in the paged aggregate without changing the answer", :equivalence do
       variants = [ scope, dash_scope(range: range, include_crawlers: true) ]
       variants.product(%w[country page exit_page], [ %w[visitors], %w[pageviews bounce_rate visit_duration] ], [ nil, 1, 2 ], [ 0, 1 ]).each do |current, key, metrics, limit, offset|
         options = { scope: current, dimension: AhoyDashboard::Dimension.find(key), metrics: metrics, limit: limit, offset: offset }
         expected = AhoyDashboard::BreakdownQuery.call(**options)
-        expected_count = AhoyDashboard::BreakdownQuery.row_count(scope: current, dimension: options[:dimension])
+        expected_count = AhoyDashboard::BreakdownQuery.call(scope: current, dimension: options[:dimension], limit: nil).rows.size
         actual = AhoyDashboard::BreakdownQuery.with_row_count(**options)
 
         expect(actual.result).to eq(expected)
@@ -265,7 +272,7 @@ RSpec.describe "Ahoy dashboard aggregate work" do
       dimension = AhoyDashboard::Dimension.find("page")
       [ "ahoy_events.properties ->> 'path' = '/a'", "false" ].each do |search|
         actual = AhoyDashboard::BreakdownQuery.with_row_count(scope: scope, dimension: dimension, search: search)
-        expect(actual.row_count).to eq(AhoyDashboard::BreakdownQuery.row_count(scope: scope, dimension: dimension, search: search))
+        expect(actual.row_count).to eq(AhoyDashboard::BreakdownQuery.call(scope: scope, dimension: dimension, search: search, limit: nil).rows.size)
       end
     end
 
@@ -278,7 +285,6 @@ RSpec.describe "Ahoy dashboard aggregate work" do
         expect(actual.row_count).to eq(3)
       end
 
-      # One paged aggregate and the existing whole-scope visitor denominator.
       expect(statements.size).to eq(2)
       expect(statements.count { |sql| sql.include?("count(*) over ()") }).to eq(1)
       expect(statements.none? { |sql| sql.include?("tm_groups") }).to be(true)
@@ -351,13 +357,15 @@ RSpec.describe "Ahoy dashboard aggregate work" do
       dash_goal(visit, AhoyDashboard::SCROLL_MILESTONE, path: nil, depth: 50)
       dimension = AhoyDashboard::Dimension.find("page")
       values = [ "/a", "/milestone-only", nil, "/missing" ]
-      expected = AhoyDashboard::EngagementQuery.call(scope: scope, dimension: dimension, values: values)
-        .transform_values(&:metrics)
+      expected = {
+        "/a" => { "scroll_depth" => 40.0, "engagement_time" => 30 },
+        "/milestone-only" => { "scroll_depth" => 0.0, "engagement_time" => 0 },
+        nil => { "scroll_depth" => 0.0, "engagement_time" => 0 }
+      }
 
       statements = analytics_sql do
-        actual = AhoyDashboard::EngagementQuery.call(
-          scope: scope, dimension: dimension, values: values, include_milestones: false
-        ).transform_values(&:metrics)
+        actual = AhoyDashboard::EngagementQuery.call(scope: scope, dimension: dimension, values: values)
+          .transform_values(&:metrics)
 
         expect(actual).to eq(expected)
         expected.each_key { |key| expect(actual.fetch(key).to_json).to eq(expected.fetch(key).to_json) }

@@ -4,15 +4,11 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter %>
 
   <% if !@presenter.any? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.rank_empty %>
-    <% end %>
+    <%= dash_empty_card **@presenter.rank_empty %>
   <% else %>
     <% unless @presenter.comparable? %>
-      <%= dash_card class: "seo-notice-card" do %>
-        <%= dash_empty compact: true, title: "Only one reading in this range",
-              hint: "Changes need at least two checks. Try a longer date range." %>
-      <% end %>
+      <%= dash_empty_card card_class: "seo-notice-card", compact: true, title: "Only one reading in this range",
+            hint: "Changes need at least two checks. Try a longer date range." %>
     <% end %>
 
     <%= dash_card class: "seo-moves" do %>
@@ -42,14 +38,7 @@
 
     <% @presenter.groups.each do |group| %>
       <%= dash_card element: :section, class: "mt-3 seo-group", id: @presenter.anchor(group.key) do %>
-        <% group_title = capture do %>
-            <%= group.title %>
-            <%= dash_badge group.rows.size, tone: group.tone, class: "seo-count" %>
-        <% end %>
-        <%= dash_card_header group_title, title_class: "seo-group-title" do %>
-          <span class="g-hint"><%= group.note %></span>
-          <%= seo_csv(@presenter, group.key) %>
-        <% end %>
+        <%= seo_group_header(@presenter, group) %>
 
         <%= dash_table label: group.title, cols: @presenter.table_cols do %>
           <thead>
@@ -75,7 +64,7 @@
                 <td>
                   <%= render "ahoy_dashboard/seo/shared/change", kind: @presenter.change_kind(row), amount: row.change&.abs %>
                 </td>
-                <td><%= seo_page_link(@presenter.path_of(row.url)) %></td>
+                <td><%= seo_page_link(row.url) %></td>
                 <% if @presenter.windows? %>
                   <td class="small text-body-secondary"><%= @presenter.window(row) %></td>
                 <% end %>
@@ -88,14 +77,7 @@
 
     <% if @presenter.unranked.any? %>
       <%= dash_card element: :section, class: "mt-3 seo-group", id: @presenter.anchor(:unranked) do %>
-        <% unranked_title = capture do %>
-            Not ranking
-            <%= dash_badge @presenter.unranked.size, class: "seo-count" %>
-        <% end %>
-        <%= dash_card_header unranked_title, title_class: "seo-group-title" do %>
-          <span class="g-hint">Nowhere at either end of the range.</span>
-          <%= seo_csv(@presenter, "unranked") %>
-        <% end %>
+        <%= seo_group_header(@presenter, @presenter.unranked_group) %>
 
         <div class="seo-chips">
           <% @presenter.unranked.each do |row| %>

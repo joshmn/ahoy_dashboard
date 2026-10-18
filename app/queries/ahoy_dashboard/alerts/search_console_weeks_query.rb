@@ -33,7 +33,7 @@ module AhoyDashboard
         @rows ||= AhoyDashboard::SearchConsoleTotal
           .where(date: (last - (DAYS * 2 - 1))..last)
           .group(:date)
-          .pluck(:date, Arel.sql("sum(clicks)"), Arel.sql("sum(impressions)"))
+          .pluck(:date, SearchConsole::Sums::CLICKS, SearchConsole::Sums::IMPRESSIONS)
           .index_by(&:first)
       end
 

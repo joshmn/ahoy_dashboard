@@ -6,9 +6,6 @@ module AhoyDashboard
         @form = form
       end
 
-      # A savepoint rather than a joined transaction, because the old steps are
-      # deleted before the new ones are known to be good. Without one, a rename the
-      # record refuses would leave the funnel with no steps at all.
       def call
         return broadcast(:invalid, form) if form.invalid?
 
@@ -20,34 +17,21 @@ module AhoyDashboard
 
         broadcast(:ok, funnel)
       rescue ActiveRecord::RecordInvalid
-        copy_errors
+        broadcast(:invalid, form.copy_errors_from(funnel))
       rescue ActiveRecord::RecordNotUnique
-        form.errors.add(:base, AhoyDashboard::FunnelForm::DUPLICATE_MESSAGE)
-        broadcast(:duplicate, form)
+        form.add_duplicate_error
+        broadcast(:invalid, form)
       end
 
       private
 
       attr_reader :funnel, :form
 
-      # The submitted list is the whole truth about the steps, so the old rows go
-      # and the new ones are numbered from one. Left alone when the goals and their
-      # order have not moved, so renaming a funnel does not churn its steps.
       def replace_steps
         return if funnel.funnel_steps.map(&:goal_id) == form.goal_ids
 
         funnel.funnel_steps.destroy_all
-        form.goal_ids.each_with_index do |goal_id, index|
-          funnel.funnel_steps.build(goal_id: goal_id, position: index + 1)
-        end
-      end
-
-      def copy_errors
-        funnel.errors.messages.each do |attribute, messages|
-          messages.each { |message| form.errors.add(attribute, message) }
-        end
-
-        broadcast(:invalid, form)
+        funnel.funnel_steps.build(form.step_attributes)
       end
     end
   end

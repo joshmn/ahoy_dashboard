@@ -1,6 +1,3 @@
-<%# The whole row is the link to that query's history, so the box cannot live
-    inside it. A trackable line is the box beside the row instead of a cell in
-    it, and the header spacer in _columns keeps the counts lined up. %>
 <% body = capture do %>
   <% if row.keyword_path %>
     <%= link_to row.keyword_path, class: "data-row", title: row.title, data: { tm_frame: "_top" } do %>

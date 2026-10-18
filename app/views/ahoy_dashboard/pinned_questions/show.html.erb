@@ -1,6 +1,3 @@
-<%# Nothing at all when nothing is pinned. The design hides the whole section
-    rather than showing an empty one, and a heading over no cards is a heading
-    for nothing. %>
 <%= dash_frame_tag AhoyDashboard::PinnedQuestionsController::FRAME do %>
   <%= render "ahoy_dashboard/pinned_questions/cards", cards: @cards %>
 <% end %>

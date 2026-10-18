@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Dashboards::SnapshotPanelPayload do
   let(:now) { Time.utc(2026, 8, 11, 14, 30) }
@@ -17,8 +16,7 @@ RSpec.describe AhoyDashboard::Dashboards::SnapshotPanelPayload do
   around { |example| travel_to(now) { example.run } }
 
   before do
-    visit = dash_visit(started_at: now - 1.day, visitor: "reader")
-    dash_page_view(visit, path: "/original")
+    dash_landing("/original", at: now - 1.day, visitor: "reader")
   end
 
   def load(section, id: nil)
@@ -30,7 +28,7 @@ RSpec.describe AhoyDashboard::Dashboards::SnapshotPanelPayload do
   end
 
   it "retains only the selected report" do
-    expect(load(:report, id: "pages").reports).to eq(reading.reports.select { |item| item.fetch(:report).key == "pages" })
+    expect(load(:report, id: "pages").reports).to eq(reading.reports.select { |item| item.report.key == "pages" })
   end
 
   it "retains only the selected funnel" do

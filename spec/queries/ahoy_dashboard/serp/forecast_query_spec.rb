@@ -7,10 +7,8 @@ RSpec.describe AhoyDashboard::Serp::ForecastQuery do
   before { allow(AhoyDashboard::Serp).to receive(:enabled?).and_return(true) }
 
   def keyword(frequency: :daily, last: nil, locations: [ "us" ], pages: 1, enabled: true)
-    record = create(:dash_serp_keyword, frequency: frequency, last_checked_at: last, locations: locations,
-                                        pages: pages, enabled: enabled)
-    create(:dash_serp_keyword_target, keyword: record)
-    record
+    create(:dash_serp_keyword, :tracked, frequency: frequency, last_checked_at: last, locations: locations,
+                                         pages: pages, enabled: enabled)
   end
 
   def call(name: :serpapi)
@@ -76,10 +74,6 @@ RSpec.describe AhoyDashboard::Serp::ForecastQuery do
     keyword(last: now, locations: %w[us gb])
 
     expect(call.searches).to eq(20)
-  end
-
-  it "says how many days of the month are left" do
-    expect(call.days_left).to eq(11)
   end
 
   it "leaves backlinks out when they run through another provider" do

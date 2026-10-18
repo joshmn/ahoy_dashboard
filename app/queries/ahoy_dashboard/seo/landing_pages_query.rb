@@ -1,15 +1,19 @@
 module AhoyDashboard
   module Seo
     class LandingPagesQuery
-      Held = Data.define(:keyword, :query, :location, :position) do
-        def place
-          Serp::Location.parse(location)
+      Held = Data.define(:keyword, :location, :position) do
+        include Serp::Placed
+
+        def query
+          keyword.query
         end
       end
 
-      Gone = Data.define(:keyword, :query, :location, :was, :now_url, :now_position) do
-        def place
-          Serp::Location.parse(location)
+      Gone = Data.define(:keyword, :location, :was, :now_url, :now_position) do
+        include Serp::Placed
+
+        def query
+          keyword.query
         end
 
         def ranked_elsewhere?
@@ -27,11 +31,7 @@ module AhoyDashboard
         end
 
         def median
-          positions = held.map(&:position).sort
-          middle = positions.size / 2
-          return positions[middle] if positions.size.odd?
-
-          ((positions[middle - 1] + positions[middle]) / 2.0).round(1)
+          Serp::Median.of(held.map(&:position))
         end
       end
 
@@ -80,14 +80,12 @@ module AhoyDashboard
       attr_reader :site, :range, :tag
 
       def checks
-        AhoyDashboard::SerpCheck
-          .where(site_id: site.id, status: AhoyDashboard::SerpCheck.statuses[:success])
-          .in_range(range).for_tag(tag)
+        AhoyDashboard::SerpCheck.success.where(site_id: site.id)
+          .in_range(range).for_tag(tag).at_current_places
       end
 
       def latest
-        @latest ||= checks.select("DISTINCT ON (keyword_id, location) ahoy_dashboard_serp_checks.*")
-          .reorder(:keyword_id, :location, checked_at: :desc, id: :desc).includes(:keyword)
+        @latest ||= checks.latest_per_search.includes(:keyword)
           .each_with_object({}) { |check, found| found[[check.keyword_id, check.location]] = check }
       end
 
@@ -111,7 +109,7 @@ module AhoyDashboard
         @pages ||= latest.values.select { |check| holding?(check) }.group_by(&:url).map do |url, checks|
           points = checks.sum { |check| CtrCurve.at(check.position) }
           held = checks.map do |check|
-            Held.new(keyword: check.keyword, query: check.keyword.query, location: check.location, position: check.position)
+            Held.new(keyword: check.keyword, location: check.location, position: check.position)
           end
 
           Page.new(url: url, held: held.sort_by { |row| [ row.position, row.query ] }, points: points,
@@ -125,7 +123,7 @@ module AhoyDashboard
             location = was.location
             now = latest[[ was.keyword_id, location ]]
 
-            Gone.new(keyword: was.keyword, query: was.keyword.query, location: location, was: was.position,
+            Gone.new(keyword: was.keyword, location: location, was: was.position,
                      now_url: (now.url if holding?(now)), now_position: (now.position if holding?(now)))
           end
 

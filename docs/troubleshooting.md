@@ -24,6 +24,7 @@ Find what you're seeing in the left column. Each feature's own page has more.
 | "Turn on" on Settings, Features is disabled | The feature isn't installed, and a feature without tables can't be switched on | Install it first. See [Adding a feature later](installation.md#adding-a-feature-later). |
 | A feature says Needs setup on Settings, Features | It's on, but something it needs is missing, like a key, a provider, a host, a prompt or a rule. Only the first missing thing is shown. | Click "Set it up" beside it, fix that, and come back to see if anything else is missing |
 | The generator stops with `this app ran an older ahoy_dashboard but is missing some of its migrations: ...` | The app ran an older version and some of the migrations it copied back then are gone from `db/migrate` | Copy the named files from the version you had, run them, then run the generator again. See [Upgrading](installation.md#upgrading). |
+| A migration stops with `Tracked keywords differ only by capitals` | Two tracked keywords are the same search apart from capitals, like "Best CRM" and "best crm", so the same results were being bought twice. The message lists their IDs. | Keep one of each on Settings, Rank tracking, delete the rest, then migrate again |
 | The generator says `separate features with commas, not spaces` | `--only` or `--skip` got a list with spaces | Use `--only serp,alerts` |
 | `NameError` at boot, naming your mailer | `alerts[:parent_mailer]` names a class that doesn't exist | Fix the name |
 | The page loads with no styles and nothing clicks | The stylesheet or script didn't load: a bad `assets_root`, a Content Security Policy blocking it, or a proxy stripping the session cookie | Open `<mount>/assets/<build>/ahoy_dashboard.css` while signed in and see what comes back. See [Content Security Policy](security-and-privacy.md#content-security-policy). |
@@ -62,7 +63,7 @@ Find what you're seeing in the left column. Each feature's own page has more.
 | "That did not come back from a sign-in this browser started." | The callback landed on a different hostname or browser than the one that started | Connect from the same address the redirect URI uses |
 | Reconnecting every 7 days | The Google Cloud consent screen is still on Testing | Set it to In production |
 | The newest 3 days are missing | Google finalizes days 3 days late. Only the Google search card shows unfinished days. | Nothing |
-| The card and Performance disagree on a query | They read different tables | See [Why the numbers don't add up](search-console.md#why-the-numbers-dont-add-up) |
+| The card and Performance disagree on a query | They can cover different days | See [Why the numbers don't add up](search-console.md#why-the-numbers-dont-add-up) |
 | A gap of missing days in the middle | An outage longer than 7 days. The nightly job only re-reads the last week. | "Fill these days" on Settings, Search Console. See [Fill missing days](search-console.md#fill-missing-days). |
 | A device or a country adds up to less than All devices or All countries | Rows synced before device and country were pulled read as Unknown, and Google hides more queries the finer you cut | Nothing. See [Device and country](search-console.md#device-and-country). |
 
@@ -85,8 +86,10 @@ More in [When it stops syncing](search-console.md#when-it-stops-syncing).
 | You see | Why | Fix |
 |---|---|---|
 | "The assistant is off. Turn it on under Settings, Features." | The assistant is switched off | Turn it on under Settings, Features. If it's on and Ask still won't answer, the notice says why. |
-| "That answer did not come back. Ask the question again." | The provider refused or failed | Check the log for `dashboard assistant failed:` |
+| "That answer did not come back. Ask the question again." | The provider refused or failed | Check Last error on Settings, Assistant, or the log for `dashboard assistant failed:`. See [When it doesn't answer](assistant.md#when-it-doesnt-answer). |
 | "Reading the data" forever | Nothing works the `default` queue | Run a worker on `default` |
+| Last error on DeepSeek says "402 from the model: the account is out of credit" | The DeepSeek balance is empty | Top it up at DeepSeek. The dashboard doesn't retry a 402. |
+| Last error on DeepSeek mentions `reasoning_content` | DeepSeek refused the empty reasoning sent in place of one it didn't write, usually in a conversation another reader started | Start a new conversation. See [DeepSeek](assistant.md#deepseek). |
 | The key saved on Settings, Assistant isn't used | The provider isn't marked "Use this one" | See [Which settings win](assistant.md#which-settings-win) |
 | Search Console and ranking answers ignore the conversation's filters | Those rows have no visitor attached, so there's nothing to filter | Nothing. The answer says it wasn't filtered. See [Filters](assistant.md#filters). |
 

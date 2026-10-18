@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp::KeywordLookupQuery do
   it "finds a keyword by its id" do

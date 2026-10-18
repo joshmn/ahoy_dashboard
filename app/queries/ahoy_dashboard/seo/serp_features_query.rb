@@ -1,16 +1,13 @@
 module AhoyDashboard
   module Seo
-    # What is on the results page besides the results, per search, plus the two
-    # pools worth having across all of them: the questions Google decided also
-    # get asked, and the searches it suggests next.
-    #
-    # This costs nothing. It reads the stored copy of readings that were already
-    # paid for. What it cannot do is see further back than the trim: a payload
-    # stored before a key was worth keeping does not have it, so the page counts
-    # what it could read rather than pretending the rest were absent.
     class SerpFeaturesQuery
-      Row = Data.define(:keyword, :query, :location, :checked_at, :features, :questions,
-                        :searches, :readable) do
+      Row = Data.define(:keyword, :location, :checked_at, :features, :questions, :searches, :readable) do
+        include Serp::Placed
+
+        def query
+          keyword.query
+        end
+
         def readable?
           readable
         end
@@ -29,10 +26,6 @@ module AhoyDashboard
 
         def keys
           features.map(&:key)
-        end
-
-        def place
-          Serp::Location.parse(location)
         end
       end
 
@@ -66,8 +59,6 @@ module AhoyDashboard
           end.select { |value| value }
         end
 
-        # Slots on page one with somebody's name on them. Ours against theirs is
-        # the whole reason to look at a feature list rather than a feature count.
         def ours(key)
           return 0 if site.nil?
 
@@ -116,38 +107,30 @@ module AhoyDashboard
 
       def rows
         @rows ||= runs.map do |run|
-          keyword = keywords[run.keyword_id]
-          next if keyword.nil?
-
           payload = payloads[run.id]
-          features, questions, searches = SerpFeatures.from(payload)
+          reading = SerpFeatures.from(payload)
 
-          Row.new(keyword: keyword, query: keyword.query, location: run.location,
-                  checked_at: run.checked_at, features: features, questions: questions,
-                  searches: searches, readable: payload.present?)
-        end.select { |value| value }
+          Row.new(keyword: run.keyword, location: run.location, checked_at: run.checked_at,
+                  features: reading.features, questions: reading.questions, searches: reading.searches,
+                  readable: payload.present?)
+        end
       end
 
-      # One reading per search and place, the most recent in the range. A feature
-      # comes and goes on the same search within a week, so counting every
-      # reading would report how often something was polled rather than how much
-      # of the page it holds.
       def runs
         @runs ||= AhoyDashboard::SerpRun.usable
           .where(checked_at: range)
           .for_tag(tag)
-          .select("distinct on (keyword_id, location) ahoy_dashboard_serp_runs.*")
-          .order(Arel.sql("keyword_id, location, checked_at desc, id desc"))
+          .at_current_places
+          .latest_per_search
+          .includes(:keyword)
           .to_a
       end
 
-      # The stored answer for each of those readings, joined back on. A run that
-      # paged is several rows, and the features live on whichever page carried
-      # them, so they merge rather than the first one winning.
       def payloads
-        @payloads ||= AhoyDashboard::SerpRunPage
-          .where(run_id: runs.map(&:id), status: AhoyDashboard::SerpRunPage.statuses[:success])
+        @payloads ||= AhoyDashboard::SerpRunPage.success
+          .where(run_id: runs.map(&:id))
           .order(:run_id, :page_number)
+          .select(:run_id, :response)
           .each_with_object({}) do |page, found|
             response = SerpFeatures.readable(page.response)
             next if response.blank?
@@ -156,9 +139,6 @@ module AhoyDashboard
           end
       end
 
-      # Every question asked across the whole tracked set, with who is answering
-      # it. This is a content list nobody had to think of: Google is naming the
-      # questions and naming who it currently believes answers them best.
       def pooled(built)
         built.flat_map(&:questions).group_by { |question| question.text.downcase }
           .map do |_key, group|
@@ -173,10 +153,6 @@ module AhoyDashboard
         built.flat_map(&:searches).map(&:downcase).each_with_object(Hash.new(0)) { |value, counts| counts[value] += 1 }
           .map { |text, times| Suggested.new(text: text, times: times) }
           .sort_by { |row| [ -row.times, row.text ] }
-      end
-
-      def keywords
-        @keywords ||= AhoyDashboard::SerpKeyword.where(id: runs.map(&:keyword_id).uniq).index_by(&:id)
       end
     end
   end

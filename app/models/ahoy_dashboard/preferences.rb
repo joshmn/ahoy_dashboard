@@ -2,9 +2,6 @@ module AhoyDashboard
   module Preferences
     INTERNAL_IPS = %w[127.0.0.0/8 ::1/128 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7].freeze
 
-    # DataForSEO publish this on the first of each month and leave the old ones
-    # up. strftime rather than interpolation, so a month is a Date everywhere
-    # and nothing has to zero pad by hand.
     PLACES_SOURCE = "https://cdn.dataforseo.com/v3/locations/locations_serp_google_%Y_%m_01.csv".freeze
 
     Definition = Data.define(:scope, :name, :type, :default, :stored_as) do
@@ -19,6 +16,7 @@ module AhoyDashboard
         when :boolean then ActiveModel::Type::Boolean.new.cast(value) || false
         when :string then value.to_s.strip.presence || default
         when :symbol then value.to_s.strip.presence&.to_sym || default
+        when :integer then value.to_s.strip.match?(/\A[-+]?\d+\z/) ? value.to_i : default
         when :list then Preferences.list(value)
         when :periods then Digests::PERIODS & Preferences.list(value).map { |period| period.downcase.to_sym }
         end
@@ -32,6 +30,10 @@ module AhoyDashboard
       [ :site, :time_zone, :string, "UTC", Setting::TIME_ZONE ],
       [ :site, :precomputed_dashboard, :boolean, false ],
       [ :search_console, :redirect_uri, :string, nil ],
+      [ :search_console, :property, :string, nil, SearchConsole::STORED_PROPERTY_SETTING ],
+      [ :assistant, :withheld, :list, [], Assistant::WITHHELD_KEY ],
+      [ :ai_visibility, :frequency, :string, AiVisibility::DEFAULT_FREQUENCY, AiVisibility::FREQUENCY_KEY ],
+      [ :ai_visibility, :monthly_cap, :integer, AiVisibility::DEFAULT_CAP, AiVisibility::CAP_KEY ],
       [ :keywords, :provider, :symbol, nil ],
       [ :keywords, :location, :string, "us" ],
       [ :keywords, :language, :string, "en" ],

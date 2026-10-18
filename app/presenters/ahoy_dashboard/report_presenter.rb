@@ -1,20 +1,9 @@
 module AhoyDashboard
-  # One report card, or the same card blown up into the details modal. Wraps a
-  # BreakdownQuery::Result so the view only ever asks for a label, a bar width
-  # and a column of numbers.
   class ReportPresenter
-    PATH_DIMENSIONS = %w[page entry_page exit_page].freeze
-    DEVICE_DIMENSIONS = %w[device].freeze
-    COUNTRY_DIMENSIONS = %w[country].freeze
     DETAILS_VIEW = "details".freeze
-    RATE_SUFFIX = "_rate".freeze
+    FRAME_PREFIX = "report_".freeze
+    DETAILS_FRAME_PREFIX = "report_details_".freeze
     PROPERTY_PREFIX = AhoyDashboard::Dimension::PROPERTY_PREFIX
-
-    DEVICE_LABELS = {
-      "desktop" => "Desktop",
-      "mobile" => "Mobile",
-      "tablet" => "Tablet"
-    }.freeze
 
     HEADINGS = {
       "channel" => "Channel", "source" => "Source", "referrer" => "Referrer",
@@ -24,42 +13,13 @@ module AhoyDashboard
       "browser" => "Browser", "os" => "OS", "device" => "Screen size", "goal" => "Goal"
     }.freeze
 
-    SMALLEST_PERCENT = 0.1
-
-    Option = Data.define(:label, :value, :params, :path, :active) do
-      def active?
-        active
-      end
-      def to_ary
-        [ label, value ]
+    class << self
+      def frame_id(report)
+        "#{FRAME_PREFIX}#{report.key}"
       end
 
-      delegate :first, :last, :[], :each, :size, to: :to_ary
-    end
-
-    # A metric the query returned. Most of them are registry metrics; the goals
-    # card answers in keys the registry does not carry (events, conversion
-    # rate), so those format themselves.
-    Column = Data.define(:key, :label, :short, :metric) do
-      # nil is not zero. A goal that carries no money has no revenue, and
-      # printing $0.00 there would claim the conversion earned nothing rather
-      # than that the question does not apply.
-      def format(value)
-        return "" if value.nil?
-        return metric.format(value) if metric
-
-        rate? ? "#{value.to_f.round}%" : ActiveSupport::NumberHelper.number_to_delimited(value.to_i)
-      end
-
-      def compact(value)
-        return "" if value.nil?
-        return metric.compact(value) if metric
-
-        rate? ? "#{value.to_f.round}%" : AhoyDashboard::CompactNumber.call(value)
-      end
-
-      def rate?
-        key.to_s.end_with?(RATE_SUFFIX)
+      def details_frame_id(report)
+        "#{DETAILS_FRAME_PREFIX}#{report.key}"
       end
     end
 
@@ -83,10 +43,6 @@ module AhoyDashboard
         row.metrics || {}
       end
 
-      def unknown?
-        row.value.blank?
-      end
-
       def display_label
         presenter.display_label(row)
       end
@@ -95,19 +51,15 @@ module AhoyDashboard
         presenter.share(row)
       end
 
-      # A different question from #share, and both are on screen at once. The bar
-      # is drawn against the biggest row in the card; this is the row's cut of
-      # everybody, which is the number somebody reads when they hover it.
       def percent
         presenter.percent_of_total(row)
       end
 
-      def metric_values
-        presenter.columns.each_with_object({}) { |column, values| values[column.key] = metric_value(column) }
-      end
+      def metric_value(metric)
+        value = metrics[metric.key]
+        return "" if value.nil?
 
-      def metric_value(column)
-        presenter.details? ? column.format(metrics[column.key]) : column.compact(metrics[column.key])
+        presenter.details? ? metric.format(value) : metric.compact(value)
       end
 
       def raw_values
@@ -135,10 +87,10 @@ module AhoyDashboard
       attr_reader :presenter
     end
 
-    attr_reader :query, :report, :tab, :result, :page, :per_page
+    attr_reader :query, :report, :tab, :result, :page, :per_page, :term
 
     def initialize(query:, result:, report: nil, tab: nil, page: 1, details: false, dimension: nil,
-                   property_keys: nil, per_page: nil)
+                   property_keys: nil, per_page: nil, term: nil)
       @query = query
       @report = report
       @tab = tab
@@ -148,6 +100,7 @@ module AhoyDashboard
       @dimension = dimension
       @property_keys = property_keys && Array(property_keys)
       @per_page = per_page
+      @term = term
     end
 
     def property_keys
@@ -163,11 +116,11 @@ module AhoyDashboard
     end
 
     def frame_id
-      "report_#{report&.key}"
+      self.class.frame_id(report)
     end
 
     def details_frame_id
-      "report_details_#{report&.key}"
+      self.class.details_frame_id(report)
     end
 
     def dimension
@@ -220,24 +173,42 @@ module AhoyDashboard
     end
 
     def columns
-      @columns ||= metric_keys.map { |key| column_for(key) }
+      @columns ||= metric_keys.map { |key| AhoyDashboard::Metric.find(key) }
     end
-    alias_method :metric_columns, :columns
 
     def header_row
       [ label_column, *columns.map(&:label) ]
     end
 
-    def tabs
-      Array(report&.tabs).map do |candidate|
-        params = tab_params(candidate)
+    def csv_rows
+      Enumerator.new do |out|
+        out << header_row
+        rows.each { |row| out << [ row.display_label, *row.raw_values ] }
+      end
+    end
 
-        Option.new(
+    def csv_filename
+      "ahoy-dashboard-#{report.key}-#{today}.csv"
+    end
+
+    def tabs
+      @tabs ||= Array(report&.tabs).map do |candidate|
+        AhoyDashboard::MenuOption.new(
           label: candidate.label,
           value: candidate.key,
-          params: params,
-          path: routes.report_path(report.key, params),
+          path: routes.report_path(report.key, link_params(tab: candidate.key)),
           active: candidate.key == tab.key
+        )
+      end
+    end
+
+    def breakdown_options
+      @breakdown_options ||= Array(tab&.breakdown_options).map do |option|
+        AhoyDashboard::MenuOption.new(
+          label: option.label,
+          value: option.key,
+          path: routes.report_path(report.key, link_params(tab: tab.key, breakdown: option.key)),
+          active: option == tab.active_breakdown
         )
       end
     end
@@ -258,26 +229,15 @@ module AhoyDashboard
       return [] unless property?
 
       @property_options ||= property_keys.map do |name|
-        params = card_params.merge(property: name)
-
-        Option.new(
+        AhoyDashboard::MenuOption.new(
           label: name,
           value: name,
-          params: params,
-          path: routes.report_path(report.key, params),
+          path: routes.report_path(report.key, card_params.merge(property: name).merge(view_params)),
           active: name == property_name
         )
       end
     end
 
-    # Which property is showing is part of the card's state, not the tab's, so it
-    # rides along on every link the card builds. The details modal and the CSV
-    # both have to group by whichever key the card in front of somebody is
-    # grouping by, and the tab key alone does not say which that is.
-    # Both per-card overrides ride along, because everything built off this is a
-    # link back to the same card: the Details modal, the pager inside it, and the
-    # CSV. Leave either one out and the download reports a different grouping than
-    # the card it came from.
     def card_params
       params = query.to_query.merge(tab: tab.key)
       params = params.merge(property: property_name) if property?
@@ -292,7 +252,8 @@ module AhoyDashboard
 
     def details_params(page_number = 1)
       params = card_params.merge(view: DETAILS_VIEW)
-      page_number > 1 ? params.merge(page: page_number) : params
+      params = params.merge(page: page_number) if page_number > 1
+      term.present? ? params.merge(q: term) : params
     end
 
     def details_path(page_number = 1)
@@ -307,14 +268,14 @@ module AhoyDashboard
       details_path(page - 1) if page > 1
     end
 
+    def clear_search_path
+      routes.report_path(report.key, details_params.except(:q))
+    end
+
     def export_path
       routes.export_path(report.key, card_params)
     end
 
-    # The same grouping this card is showing, handed to the surface that can
-    # change it. The dimension and the columns go over explicitly because explore
-    # holds them and QueryForm does not; anything the dimension cannot answer is
-    # dropped there rather than printed as zero.
     def explore_path
       params = query.to_query.merge(
         dimension: dimension.key,
@@ -325,45 +286,22 @@ module AhoyDashboard
     end
 
     def display_label(row)
-      return row.label.to_s if row.value.blank?
+      label = row.label.to_s
+      return label if row.value.blank?
 
-      # A goal label is not humanized. It is either a name somebody typed or the
-      # event name itself, and rewriting either one makes the row stop matching
-      # the definition on the settings screen.
       case dimension.key
-      when *COUNTRY_DIMENSIONS then Countries.name(row.label)
-      when *DEVICE_DIMENSIONS then DEVICE_LABELS.fetch(row.label.to_s.downcase, row.label.to_s.humanize)
-      when *PATH_DIMENSIONS then row.label.to_s
-      else row.label.to_s
+      when "country" then Countries.name(row.label)
+      when "device" then label.humanize
+      else label
       end
     end
 
-    # Scaled against the biggest row in this card rather than the range total,
-    # which is what Plausible does: the top row always fills the card and every
-    # other row is read against it. Dividing by the total instead left a card
-    # whose winner held a third of the traffic looking like a broken stub.
     def share(row)
-      denominator = largest_value
-
-      return 0.0 unless denominator.positive?
-
-      (row.metrics&.values&.first.to_f / denominator).clamp(0.0, 1.0)
+      AhoyDashboard::Share.fraction(row.metrics&.values&.first, of: largest_value)
     end
 
-    # Rounds to a whole percent above ten and one decimal below it, so a row
-    # holding half a percent does not print as zero. Anything at or above 99.5
-    # says 100 rather than rounding to it and looking like a bug beside a row
-    # that is genuinely everything.
     def percent_of_total(row)
-      return nil unless total.positive?
-
-      value = row.metrics&.values&.first.to_f / total * 100
-
-      return "100%" if value >= 99.5
-      return "0%" if value.zero?
-      return "<#{SMALLEST_PERCENT}%" if value.round(1) < SMALLEST_PERCENT
-
-      value >= 10 ? "#{value.round}%" : "#{value.round(1)}%"
+      AhoyDashboard::Share.label(row.metrics&.values&.first, of: total)
     end
 
     def filter_params(row)
@@ -413,37 +351,26 @@ module AhoyDashboard
       Array(keys).map(&:to_s)
     end
 
-    def column_for(key)
-      metric = lookup_metric(key)
-
-      Column.new(
-        key: key,
-        label: metric&.label || key.humanize,
-        short: metric&.short || key.humanize,
-        metric: metric
-      )
-    end
-
     def offset
       return 0 unless per_page.to_i.positive?
 
       (page - 1) * per_page.to_i
     end
 
-    def lookup_metric(key)
-      AhoyDashboard::Metric.find_by_key(key)
+    def today
+      Time.current.in_time_zone(AhoyDashboard.time_zone).to_date.iso8601
     end
 
-    # Memoized because #share asks for it once per row, so without this the bar
-    # widths are quadratic in the row count. The details modal renders a hundred.
     def largest_value
       @largest_value ||= rows.map { |row| row.metrics.values.first.to_f }.max.to_f
     end
 
-    def tab_params(candidate)
-      params = query.to_query.merge(tab: candidate.key)
-      params = params.merge(view: DETAILS_VIEW) if details?
-      params
+    def link_params(overrides)
+      query.to_query.merge(overrides).merge(view_params)
+    end
+
+    def view_params
+      details? ? { view: DETAILS_VIEW } : {}
     end
 
     def routes

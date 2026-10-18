@@ -1,40 +1,21 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard journey explorer", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
   def clock(hour, minute = 0)
-    AhoyDashboard.time_zone.local(2026, 8, 10, hour, minute)
+    dash_time(2026, 8, 10, hour, minute)
   end
 
   def journeys!
-    first = dash_visit(started_at: clock(9), visitor: "a")
-    dash_page_view(first, path: "/", at: clock(9))
+    first = dash_landing(at: clock(9), visitor: "a")
     dash_page_view(first, path: "/going-in", at: clock(9, 5))
     dash_page_view(first, path: "/going-in/faq", at: clock(9, 9))
 
-    second = dash_visit(started_at: clock(10), visitor: "b")
-    dash_page_view(second, path: "/", at: clock(10))
+    second = dash_landing(at: clock(10), visitor: "b")
     dash_page_view(second, path: "/consult", at: clock(10, 5))
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/journey"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/journey"
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do
@@ -56,7 +37,7 @@ RSpec.describe "Dashboard journey explorer", type: :request do
       journeys!
 
       get "/telemetry/journey"
-      text = Nokogiri::HTML5(response.body).text.squish
+      text = document.text.squish
 
       expect(text).to include("Where visitors went after any page they viewed.")
       expect(text).not_to include("Entry pages", "landed on", "entry page")
@@ -64,12 +45,11 @@ RSpec.describe "Dashboard journey explorer", type: :request do
 
     it "counts visitors, not sessions" do
       journeys!
-      revisit = dash_visit(started_at: clock(11), visitor: "a")
-      dash_page_view(revisit, path: "/", at: clock(11))
+      revisit = dash_landing(at: clock(11), visitor: "a")
       dash_page_view(revisit, path: "/going-in", at: clock(11, 5))
 
       get "/telemetry/journey", params: { steps: [ "/", "/going-in" ] }
-      text = Nokogiri::HTML5(response.body).text.squish
+      text = document.text.squish
 
       expect(text).to include("1 visitor")
       expect(text).to include("50% of step 1")
@@ -94,7 +74,7 @@ RSpec.describe "Dashboard journey explorer", type: :request do
 
       get "/telemetry/journey", params: { steps: [ "/", "/consult" ] }
 
-      expect(Nokogiri::HTML5(response.body).css("a[title='Visitors who left the site here']")).to be_present
+      expect(document.css("a[title='Visitors who left the site here']")).to be_present
     end
 
     it "opens the next column only once a step is picked" do
@@ -107,8 +87,6 @@ RSpec.describe "Dashboard journey explorer", type: :request do
       expect(response.body).not_to include("Step 3")
     end
 
-    # Columns scroll sideways rather than folding away. A journey is a sequence
-    # and hiding the middle of it hides the thing being read.
     it "keeps every earlier column open once a third one opens" do
       journeys!
 
@@ -176,15 +154,13 @@ RSpec.describe "Dashboard journey explorer", type: :request do
       expect(response.body).to include("Nothing matches that")
     end
 
-    # The design's column is a head and a list, so a cut column shows the rows it
-    # kept rather than a line explaining that it cut some.
     it "shows the busiest rows and no more when a column is cut" do
       journeys!
       visit = dash_visit(started_at: clock(11), visitor: "c")
       15.times { |index| dash_page_view(visit, path: "/page-#{index}", at: clock(11, index)) }
 
       get "/telemetry/journey"
-      rows = Nokogiri::HTML5(response.body).css(".j-col .j-list .data-row")
+      rows = document.css(".j-col .j-list .data-row")
 
       expect(rows.size).to be <= AhoyDashboard::JourneyQuery::ROWS
       expect(response.body).not_to include("Showing the busiest")
@@ -249,13 +225,10 @@ RSpec.describe "Dashboard journey explorer", type: :request do
   describe "on the dashboard" do
     before { sign_in create(:user, :admin) }
 
-    # Embedded at the bottom of the page rather than linked from the bar: three
-    # columns need the full width, and the bar is for controls that change what is
-    # on screen rather than for destinations.
     it "is embedded at the bottom, carrying the query the dashboard was opened on" do
       get "/telemetry", params: { period: "7d" }
 
-      frame = Nokogiri::HTML5(response.body).at_css("tm-frame#dash_journey")
+      frame = document.at_css("tm-frame#dash_journey")
 
       expect(frame).to be_present
       expect(frame["src"]).to eq("/telemetry/journey?period=7d")
@@ -270,12 +243,10 @@ RSpec.describe "Dashboard journey explorer", type: :request do
       expect(body.index("id=\"dash_journey\"")).to be > body.index('id="panels"')
     end
 
-    # The frame the dashboard points at must not repeat its own source url, or the
-    # response sends the frame straight back where it came from.
     it "serves its own frame without a src" do
       get "/telemetry/journey"
 
-      frame = Nokogiri::HTML5(response.body).at_css("tm-frame#dash_journey")
+      frame = document.at_css("tm-frame#dash_journey")
 
       expect(frame).to be_present
       expect(frame["src"]).to be_nil

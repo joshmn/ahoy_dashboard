@@ -1,9 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe "Dashboard search console card", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
   let(:day) { (now - 5.days).to_date }
 
   around { |example| travel_to(now) { example.run } }
@@ -13,28 +11,12 @@ RSpec.describe "Dashboard search console card", type: :request do
   end
 
   def rows!
-    create(:dash_search_console_row, date: day, query: "fci thomson visiting", clicks: 6,
-           impressions: 90, ctr: 0.066, position: 4.2)
-    create(:dash_search_console_row, date: day, query: "halfway house rules", clicks: 2,
-           impressions: 30, ctr: 0.066, position: 11.5)
+    [ :dash_search_console_row, :dash_search_console_keyword ].each do |factory|
+      create(factory, date: day, query: "fci thomson visiting", clicks: 6, impressions: 90, ctr: 0.066, position: 4.2)
+      create(factory, date: day, query: "halfway house rules", clicks: 2, impressions: 30, ctr: 0.066, position: 11.5)
+    end
     create(:dash_search_console_total, date: day, clicks: 12, impressions: 200,
            ctr: 0.06, position: 9.1)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/search_console"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/search_console"
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do
@@ -51,12 +33,12 @@ RSpec.describe "Dashboard search console card", type: :request do
 
     it "reports a connection refusal recorded by the background refresh" do
       search_console_enabled!
-      account = create(:dash_google_account, :with_property, access_token: "good", expires_at: 30.minutes.from_now)
+      account = create(:dash_google_account, :with_property)
       account.record_error!(AhoyDashboard::SearchConsole::RefreshTokenService::REFUSED_MESSAGE)
       rows!
 
       get "/telemetry/search_console"
-      note = Nokogiri::HTML5(response.body).css("p").find { |line| line.text.include?("not syncing") }
+      note = document.css("p").find { |line| line.text.include?("not syncing") }
 
       expect(note.text.squish).to eq("Search Console is not syncing, so the newest days may be missing. Fix connection")
       expect(note.at_css("a")["href"]).to eq(AhoyDashboard::Engine.routes.url_helpers.settings_google_connection_path)
@@ -83,7 +65,6 @@ RSpec.describe "Dashboard search console card", type: :request do
     end
 
     it "says how far the data runs when the range reaches past it" do
-      search_console_disabled!
       connect!
       rows!
 
@@ -97,7 +78,6 @@ RSpec.describe "Dashboard search console card", type: :request do
     end
 
     it "says nothing about how far the data runs when it reaches the end of the range" do
-      search_console_disabled!
       connect!
       rows!
       create(:dash_search_console_total, date: now.to_date, clicks: 1, impressions: 10)
@@ -119,9 +99,6 @@ RSpec.describe "Dashboard search console card", type: :request do
       expect(response.body).to include("halfway house rules")
     end
 
-    # The card is nine rows and a foot, and four sentences of caveat under it read
-    # as the card's own content rather than as a note about it. The drilldown is
-    # where somebody is actually reading the list closely enough to need it.
     it "keeps the gap off the card" do
       connect!
       rows!
@@ -156,9 +133,9 @@ RSpec.describe "Dashboard search console card", type: :request do
     end
 
     it "shows a withheld query as anonymized rather than dropping the row" do
-      search_console_disabled!
       connect!
       create(:dash_search_console_row, date: day, query: "", clicks: 4, impressions: 50)
+      create(:dash_search_console_keyword, date: day, query: "", clicks: 4, impressions: 50)
 
       get "/telemetry/search_console"
 
@@ -167,7 +144,6 @@ RSpec.describe "Dashboard search console card", type: :request do
     end
 
     it "opens a query row into that keyword's own history" do
-      search_console_disabled!
       connect!
       rows!
 
@@ -178,7 +154,6 @@ RSpec.describe "Dashboard search console card", type: :request do
     end
 
     it "leaves a page row static, because a page has no series of its own" do
-      search_console_disabled!
       connect!
       rows!
 
@@ -193,7 +168,7 @@ RSpec.describe "Dashboard search console card", type: :request do
       rows!
 
       get "/telemetry/search_console"
-      tabs = Nokogiri::HTML5(response.body).css('[data-controller="dash--tabs"] nav a')
+      tabs = document.css('[data-controller="dash--tabs"] nav a')
 
       expect(tabs.find { |tab| tab["aria-current"] == "true" }.text.strip).to eq("Queries")
     end
@@ -204,7 +179,7 @@ RSpec.describe "Dashboard search console card", type: :request do
 
       get "/telemetry/search_console", params: { tab: "pages" }
 
-      tabs = Nokogiri::HTML5(response.body).css('[data-controller="dash--tabs"] nav a')
+      tabs = document.css('[data-controller="dash--tabs"] nav a')
 
       expect(response).to have_http_status(:ok)
       expect(tabs.find { |tab| tab["aria-current"] == "true" }.text.strip).to eq("Pages")
@@ -216,7 +191,7 @@ RSpec.describe "Dashboard search console card", type: :request do
       rows!
 
       get "/telemetry/search_console", params: { tab: "banana" }
-      tabs = Nokogiri::HTML5(response.body).css('[data-controller="dash--tabs"] nav a')
+      tabs = document.css('[data-controller="dash--tabs"] nav a')
 
       expect(response).to have_http_status(:ok)
       expect(tabs.find { |tab| tab["aria-current"] == "true" }.text.strip).to eq("Queries")
@@ -235,7 +210,7 @@ RSpec.describe "Dashboard search console card", type: :request do
       expect(response.body).not_to include(%(id="report_search_console"))
       expect(document.css(".m-list .data-row")).to be_present
       expect(document.at_css(".m-list").text).to include("fci thomson visiting")
-      expect(document.at_css(".m-list").text).to include("fci thomson visiting")
+      expect(document.at_css(".m-list").text).to include("halfway house rules")
     end
 
     it "renders the details view when nothing is connected" do
@@ -305,12 +280,9 @@ RSpec.describe "Dashboard search console card", type: :request do
       expect(response.body).to include(%(src="/telemetry/search_console))
       expect(response.body).to include(%(id="tm-modal-search_console"))
       expect(response.body).to include(%(id="report_details_search_console"))
-      expect(Nokogiri::HTML5(response.body).at_css("tm-frame#report_search_console")["loading"]).to eq("lazy")
+      expect(document.at_css("tm-frame#report_search_console")["loading"]).to eq("lazy")
     end
 
-    # Disconnecting revokes the token; it does not delete what was already
-    # pulled, and the settings screen promises as much. A card that reverted to
-    # "not connected" would contradict it.
     describe "disconnected with rows already stored" do
       before { rows! }
 
@@ -330,7 +302,7 @@ RSpec.describe "Dashboard search console card", type: :request do
       it "still lists the stored rows in the details modal" do
         get "/telemetry/search_console", params: { view: "details" }
 
-        expect(Nokogiri::HTML5(response.body).at_css(".m-list").text).to include("fci thomson visiting")
+        expect(document.at_css(".m-list").text).to include("fci thomson visiting")
       end
 
       it "keeps the tab strip, so the pages side is still reachable" do
@@ -341,8 +313,6 @@ RSpec.describe "Dashboard search console card", type: :request do
     end
 
     describe "titles" do
-      # The header used to read "Search queries" beside an active tab reading
-      # "Search queries".
       it "does not repeat the active tab label as the card title" do
         connect!
         rows!

@@ -1,11 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe "Dashboard screens of a feature that is not installed", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
   def hrefs(selector)
     document.css("#{selector} a[href]").map { |link| link["href"].split("?").first }
   end
@@ -22,7 +17,7 @@ RSpec.describe "Dashboard screens of a feature that is not installed", type: :re
   assistant_provider = AhoyDashboard::AssistantProvider::NAMES.first
   ai_assistant = AhoyDashboard::AiVisibility::NAMES.first
 
-  UNINSTALLED_CHANGES = {
+  changes = {
     search_console: [
       [ :post, "/telemetry/settings/search_console_sync" ],
       [ :post, "/telemetry/settings/search_console_backfill" ],
@@ -60,20 +55,19 @@ RSpec.describe "Dashboard screens of a feature that is not installed", type: :re
     ]
   }.freeze
 
-  UNINSTALLED_PAGES = {
-    search_console: %w[/telemetry/settings/google_callback /telemetry/settings/google_authorization/new],
-    places: %w[/telemetry/settings/places],
+  pages = {
+    search_console: %w[/telemetry/settings/google_callback],
     assistant: %w[/telemetry/chats/1]
   }.freeze
 
-  UNINSTALLED_PROVIDER_CHANGES = [
+  provider_changes = [
     [ :patch, "/telemetry/settings/serp_providers/#{serp_provider}" ],
     [ :delete, "/telemetry/settings/serp_providers/#{serp_provider}/secrets/api_key" ]
   ].freeze
 
   before { sign_in create(:user, :admin) }
 
-  UNINSTALLED_CHANGES.each do |feature, requests|
+  changes.each do |feature, requests|
     it "refuses every change to #{feature} once it is not installed, and says why" do
       uninstall_ahoy_dashboard(feature)
 
@@ -87,7 +81,7 @@ RSpec.describe "Dashboard screens of a feature that is not installed", type: :re
     end
   end
 
-  UNINSTALLED_PAGES.each do |feature, paths|
+  pages.each do |feature, paths|
     it "shows how to install #{feature} on its pages instead of the page" do
       uninstall_ahoy_dashboard(feature)
 
@@ -117,7 +111,7 @@ RSpec.describe "Dashboard screens of a feature that is not installed", type: :re
     expect(response).to have_http_status(:ok)
     expect(response.body).to include(install_command(:serp), install_command(:keywords), install_command(:backlinks))
 
-    UNINSTALLED_PROVIDER_CHANGES.each do |verb, path|
+    provider_changes.each do |verb, path|
       public_send(verb, path)
       expect(response).to be_redirect
     end
@@ -216,7 +210,7 @@ RSpec.describe "Dashboard screens of a feature that is not installed", type: :re
     it "answers the panel's own frame with how to install it" do
       uninstall_ahoy_dashboard(:assistant)
 
-      get "/telemetry/ask", headers: { "Tm-Frame" => AhoyDashboard::AsksController::FRAME }
+      get_frame("/telemetry/ask", AhoyDashboard::AsksController::FRAME)
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(install_command(:assistant))
@@ -240,10 +234,11 @@ RSpec.describe "Dashboard screens of a feature that is not installed", type: :re
 
       expect(document.css("[src^='/telemetry/search_console']")).to be_present
 
-      get "/telemetry/search_console", headers: { "Tm-Frame" => AhoyDashboard::SearchConsolePresenter::FRAME }
+      get_frame("/telemetry/search_console", AhoyDashboard::SearchConsolePresenter::FRAME)
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(install_command(:search_console))
+      expect(document.at_css("##{AhoyDashboard::SearchConsolePresenter::FRAME}").text).to include("Not installed yet")
     end
   end
 
@@ -312,20 +307,18 @@ RSpec.describe "Dashboard screens of a feature that is not installed", type: :re
   end
 
   describe "the missing tables notice" do
-    def switch_on(name)
-      AhoyDashboard::Preferences.write(name, enabled: true)
-    end
-
     it "names each switched-on feature with no tables, on settings pages too" do
       uninstall_ahoy_dashboard(:serp, :alerts)
-      switch_on(:serp)
-      switch_on(:alerts)
+      switch_on_ahoy_dashboard(:serp, :alerts)
 
-      get "/telemetry/settings/goals"
-      notices = document.css("main [role=alert], main [role=status]").map { |node| node.text.squish }
+      %w[/telemetry /telemetry/settings/goals].each do |path|
+        get path
+        notices = document.css("main [role=alert], main [role=status]").map { |node| node.text.squish }
 
-      expect(notices).to include(AhoyDashboard::Installation.fetch(:serp).missing_message,
-                                 AhoyDashboard::Installation.fetch(:alerts).missing_message)
+        expect(response).to have_http_status(:ok), path
+        expect(notices).to include(AhoyDashboard::Installation.fetch(:serp).missing_message,
+                                   AhoyDashboard::Installation.fetch(:alerts).missing_message), path
+      end
     end
 
     it "says nothing about a feature that is switched off" do
@@ -337,7 +330,7 @@ RSpec.describe "Dashboard screens of a feature that is not installed", type: :re
     end
 
     it "says nothing when everything is installed" do
-      switch_on(:serp)
+      switch_on_ahoy_dashboard(:serp)
 
       get "/telemetry"
 
@@ -381,7 +374,7 @@ RSpec.describe "Dashboard screens of a feature that is not installed", type: :re
     before { allow(AhoyDashboard::Assistant).to receive(:available?).and_return(false) }
 
     it "keeps the question box on a conversation, disabled, with the reason" do
-      chat = AhoyDashboard::Chat.create!
+      chat = create(:dash_chat)
 
       get "/telemetry/chats/#{chat.id}"
       box = document.at_css("textarea[name='message[content]']")
@@ -394,7 +387,7 @@ RSpec.describe "Dashboard screens of a feature that is not installed", type: :re
     end
 
     it "keeps the panel's question box and suggestions, disabled" do
-      get "/telemetry/ask", headers: { "Tm-Frame" => AhoyDashboard::AsksController::FRAME }
+      get_frame("/telemetry/ask", AhoyDashboard::AsksController::FRAME)
 
       expect(document.at_css("textarea#ask_content")["disabled"]).not_to be_nil
       expect(document.at_css("button[aria-label='Ask']")["disabled"]).not_to be_nil

@@ -1,10 +1,6 @@
 module AhoyDashboard
   module Serp
-    class RankingsPresenter
-      include AhoyDashboard::Seo::Exportable
-
-      Tile = Data.define(:label, :value, :note)
-
+    class RankingsPresenter < AhoyDashboard::Seo::BasePresenter
       BandItem = Data.define(:band, :count, :url, :current) do
         def key
           band.key
@@ -15,44 +11,17 @@ module AhoyDashboard
         end
       end
 
-      attr_reader :query, :result, :visibility, :share, :site, :sites, :distribution, :band, :tag, :tags
+      TABLE_ANCHOR = "tracked-searches".freeze
 
-      def initialize(query:, result:, visibility:, share:, site:, sites:, distribution: nil, band: nil,
-                     tag: nil, tags: [])
-        @query = query
-        @result = result
+      attr_reader :visibility, :share, :distribution, :band
+
+      def initialize(visibility:, share:, distribution: nil, band: nil,
+                     surface: AhoyDashboard::Seo::Surface.find("rankings"), **options)
+        super(surface: surface, **options)
         @visibility = visibility
         @share = share
-        @site = site
-        @sites = sites
         @distribution = distribution
         @band = RankBand.find(band)
-        @tag = tag.presence
-        @tags = tags
-      end
-
-      def heading
-        rival? ? "Rankings: #{site.name}" : "Rankings"
-      end
-
-      def surface
-        @surface ||= AhoyDashboard::Seo::Surface.find("rankings")
-      end
-
-      def blurb
-        rival? ? surface.blurb.sub("your site", site.name) : surface.blurb
-      end
-
-      def rival?
-        site.present? && !site.ours?
-      end
-
-      def site_label
-        "Site: #{site&.name || "none"}"
-      end
-
-      def any?
-        result.any?
       end
 
       def rows
@@ -106,8 +75,6 @@ module AhoyDashboard
         "Nothing in #{band&.label} on the latest reading"
       end
 
-      TABLE_ANCHOR = "tracked-searches".freeze
-
       def no_site?
         site.nil?
       end
@@ -123,13 +90,6 @@ module AhoyDashboard
           if no_site? then AhoyDashboard::SetupNotice.call(:site, url: new_site_path)
           elsif no_keywords? then AhoyDashboard::SetupNotice.call(:keywords, url: new_keyword_path)
           end
-      end
-
-      def summary
-        return "Nothing is being tracked yet." if no_keywords?
-        return "No site is set up to look for." if no_site?
-
-        "#{site.domain} · #{range_label.downcase} · #{helpers.pluralize(result.tracked, 'search')}"
       end
 
       def tiles
@@ -152,10 +112,14 @@ module AhoyDashboard
       def change_kind(row)
         return :new if row.arrived?
         return :gone if row.lost?
-        return :none if row.change.nil?
-        return :level if row.change.zero?
 
-        row.change.positive? ? :up : :down
+        movement(row.change)
+      end
+
+      def overview_label(row)
+        return "Cited" if row.cited?
+
+        "Shown" if row.overview?
       end
 
       def places?
@@ -176,55 +140,19 @@ module AhoyDashboard
         depth.positive? ? "Past #{depth}" : "Nowhere"
       end
 
-      def keyword_path(row)
-        routes.rank_keyword_path(query.to_query.merge(keyword: row.keyword.id, at: row.location, site: site&.id).compact)
-      end
-
-      def site_options
-        sites.map do |candidate|
-          {
-            label: "#{candidate.name} (#{candidate.domain})",
-            url: routes.rankings_path(query.to_query.merge(site: candidate.id, band: band&.key, tag: tag).compact),
-            active: candidate.id == site&.id
-          }
-        end
-      end
-
-      def period_options
-        AhoyDashboard::SeoRange.periods.map do |period|
-          {
-            label: period.label,
-            url: routes.rankings_path(query.with(period: period.key).to_query.merge(site: site&.id, band: band&.key, tag: tag).compact),
-            active: period.key == query.period.key
-          }
-        end
-      end
-
-      def range_label
-        query.period.custom? ? query.range_label : query.period.label
-      end
-
       def widen_action
-        return nil if AhoyDashboard::SeoRange.wide_enough?(query)
-
-        { label: AhoyDashboard::SeoRange.widen_label, primary: true, data: { tm_frame: "_top" },
-          url: routes.rankings_path(AhoyDashboard::SeoRange.widened(query).merge(site: site&.id, tag: tag).compact) }
-      end
-
-      def tag_menu
-        @tag_menu ||= TagMenu.new(
-          tags: tags, current: tag,
-          url: ->(chosen) { routes.rankings_path(query.to_query.merge(site: site&.id, band: band&.key, tag: chosen).compact) }
-        )
+        super.merge(url: surface.path(AhoyDashboard::Seo::Periods.widened(query).merge(site_param).merge(tag_param)))
       end
 
       def empty_action
-        widen_action || (tag_menu.clear_action(data: { tm_frame: "_top" }) if tag)
+        return widen_action if narrow?
+
+        tag_menu.clear_action(data: TOP) if tag
       end
 
       def empty_hint
         return "No check tagged #{tag} ran in these dates. Try a longer date range, or another tag." if tag
-        return "No check ran in these dates. Try a longer date range, or press Check now." if check_now?
+        return "No check ran in these dates. Try a longer date range, or press Check now." if check_now.available?
 
         "No check ran in these dates. Try a longer date range."
       end
@@ -237,59 +165,9 @@ module AhoyDashboard
         rankings_url(band: band&.key)
       end
 
-      def dashboard_path
-        routes.root_path(query.to_query)
+      def check_now
+        @check_now ||= CheckNowPresenter.new
       end
-
-      def check_now_path
-        check_now.path
-      end
-
-      def trackable
-        @trackable ||= SerpKeyword.trackable.to_a
-      end
-
-      def check_now?
-        check_now.available?
-      end
-
-      def check_now_reason
-        check_now.reason
-      end
-
-      def check_now_notice_reason
-        check_now.notice_reason
-      end
-
-      def check_now_fix
-        check_now.fix
-      end
-
-      def check_now_confirm
-        check_now.confirm
-      end
-
-      def keywords_path
-        routes.settings_serp_keywords_path
-      end
-
-      def invented?
-        Serp.provider.to_sym == :fake
-      end
-
-      def providers_path
-        routes.settings_serp_providers_path
-      end
-
-      def new_keyword_path
-        routes.new_settings_serp_keyword_path
-      end
-
-      def new_site_path
-        routes.new_settings_serp_site_path
-      end
-
-      SHARE_FLOOR = 3
 
       def shares?
         share.searches.to_i >= SHARE_FLOOR
@@ -315,7 +193,7 @@ module AhoyDashboard
         return nil unless share.any?
 
         "Sites in the top #{share.depth} results, from the latest check of " \
-          "#{helpers.pluralize(share.searches, 'search')}."
+          "#{pluralize(share.searches, 'search')}."
       end
 
       def visibility_note
@@ -323,18 +201,6 @@ module AhoyDashboard
 
         "#{percent(visibility.share_shown)} of checks showed an AI overview, and " \
           "#{percent(visibility.share_cited)} of those cited #{site.domain}."
-      end
-
-      def export_key
-        surface.export
-      end
-
-      def export_path(params)
-        routes.rankings_path(params)
-      end
-
-      def export_params
-        query.to_query.merge(site: site&.id, band: band&.key, tag: tag).compact
       end
 
       def csv_tables
@@ -348,15 +214,11 @@ module AhoyDashboard
         ]
       end
 
-      def percent(value)
-        "#{(value.to_f * 100).round}%"
-      end
-
-      def number(value)
-        ActiveSupport::NumberHelper.number_to_delimited(value.to_i)
-      end
-
       private
+
+      def link_param
+        super.merge({ band: band&.key }.compact)
+      end
 
       def tracked_headers
         headers = [ "Search", "Position", "Change", "Best", "AI", "URL" ]
@@ -366,32 +228,11 @@ module AhoyDashboard
       end
 
       def tracked_csv_row(row)
-        values = [ row.keyword.query, (row.position if row.ranked?), change_csv(row), row.best,
-                   overview_csv(row), url_csv(row.url) ]
+        values = [ row.keyword.query, (row.position if row.ranked?), csv_change(row), row.best,
+                   overview_label(row), AhoyDashboard::Seo::Formatting.url_path(row.url) ]
         values.insert(1, row.place.label) if places?
 
         values
-      end
-
-      def change_csv(row)
-        case change_kind(row)
-        when :new then "New"
-        when :gone then "Gone"
-        else row.change
-        end
-      end
-
-      def overview_csv(row)
-        return "Cited" if row.cited?
-        return "Shown" if row.overview?
-
-        nil
-      end
-
-      def url_csv(url)
-        return nil if url.blank?
-
-        url.to_s.sub(%r{\Ahttps?://[^/]+}, "").presence || "/"
       end
 
       def page_one_headers
@@ -423,23 +264,7 @@ module AhoyDashboard
       end
 
       def rankings_url(band:, anchor: nil)
-        routes.rankings_path(query.to_query.merge(site: site&.id, band: band, tag: tag, anchor: anchor).compact)
-      end
-
-      def on_label(date)
-        AhoyDashboard::SeoHelper.short_date(date, zone: (@zone ||= AhoyDashboard.time_zone))
-      end
-
-      def check_now
-        @check_now ||= CheckNowPresenter.new
-      end
-
-      def helpers
-        ActionController::Base.helpers
-      end
-
-      def routes
-        AhoyDashboard::Engine.routes.url_helpers
+        surface.path(query.to_query.merge(site_param).merge(tag_param).merge({ band: band, anchor: anchor }.compact))
       end
     end
   end

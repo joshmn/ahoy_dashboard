@@ -1,9 +1,4 @@
 module AhoyDashboard
-  # The goal conversions card.
-  #
-  # Its own resource rather than a report, because it is not one: a report is a
-  # card with tabs in a half-width column, and this is a full-width section with
-  # three numbers per row. Singular, because there is one of it.
   class GoalConversionsController < AhoyDashboard::BaseController
     def show
       snapshot = Dashboards::SnapshotReadQuery.call(query: query, section: :goals)

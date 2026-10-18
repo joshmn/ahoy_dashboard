@@ -1,12 +1,7 @@
 <% skipped = Array(local_assigns[:except]).map(&:to_s) %>
-<% query.to_query.each do |name, value| %>
-  <% next if name.to_s == "filters" || skipped.include?(name.to_s) %>
-  <% next if value.nil? || value.to_s.empty? %>
-  <%= hidden_field_tag name, value, id: nil %>
-<% end %>
-<%# The filter being edited is left out on purpose: the row in the form puts it
-    back with whatever it was changed to, so applying replaces rather than adds a
-    second filter on the same dimension. %>
+<%= dash_hidden_fields(query.to_query.reject { |name, value|
+      name.to_s == "filters" || skipped.include?(name.to_s) || value.nil? || value.to_s.empty?
+    }) %>
 <% dropped = local_assigns[:except_filter] %>
 <% numbered = local_assigns[:numbered] %>
 <% if query.filters.none? && query.carried_filters.present? && !local_assigns.key?(:except_filter) %>

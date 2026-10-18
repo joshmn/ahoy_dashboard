@@ -1,11 +1,5 @@
 module AhoyDashboard
   module Alerts
-    # Every rule the dashboard knows how to evaluate.
-    #
-    # A registry rather than rows somebody writes, because a rule is code: the
-    # threshold is configurable and the question is not. That also means a rule
-    # added in a new version appears for everybody without a migration, and a
-    # rule removed stops firing rather than sitting there evaluating nothing.
     module Catalogue
       GROUPS = {
         rank: "Rank tracking",
@@ -19,7 +13,7 @@ module AhoyDashboard
 
       REQUIRES = {
         rank: %i[serp],
-        spend: %i[serp keywords backlinks],
+        spend: Installation::PROVIDER_FEATURES,
         search_console: %i[search_console],
         backlinks: %i[backlinks]
       }.freeze
@@ -44,10 +38,6 @@ module AhoyDashboard
 
       def self.available
         all.select(&:available?)
-      end
-
-      def self.unavailable_keys
-        all.reject(&:available?).map(&:key)
       end
 
       def self.find(key)

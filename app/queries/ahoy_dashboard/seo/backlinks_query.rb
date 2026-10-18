@@ -77,8 +77,7 @@ module AhoyDashboard
       end
 
       def series
-        AhoyDashboard::BacklinkSample.in_range(range).chronological
-          .pluck(:on, :domains).map { |on, count| [ on, count ] }
+        AhoyDashboard::BacklinkSample.in_range(range).chronological.pluck(:on, :domains)
       end
 
       def anchors
@@ -93,9 +92,6 @@ module AhoyDashboard
         AhoyDashboard::BacklinkDomain.lost_since(since).by_authority.limit(CHANGES_LIMIT).to_a
       end
 
-      # Not a toxicity score. Nothing here can tell a bad link from a good one,
-      # and a vendor that says it can is selling a guess. What it can say is
-      # which of them pass no authority at all, which is a fact.
       def nofollow
         live.where(follow: false).by_authority.limit(NOFOLLOW_LIMIT).to_a
       end

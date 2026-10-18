@@ -1,8 +1,5 @@
 module AhoyDashboard
   module LLM
-    # The parameter block on a tool, turned into the JSON Schema an OpenAI shaped
-    # `tools[].function.parameters` wants. Small on purpose: a tool that needs
-    # more than a flat object of scalars is a tool that is doing too much.
     class Schema
       TYPES = %w[string integer number boolean array object].freeze
 

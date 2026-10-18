@@ -1,5 +1,4 @@
 <% scope = local_assigns.fetch(:scope, "card") %>
-<% extra = local_assigns.fetch(:extra, {}) %>
 <% picker_id = "tm-#{scope}-#{report.key}-property" %>
 <% showing = presenter.property_name %>
 
@@ -7,10 +6,7 @@
       panel_class: "tm-scroll", data: { tm_picker: "property" } do %>
   <%= dash_menu_header "Property" %>
 
-<%# Plain links, no controller. They are rendered inside the card's own frame, so
-    the frame navigates and the card comes back grouped by the new key.
-    The class is what menu_controller reads for arrow keys, Home, End and Escape. %>
   <% presenter.property_options.each do |option| %>
-    <%= dash_menu_item option.label, report_path(report.key, option.params.merge(extra)), current: option.active? %>
+    <%= dash_menu_item option.label, option.path, current: option.active? %>
   <% end %>
 <% end %>

@@ -1,7 +1,7 @@
 module AhoyDashboard
   module Settings
     module SerpProviders
-      class SecretsController < AhoyDashboard::BaseController
+      class SecretsController < AhoyDashboard::Settings::BaseController
         requires_installed :serp, :keywords, :backlinks
 
         def destroy
@@ -12,7 +12,9 @@ module AhoyDashboard
           secret = AhoyDashboard::Settings::StoredSecretPresenter.serp(name, key)
           back = edit_settings_serp_provider_path(name)
 
-          AhoyDashboard::Serp::Credentials::RemoveCommand.call(name: name, key: key) do
+          record = AhoyDashboard::SerpProvider.for(name)
+
+          AhoyDashboard::Secrets::RemoveCommand.call(record: record, key: key) do
             on(:ok) { redirect_to back, notice: secret.removed_notice }
             on(:missing) { redirect_to back, alert: secret.missing_notice }
           end

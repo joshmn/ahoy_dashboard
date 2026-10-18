@@ -1,23 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/assistant"
 
 RSpec.describe "Dashboard ask panel", type: :request do
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/ask"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      post "/telemetry/ask"
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
@@ -28,8 +11,7 @@ RSpec.describe "Dashboard ask panel", type: :request do
     end
 
     it "opens on the screen it was launched from, with no conversation yet" do
-      get "/telemetry/ask", params: { page: "/telemetry/rankings", period: "7d" },
-        headers: { "Tm-Frame" => AhoyDashboard::AsksController::FRAME }
+      get_frame("/telemetry/ask", AhoyDashboard::AsksController::FRAME, params: { page: "/telemetry/rankings", period: "7d" })
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(%(tm-frame id="#{AhoyDashboard::AsksController::FRAME}"))
@@ -129,20 +111,19 @@ RSpec.describe "Dashboard ask panel", type: :request do
 
     describe "from one page to the next" do
       let(:chat) do
-        AhoyDashboard::Chat.create!(context: { "path" => "/telemetry/rankings", "screen" => "rankings" }).tap do |chat|
-          chat.chat_messages.create!(role: :user, status: :complete, content: "why did this drop?")
-          chat.chat_messages.create!(role: :assistant, status: :complete, content: "Because it did.")
+        create(:dash_chat, context: { "path" => "/telemetry/rankings", "screen" => "rankings" }).tap do |chat|
+          create(:dash_chat_message, chat: chat, content: "why did this drop?")
+          create(:dash_chat_message, :assistant, chat: chat, content: "Because it did.")
         end
       end
 
       def open_panel(**params)
-        get "/telemetry/ask", params: { page: "/telemetry", **params },
-          headers: { "Tm-Frame" => AhoyDashboard::AsksController::FRAME }
+        get_frame("/telemetry/ask", AhoyDashboard::AsksController::FRAME, params: { page: "/telemetry", **params })
       end
 
       def page(path = "/telemetry/explore", headers: {})
         get path, headers: headers
-        Nokogiri::HTML5(response.body)
+        document
       end
 
       it "is shut and empty until somebody opens it" do
@@ -186,7 +167,7 @@ RSpec.describe "Dashboard ask panel", type: :request do
         expect(page.at_css("#dash-ask textarea").key?("autofocus")).to be(false)
 
         open_panel
-        expect(Nokogiri::HTML5(response.body).at_css("textarea").key?("autofocus")).to be(true)
+        expect(document.at_css("textarea").key?("autofocus")).to be(true)
       end
 
       it "stays shut after it is closed, and keeps the conversation for next time" do

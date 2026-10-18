@@ -1,0 +1,9 @@
+<tr>
+  <td class="num"><%= number %></td>
+  <td>
+    <div class="seo-stack">
+      <span class="t-main min-w-0"><%= seo_domain(result.domain, mine: mine) %></span>
+      <span class="seo-sub"><%= seo_label(result.title.presence || result.link) %></span>
+    </div>
+  </td>
+</tr>

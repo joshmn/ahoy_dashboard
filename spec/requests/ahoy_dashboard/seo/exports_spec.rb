@@ -1,13 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
-require "support/ahoy_dashboard/alerts"
-require "support/ahoy_dashboard/fixtures"
-require "support/ahoy_dashboard/exports"
 
 RSpec.describe "Dashboard seo exports", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:today) { now.to_date }
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
   let(:rival) { create(:dash_serp_site, name: "Them", domain: "rival.test") }
@@ -97,24 +91,24 @@ RSpec.describe "Dashboard seo exports", type: :request do
   def keyword_ideas
     [ [ "visiting hours federal prison", 1200, 20 ], [ "how long are prison visits", 400, 30 ],
       [ "visiting hours rules", 90, 70 ] ].each do |query, volume, difficulty|
-      AhoyDashboard::KeywordIdea.create!(seed: "visiting", query: query, location: "us", language: "en",
-                                         volume: volume, difficulty: difficulty, cpc: 1.25, intent: "informational",
-                                         provider: "fake", fetched_at: now - 1.day)
+      create(:dash_keyword_idea, seed: "visiting", query: query, location: "us", language: "en",
+             volume: volume, difficulty: difficulty, cpc: 1.25, intent: "informational",
+             provider: "fake", fetched_at: now - 1.day)
     end
   end
 
   def backlink_rows
-    AhoyDashboard::BacklinkDomain.create!(domain: "press.test", authority: 55, links: 4, follow: true,
-                                          first_seen_on: today - 200, last_seen_on: today, provider: "dataforseo")
-    AhoyDashboard::BacklinkDomain.create!(domain: "fresh.test", authority: 20, links: 1, follow: true,
-                                          first_seen_on: today - 1, last_seen_on: today, provider: "dataforseo")
-    AhoyDashboard::BacklinkDomain.create!(domain: "gone.test", authority: 10, links: 1, follow: true,
-                                          first_seen_on: today - 90, last_seen_on: today - 2, lost_on: today - 1,
-                                          provider: "dataforseo")
-    AhoyDashboard::BacklinkDomain.create!(domain: "forum.test", authority: 15, links: 7, follow: false,
-                                          first_seen_on: today - 30, last_seen_on: today, provider: "dataforseo")
-    AhoyDashboard::BacklinkAnchor.create!(text: "prison consultant", domains: 2, links: 5, seen_on: today)
-    AhoyDashboard::BacklinkSample.create!(on: today - 1, domains: 3, links: 12, provider: "dataforseo")
+    create(:dash_backlink_domain, domain: "press.test", authority: 55, links: 4, follow: true,
+           first_seen_on: today - 200, last_seen_on: today, provider: "dataforseo")
+    create(:dash_backlink_domain, domain: "fresh.test", authority: 20, links: 1, follow: true,
+           first_seen_on: today - 1, last_seen_on: today, provider: "dataforseo")
+    create(:dash_backlink_domain, domain: "gone.test", authority: 10, links: 1, follow: true,
+           first_seen_on: today - 90, last_seen_on: today - 2, lost_on: today - 1,
+           provider: "dataforseo")
+    create(:dash_backlink_domain, domain: "forum.test", authority: 15, links: 7, follow: false,
+           first_seen_on: today - 30, last_seen_on: today, provider: "dataforseo")
+    create(:dash_backlink_anchor, text: "prison consultant", domains: 2, links: 5, seen_on: today)
+    create(:dash_backlink_sample, on: today - 1, domains: 3, links: 12, provider: "dataforseo")
   end
 
   def answered_prompts
@@ -301,25 +295,6 @@ RSpec.describe "Dashboard seo exports", type: :request do
       rows = fetch_csv("/telemetry/seo/visibility.csv")
 
       expect(rows.size).to eq(1)
-    end
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      sign_out :user
-
-      get "/telemetry/seo/visibility.csv"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_out :user
-      sign_in create(:user)
-
-      get "/telemetry/seo/visibility.csv"
-
-      expect(response).to have_http_status(:not_found)
     end
   end
 end

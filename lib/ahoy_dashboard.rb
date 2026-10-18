@@ -1,9 +1,3 @@
-# Nothing but Rails and csv. ahoy_matey is deliberately not a dependency either:
-# Ahoy::Visit and Ahoy::Event are generated into the host application rather
-# than defined by that gem, and nothing here calls ahoy itself. What this needs
-# is two tables of the right shape and models over them, whatever is writing
-# them and whatever they are called.
-
 require "csv"
 require "delegate"
 require "digest"
@@ -23,23 +17,23 @@ require "ahoy_dashboard/compatibility/record"
 require "ahoy_dashboard/version"
 require "ahoy_dashboard/configuration"
 require "ahoy_dashboard/markdown"
+require "ahoy_dashboard/http_client"
 require "ahoy_dashboard/llm"
 require "ahoy_dashboard/engine"
 require "ahoy_dashboard/assets"
 require "ahoy_dashboard/compact_number"
+require "ahoy_dashboard/date_format"
 require "ahoy_dashboard/event_statistics"
 require "ahoy_dashboard/analytics_cache"
+require "ahoy_dashboard/search_term"
+require "ahoy_dashboard/share"
+require "ahoy_dashboard/counted"
 
 module AhoyDashboard
   PAGE_VIEW = "page_view".freeze
 
-  # Fired by the engagement script when a page is left or navigated away from,
-  # carrying how far down it was read and how long it was open. One per page
-  # view at most.
   ENGAGEMENT = "engagement".freeze
 
-  # Fired as each quarter of a page is crossed, so a long guide can say where
-  # people stop rather than only how far the average one got.
   SCROLL_MILESTONE = "scroll_milestone".freeze
 
   class << self
@@ -55,9 +49,6 @@ module AhoyDashboard
       config.cache_store || Rails.cache
     end
 
-    # Every range, bucket and label is read in one zone rather than UTC, because
-    # a visit at 11pm belongs to the day the person had, not the day Postgres
-    # had.
     def time_zone
       ActiveSupport::TimeZone[Preferences.read(:site, :time_zone).to_s] || ActiveSupport::TimeZone["UTC"]
     end
@@ -78,10 +69,8 @@ module AhoyDashboard
       Preferences.read(:site, :canonical_host) || host
     end
 
-    # Sent with every request the dashboard makes on its own behalf, so the site
-    # on the other end can tell who is asking.
     def user_agent
-      "#{host || "ahoy_dashboard"} favicon proxy"
+      host.present? ? "ahoy_dashboard/#{VERSION} (#{host})" : "ahoy_dashboard/#{VERSION}"
     end
 
     def authorized?(controller)
@@ -92,12 +81,9 @@ module AhoyDashboard
       !!callable.call(controller)
     end
 
-    # Where the engine is mounted in the host, so anything that has to name a
-    # screen in plain text (the assistant's map of the app) says where it
-    # actually lives rather than where it lived in the app this came out of.
     def mount_path(rest = nil)
       base = begin
-        Rails.application.routes.url_helpers.ahoy_dashboard_path
+        AhoyDashboard::Engine.routes.url_helpers.root_path.chomp("/").presence || "/"
       rescue StandardError
         "/"
       end

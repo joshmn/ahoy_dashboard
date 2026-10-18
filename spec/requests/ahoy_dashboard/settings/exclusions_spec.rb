@@ -9,66 +9,17 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
     document.css("tbody tr").reject { |row| row["id"] == "confirm" }
   end
 
-  def filter_rows(body)
-    Nokogiri::HTML5(body).css("[data-dash--filters-target~='row']").reject { |node| node.ancestors("template").any? }
-  end
-
-  def values_in(row)
-    row.at_css("textarea[name$='[values_text]']")&.text.to_s.split("\n")
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/exclusions"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "sends a signed out visitor to sign in on a write too" do
-      post "/telemetry/settings/exclusions", params: { exclusion: { name: "Bots", filters: [ entry ] } }
-
-      expect(response).to redirect_to("/users/sign_in")
-      expect(AhoyDashboard::Exclusion.count).to be_zero
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/settings/exclusions"
-
-      expect(response).to have_http_status(:not_found)
-    end
-
-    it "is a 404 for a non-admin trying to write" do
-      sign_in create(:user)
-
-      post "/telemetry/settings/exclusions", params: { exclusion: { name: "Bots", filters: [ entry ] } }
-
-      expect(response).to have_http_status(:not_found)
-      expect(AhoyDashboard::Exclusion.count).to be_zero
-    end
-
-    it "is a 404 for a non-admin trying the switch" do
-      exclusion = create(:dash_exclusion)
-      sign_in create(:user)
-
-      patch "/telemetry/settings/exclusions/#{exclusion.id}/state", params: { enabled: "0" }
-
-      expect(response).to have_http_status(:not_found)
-      expect(exclusion.reload.enabled).to be(true)
-    end
-
-    it "is a 404 for a non-admin asking for a preview" do
-      sign_in create(:user)
-
-      get "/telemetry/settings/exclusions/preview", params: { exclusion: { filters: [ entry ] } }
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
+
+    include_examples "a settings record nobody created",
+                     path: "/telemetry/settings/exclusions", noun: "an exclusion", changes: { exclusion: { name: "x" } }
+
+    include_examples "a settings record built from filters",
+                     model: AhoyDashboard::Exclusion, factory: :dash_exclusion, path: "/telemetry/settings/exclusions",
+                     param: :exclusion, article: "an exclusion", noun: "exclusion", name: "Bots",
+                     filter: { "dimension" => "asn", "operator" => "contains", "value" => "EXAMPLE-DATACENTER" },
+                     other: { "dimension" => "country", "operator" => "is", "value" => "ZZ" }
 
     describe "index" do
       it "explains what an exclusion is when there are none" do
@@ -81,7 +32,7 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
 
       it "is on the settings menu" do
         get "/telemetry/settings/exclusions"
-        link = Nokogiri::HTML5(response.body).css(".set-nav a").find { |node| node.text.strip == "Excluded traffic" }
+        link = document.css(".set-nav a").find { |node| node.text.strip == "Excluded traffic" }
 
         expect(link["href"]).to eq("/telemetry/settings/exclusions")
         expect(link["aria-current"]).to eq("page")
@@ -109,14 +60,9 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
 
       it "counts every exclusion in one query" do
         create_list(:dash_exclusion, 3)
-        counted = 0
-        counter = ->(*, payload) { counted += 1 if payload[:sql].include?("count(*) filter") }
+        counted = captured_sql("count(*) filter", cached: true) { get "/telemetry/settings/exclusions" }
 
-        ActiveSupport::Notifications.subscribed(counter, "sql.active_record") do
-          get "/telemetry/settings/exclusions"
-        end
-
-        expect(counted).to eq(1)
+        expect(counted.size).to eq(1)
       end
 
       it "says an exclusion that names something gone is not being applied" do
@@ -150,7 +96,7 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
         exclusion = create(:dash_exclusion, name: "Bots")
 
         get "/telemetry/settings/exclusions", params: { confirm: exclusion.id }
-        confirm = Nokogiri::HTML5(response.body).at_css("#confirm")
+        confirm = document.at_css("#confirm")
 
         expect(confirm.text).to include("Delete Bots?")
         expect(confirm.at_css("form")["action"]).to eq("/telemetry/settings/exclusions/#{exclusion.id}")
@@ -178,7 +124,7 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
         document = Nokogiri::HTML5(response.body)
         row = sole_item(filter_rows(response.body))
 
-        expect(values_in(row)).to eq(%w[EXAMPLE-DATACENTER OTHER-CLOUD])
+        expect(filter_values(row)).to eq(%w[EXAMPLE-DATACENTER OTHER-CLOUD])
         expect(row.at_css("select option[selected]")["value"]).to eq("contains")
         expect(document.at_css("#dash_exclusion_preview").text.split.join(" "))
           .to include("This would hide 2 visits in the last 30 days")
@@ -187,7 +133,7 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
       it "offers the dimensions to filter on without the dashboard-only rows" do
         create(:dash_segment)
         get "/telemetry/settings/exclusions/new"
-        rail = Nokogiri::HTML5(response.body).at_css("[data-dash--modal-key='filter'] nav[aria-label=Dimensions]")
+        rail = document.at_css("[data-dash--modal-key='filter'] nav[aria-label=Dimensions]")
 
         expect(rail.css("a[data-dimension]").map { |node| node.text.strip }).to include("Country", "Browser")
         expect(rail.text).not_to include("Segments")
@@ -225,7 +171,7 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
         expect(sets.size).to eq(2)
         expect(sets.map { |set| set.css("input[name$='[block]']").map { |node| node["value"] }.uniq }).to eq([ %w[0], %w[1] ])
         expect(sets.first.at_css("button[aria-label='Add a filter to set 1']")).to be_present
-        expect(Nokogiri::HTML5(response.body).at_css("#exclusion-filter-button").text.strip).to eq("Add another set")
+        expect(document.at_css("#exclusion-filter-button").text.strip).to eq("Add another set")
       end
 
       it "takes a whole set away from its Remove set button" do
@@ -238,7 +184,7 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
 
         sets = sets_in(response.body)
         expect(sets.size).to eq(1)
-        expect(filter_rows(response.body).map { |row| values_in(row) }).to eq([ %w[AMAZON] ])
+        expect(filter_rows(response.body).map { |row| filter_values(row) }).to eq([ %w[AMAZON] ])
         expect(sole_item(sets).at_css("button[value='set:0']")).to be_present
       end
 
@@ -262,19 +208,19 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
                                "2" => { dimension: "country", operator: "is", values: %w[US], block: "1" } } }
         }
 
-        expect(Nokogiri::HTML5(response.body).at_css("tm-frame#dash_exclusion_preview").text.squish)
+        expect(document.at_css("tm-frame#dash_exclusion_preview").text.squish)
           .to include("This would hide 2 visits")
       end
     end
 
     describe "the filter dialog" do
-      def document
+      def new_form
         get "/telemetry/settings/exclusions/new"
-        Nokogiri::HTML5(response.body)
+        document
       end
 
       it "sits inside the form, feeding the rows from all traffic" do
-        page = document
+        page = new_form
         dialog = page.at_css("[data-dash--modal-key='filter']")
         field = dialog.ancestors.find { |node| node["data-controller"].to_s.include?("dash--filters") }
         url = URI.parse(dialog["data-dash--filter-modal-url-value"])
@@ -289,11 +235,11 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
       it "offers no segments inside a form" do
         create(:dash_segment, name: "Not in here")
 
-        expect(document.at_css("[data-dash--modal-key='filter'] nav").text).not_to include("Not in here")
+        expect(new_form.at_css("[data-dash--modal-key='filter'] nav").text).not_to include("Not in here")
       end
 
       it "opens from a set's add button and from a new set" do
-        page = document
+        page = new_form
 
         expect(page.at_css("[data-fx-add]")).to have_attribute("data-tm-filter")
         expect(page.at_css("button[data-action~='dash--filters#newSet']")).to have_attribute("data-tm-filter")
@@ -302,7 +248,7 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
       it "opens on one row's own dimension from that row" do
         create(:ahoy_visit, country: "US")
         get "/telemetry/settings/exclusions/new", params: { filters: [ { dimension: "country", operator: "is", value: "US" } ] }
-        row = Nokogiri::HTML5(response.body).at_css("[data-dash--filters-target~=row][data-dimension=country]")
+        row = document.at_css("[data-dash--filters-target~=row][data-dimension=country]")
         pick = row.at_css("[data-action~='dash--filters#more']")
 
         expect(pick["data-tm-filter-dimension"]).to eq("country")
@@ -359,13 +305,6 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
         expect(AhoyDashboard::Exclusion.count).to be_zero
       end
 
-      it "refuses an exclusion with no name" do
-        post "/telemetry/settings/exclusions", params: { exclusion: { name: " ", filters: [ entry ] } }
-
-        expect(response).to have_http_status(:unprocessable_entity)
-        expect(AhoyDashboard::Exclusion.count).to be_zero
-      end
-
       it "refuses a filter on the exit page and says why" do
         post "/telemetry/settings/exclusions", params: {
           exclusion: { name: "Exits", filters: [ entry(dimension: "exit_page", operator: "is", value: "/") ] }
@@ -402,7 +341,7 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
           exclusion: { name: "Bots", remove: "0",
                        filters: [ entry, entry(dimension: "country", operator: "is", value: "ZZ") ] }
         }
-        values = filter_rows(response.body).map { |row| values_in(row) }
+        values = filter_rows(response.body).map { |row| filter_values(row) }
 
         expect(response).to have_http_status(:ok)
         expect(values).to eq([ %w[ZZ] ])
@@ -420,23 +359,8 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("Edit Bots")
-        expect(values_in(row)).to eq(%w[EXAMPLE-DATACENTER])
+        expect(filter_values(row)).to eq(%w[EXAMPLE-DATACENTER])
         expect(row.at_css("select option[selected]")["value"]).to eq("contains")
-      end
-
-      it "says so on an exclusion that names something gone" do
-        exclusion = create(:dash_exclusion, :unreadable)
-
-        get "/telemetry/settings/exclusions/#{exclusion.id}/edit"
-
-        expect(response).to have_http_status(:ok)
-        expect(response.body).to include("This one is not being applied")
-      end
-
-      it "404s for an exclusion nobody created" do
-        get "/telemetry/settings/exclusions/9999/edit"
-
-        expect(response).to have_http_status(:not_found)
       end
     end
 
@@ -451,48 +375,6 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
         expect(response).to redirect_to("/telemetry/settings/exclusions")
         expect(exclusion.reload.name).to eq("Nowhere")
         expect(AhoyDashboard::ExclusionDecorator.new(exclusion).summary).to eq("Country is ZZ")
-      end
-
-      it "refuses to leave one with no filters" do
-        exclusion = create(:dash_exclusion)
-
-        patch "/telemetry/settings/exclusions/#{exclusion.id}", params: {
-          exclusion: { name: exclusion.name, filters: [ entry(value: "") ] }
-        }
-
-        expect(response).to have_http_status(:unprocessable_entity)
-        expect(exclusion.reload.entries.size).to eq(1)
-      end
-
-      it "refuses a name another exclusion already has" do
-        create(:dash_exclusion, name: "Taken")
-        exclusion = create(:dash_exclusion, name: "Bots")
-
-        patch "/telemetry/settings/exclusions/#{exclusion.id}", params: {
-          exclusion: { name: "Taken", filters: [ entry ] }
-        }
-
-        expect(response).to have_http_status(:unprocessable_entity)
-        expect(exclusion.reload.name).to eq("Bots")
-      end
-
-      it "takes a filter out when its remove is pressed, without saving" do
-        exclusion = create(:dash_exclusion)
-
-        patch "/telemetry/settings/exclusions/#{exclusion.id}", params: {
-          exclusion: { name: exclusion.name, remove: "0",
-                       filters: [ entry, entry(dimension: "country", operator: "is", value: "ZZ") ] }
-        }
-
-        expect(response).to have_http_status(:ok)
-        expect(filter_rows(response.body).map { |row| values_in(row) }).to eq([ %w[ZZ] ])
-        expect(exclusion.reload.entries.size).to eq(1)
-      end
-
-      it "404s for an exclusion nobody created" do
-        patch "/telemetry/settings/exclusions/9999", params: { exclusion: { name: "x" } }
-
-        expect(response).to have_http_status(:not_found)
       end
     end
 
@@ -559,41 +441,9 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
     end
 
     describe "destroy" do
-      it "deletes it" do
-        exclusion = create(:dash_exclusion)
-
-        delete "/telemetry/settings/exclusions/#{exclusion.id}"
-
-        expect(response).to redirect_to("/telemetry/settings/exclusions")
-        expect(AhoyDashboard::Exclusion.count).to be_zero
-      end
-
-      it "404s for an exclusion nobody created" do
-        delete "/telemetry/settings/exclusions/9999"
-
-        expect(response).to have_http_status(:not_found)
-      end
     end
 
     describe "markup" do
-      def expect_sound_markup(status: :ok)
-        document = Nokogiri::HTML5(response.body)
-        ids = document.css("[id]").map { |node| node["id"] }
-        references = document.css("[aria-labelledby], [aria-describedby]").flat_map do |node|
-          [ node["aria-labelledby"], node["aria-describedby"] ].compact.flat_map(&:split)
-        end
-        unnamed = document.css("button:not([aria-hidden=true])").reject do |button|
-          button.text.strip.present? || button["aria-label"].present? || button["title"].present?
-        end
-
-        expect(response).to have_http_status(status)
-        expect(document.css("h1").size).to eq(1)
-        expect(ids.group_by { |item| item }.transform_values(&:size).select { |_, count| count > 1 }.keys).to be_empty
-        expect(references - ids).to be_empty
-        expect(document.css("label[for]").map { |label| label["for"] } - ids).to be_empty
-        expect(unnamed.map(&:to_html)).to be_empty
-      end
-
       it "holds together on a list with rows, one of them broken" do
         create(:dash_exclusion)
         create(:dash_exclusion, :off)
@@ -625,7 +475,7 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
     describe "preview" do
       def preview_text(params, headers: {})
         get "/telemetry/settings/exclusions/preview", params: params, headers: headers
-        Nokogiri::HTML5(response.body).at_css("tm-frame#dash_exclusion_preview").text.split.join(" ")
+        document.at_css("tm-frame#dash_exclusion_preview").text.split.join(" ")
       end
 
       before do
@@ -661,8 +511,7 @@ RSpec.describe "Dashboard excluded traffic settings", type: :request do
       end
 
       it "answers the frame on its own when the frame asks" do
-        get "/telemetry/settings/exclusions/preview", params: { exclusion: { filters: [ entry ] } },
-                                                      headers: { "Tm-Frame" => "dash_exclusion_preview" }
+        get_frame("/telemetry/settings/exclusions/preview", "dash_exclusion_preview", params: { exclusion: { filters: [ entry ] } })
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("This would hide")

@@ -1,14 +1,10 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::ChatMessageDecorator, type: :decorator do
-  let(:chat) { AhoyDashboard::Chat.create! }
-
-  def decorate(message)
-    described_class.new(message)
-  end
+  let(:chat) { create(:dash_chat) }
 
   def reply(**attributes)
-    chat.chat_messages.create!(role: :assistant, status: :complete, **attributes)
+    create(:dash_chat_message, :assistant, chat: chat, **attributes)
   end
 
   describe "#looked_at" do
@@ -41,6 +37,15 @@ RSpec.describe AhoyDashboard::ChatMessageDecorator, type: :decorator do
 
     it "is nothing at all when neither was recorded" do
       expect(decorate(reply(content: "Flat.")).tokens).to be_nil
+    end
+  end
+
+  describe "#work_label" do
+    it "says what it read, then that it is writing, then that it is still reading" do
+      expect(decorate(reply(tool_calls: [ { "name" => "TrafficSummary" } ])).work_label)
+        .to eq("Read the headline figures")
+      expect(decorate(reply(content: "Half an answer")).work_label).to eq("Writing")
+      expect(decorate(reply).work_label).to eq("Reading the data")
     end
   end
 end

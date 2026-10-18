@@ -13,8 +13,7 @@ module AhoyDashboard
     private
 
     def dialog_params
-      keys = DashboardHelper::DESTINATION_KEYS.map { |key| "#{DashboardHelper::CARRIED_PREFIX}#{key}" }
-      params.permit(:return, :dimension, *keys).to_h.symbolize_keys
+      params.permit(:return, :dimension, *FilterDestination.prefixed_keys).to_h.symbolize_keys
     end
   end
 end

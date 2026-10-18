@@ -1,14 +1,10 @@
 <% content_for :title, "New funnel" %>
 <% content_for :dash_settings_section, "funnels" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "New funnel",
-          lede: "Pick the goals in order. It reports on all the data already collected." %>
+<%= dash_page_head title: "New funnel",
+      lede: "Pick the goals in order. It reports on all the data already collected." %>
 
-    <%= dash_card do %>
-      <%= render "ahoy_dashboard/settings/funnels/form",
-            url: settings_funnels_path, method: :post, submit_label: "Create funnel" %>
-    <% end %>
-  </section>
-</div>
+<%= dash_card do %>
+  <%= render "ahoy_dashboard/settings/funnels/form",
+        url: settings_funnels_path, method: :post, submit_label: "Create funnel" %>
+<% end %>

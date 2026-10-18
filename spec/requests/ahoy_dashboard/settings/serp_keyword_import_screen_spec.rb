@@ -1,16 +1,6 @@
 require "rails_helper"
 
-# The import screen itself, rather than what importing does.
-#
-# The list it offers can be a hundred and fifty rows long, which used to push
-# every setting and the button below it off the bottom of the page. What is on
-# here now is a list you can search and sort, a running count and a cost that
-# stay in view, and a paste box that is out of the way until it is wanted.
 RSpec.describe "Dashboard serp keyword import screen", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
   def searched(query, impressions:, clicks: 0, position: 12.0)
     create(:dash_search_console_keyword, query: query, impressions: impressions, clicks: clicks,
            position: position, date: Date.current - 3)
@@ -54,8 +44,6 @@ RSpec.describe "Dashboard serp keyword import screen", type: :request do
       expect(actions).to include("Select all", "Clear")
     end
 
-    # Every checkbox is a target of the cost controller, so ticking one moves
-    # the number in the corner.
     it "wires every row into the running count" do
       boxes = document.css("[data-dash--keyword-form-target='pick']")
 
@@ -70,8 +58,6 @@ RSpec.describe "Dashboard serp keyword import screen", type: :request do
       get "/telemetry/settings/serp_keyword_import/new"
     end
 
-    # It never said what an import would cost. You could pick two hundred
-    # keywords, five places and daily, and find out afterwards.
     it "says what the whole import costs, not only what one keyword costs" do
       summary = document.css(".kw-sum")
 

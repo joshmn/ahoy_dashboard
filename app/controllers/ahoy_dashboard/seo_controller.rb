@@ -8,12 +8,9 @@ module AhoyDashboard
 
     private
 
-    # The overview is not one of the surfaces the rail lists under a group, so
-    # it wears a registry entry built here rather than one in the list that
-    # would then have to be filtered out of every menu.
     def surface
       @surface ||= AhoyDashboard::Seo::Surface.new(
-        key: "seo", title: "SEO", group: nil, source: :stored, route: :seo_path, reads: "",
+        key: "seo", title: "SEO", group: nil, source: :stored, route: :seo_path, reads: "search_console_rows",
         features: AhoyDashboard::Seo::Surface::FEATURES,
         blurb: "How your site is doing in Google search, and what to work on next."
       )

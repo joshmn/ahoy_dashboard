@@ -1,25 +1,17 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::AnalyticsCache do
   let(:now) { Time.utc(2026, 8, 11, 14, 30, 5) }
   let(:range) { now.beginning_of_day..now.end_of_day }
 
-  around do |example|
-    original_cache = Rails.cache
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    travel_to(now) { example.run }
-  ensure
-    Rails.cache.clear
-    Rails.cache = original_cache
-  end
+  include_context "with a memory cache"
+
+  around { |example| travel_to(now) { example.run } }
 
   def visitor(country: "US", token: nil, at: now - 1.hour)
-    visit = dash_visit(started_at: at, country: country, visitor: token)
-    dash_page_view(visit, at: at)
-    visit
+    dash_landing(at: at, country: country, visitor: token)
   end
 
   def total(scope: dash_scope(range: range), metric: "visitors")

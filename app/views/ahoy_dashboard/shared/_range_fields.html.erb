@@ -1,11 +1,3 @@
-<%# The custom range's own fields. They sit out here rather than inside the
-    period menu on purpose: the menu controller claims the arrow keys for its own
-    list, and a date input needs them to step days.
-
-    url is the surface they apply to and clear_path is the way back to the
-    default range. carried is whatever that surface holds that the query string
-    does not, so setting a range on a composed question comes back to the same
-    question rather than to the dashboard's default breakdown. %>
 <% url = local_assigns.fetch(:url) %>
 <% clear_path = local_assigns.fetch(:clear_path) %>
 <% carried = local_assigns.fetch(:carried, {}) %>
@@ -14,9 +6,7 @@
 <% fields = capture do %>
   <%= form_with url: url, method: :get, class: "tm-range", html: { "aria-label": "Custom date range" } do %>
     <%= render "ahoy_dashboard/shared/query_fields", except: [ :from, :to ] %>
-    <% carried.each do |name, value| %>
-      <%= hidden_field_tag name, value, id: nil %>
-    <% end %>
+    <%= dash_hidden_fields carried %>
 
     <span class="tm-range__bound">
       <span class="tm-range__word" aria-hidden="true">From</span>

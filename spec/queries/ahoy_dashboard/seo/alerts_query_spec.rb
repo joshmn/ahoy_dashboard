@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/alerts"
 
 RSpec.describe AhoyDashboard::Seo::AlertsQuery do
   let(:range) { 7.days.ago..Time.current }
@@ -18,16 +17,11 @@ RSpec.describe AhoyDashboard::Seo::AlertsQuery do
     create(:dash_alert_event, rule: rule, fired_at: range.end, severity: :medium, delivery_error: "")
     create(:dash_alert_event, rule: rule, fired_at: 1.day.ago, severity: :low, delivery_error: "failed")
     create(:dash_alert_event, rule: rule, fired_at: range.begin - 1.second, severity: :high, delivery_error: "outside")
-    reads = []
-    subscriber = ->(_name, _started, _finished, _id, payload) do
-      sql = payload[:sql]
-      reads << sql if sql.include?('FROM "ahoy_dashboard_alert_events"') && sql.match?(/count\(/i)
-    end
-
-    found = ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { result }
+    found = nil
+    reads = captured_sql('FROM "ahoy_dashboard_alert_events"', cached: true) { found = result }
 
     expect(found).to have_attributes(total: 3, firing: 1, failed_alerts: 2)
-    expect(reads.size).to eq(1)
+    expect(reads.grep(/count\(/i).size).to eq(1)
   end
 
   describe "counts past one page of alerts" do

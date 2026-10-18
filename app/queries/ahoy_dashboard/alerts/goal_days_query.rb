@@ -60,7 +60,7 @@ module AhoyDashboard
         expression = dimension.sql
 
         AhoyDashboard::ScopeQuery.call(range: range).events_for(dimension)
-          .where(name: goals.map { |goal| goal.custom_event? ? goal.event_name : AhoyDashboard::PAGE_VIEW }.uniq)
+          .where(name: AhoyDashboard::Sql::GoalCompiler.event_names(goals))
           .where(time: range)
           .where("#{expression} is not null")
           .group(Arel.sql(expression.to_s), Arel.sql(days_ago))
@@ -68,7 +68,7 @@ module AhoyDashboard
       end
 
       def days_ago
-        "floor(extract(epoch from (#{Sql.literal(now.utc.strftime("%Y-%m-%d %H:%M:%S.%6N"))}::timestamp - ahoy_events.time)) / 86400)::integer"
+        "floor(extract(epoch from (#{Timestamp.literal(now)} - ahoy_events.time)) / 86400)::integer"
       end
     end
   end

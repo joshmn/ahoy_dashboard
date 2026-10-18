@@ -8,7 +8,6 @@ module AhoyDashboard
         end
 
         def call
-          return broadcast(:missing) if account.nil?
           return broadcast(:invalid, form) if form.invalid?
 
           cleared = nil
@@ -17,8 +16,6 @@ module AhoyDashboard
             events = Properties::AdoptCommand.call(account: account, property_uri: form.property_uri)
             cleared = events[:cleared]
 
-            # Stored exactly as Google handed it over. "sc-domain:example.com" is the
-            # real identifier of a domain property, not a scheme that needs fixing.
             account.update!(property_uri: form.property_uri)
           end
 

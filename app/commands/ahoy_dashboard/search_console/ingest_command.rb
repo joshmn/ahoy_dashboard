@@ -12,10 +12,9 @@ module AhoyDashboard
       PERMISSION_MESSAGE = "This Google account can no longer read %<property>s in Search Console. Give it " \
                            "access again there, or pick another property.".freeze
 
-      def initialize(account: nil, dates: nil, data_state: SearchConsole::DATA_STATE_FINAL, stamp: true)
+      def initialize(account: nil, dates: nil, stamp: true)
         @account = account
         @dates = dates || SearchConsole.ingest_dates
-        @data_state = data_state
         @stamp = stamp
         @refused = []
       end
@@ -48,7 +47,7 @@ module AhoyDashboard
 
       private
 
-      attr_reader :dates, :data_state, :stamp, :refused
+      attr_reader :dates, :stamp, :refused
 
       def account
         @account ||= GoogleAccount.current
@@ -76,9 +75,7 @@ module AhoyDashboard
       end
 
       def fetch(date, dimensions)
-        AnalyticsService.call(
-          account: account, dates: [date], dimensions: dimensions, data_state: data_state
-        ).fetch(date)
+        AnalyticsService.call(account: account, date: date, dimensions: dimensions)
       end
 
       def finish

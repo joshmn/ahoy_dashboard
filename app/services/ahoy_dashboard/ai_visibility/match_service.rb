@@ -32,7 +32,8 @@ module AhoyDashboard
       def match(entry)
         domain = domain_for(entry.url, entry.title)
 
-        Match.new(url: entry.url, title: entry.title, domain: domain, ours: ours?(domain))
+        Match.new(url: entry.url, title: entry.title, domain: domain,
+                  ours: Serp::Domain.matches?(domain, own, match_subdomains: true))
       end
 
       def domain_for(url, title)
@@ -41,12 +42,6 @@ module AhoyDashboard
 
         named = Serp::Domain.host(title)
         named.present? && named.match?(HOSTNAME) ? named : host
-      end
-
-      def ours?(domain)
-        return false if own.blank? || domain.blank?
-
-        domain == own || domain.end_with?(".#{own}")
       end
 
       def mentioned?

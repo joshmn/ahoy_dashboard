@@ -1,9 +1,3 @@
-# Tasks for working on the gem itself. Deliberately not in lib/tasks: the engine
-# loads that directory into every host application, and a host has no reason to
-# own a build, no reason to have node or the bootstrap gem, and no way to run
-# any of this. Everything under assets/builds is committed; consumers build
-# nothing.
-
 require "pathname"
 require "json"
 require "openssl"
@@ -54,10 +48,6 @@ end
 
 desc "bundle assets/javascript into assets/builds/ahoy_dashboard.js"
 task :build_js do
-  # The module tree is 24 files that import each other, and every request for
-  # one goes through the dashboard's own controller and its authorization. A
-  # cold load was 24 authenticated round trips three imports deep. One file is
-  # one round trip.
   entry = ROOT.join("assets/javascript/index.js")
   out = BUILDS.join("ahoy_dashboard.js")
   BUILDS.mkpath

@@ -1,7 +1,7 @@
 module AhoyDashboard
   module Settings
     module Exclusions
-      class StatesController < AhoyDashboard::BaseController
+      class StatesController < AhoyDashboard::Settings::BaseController
         def update
           exclusion = AhoyDashboard::Exclusion.find(params[:exclusion_id])
 

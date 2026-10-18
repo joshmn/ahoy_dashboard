@@ -2,10 +2,6 @@ class CreateAhoyDashboardAlertTables < ActiveRecord::Migration[6.0]
   CHECKS = :ahoy_dashboard_serp_checks
 
   def up
-    # What to watch for. The key decides which evaluator runs; the threshold is
-    # the one number that rule reads. Rules are seeded switched off, because a
-    # rule that fires the day it is installed has never been calibrated against
-    # anything.
     create_table :ahoy_dashboard_alert_rules do |t|
       t.string :key, null: false
       t.string :name, null: false
@@ -21,9 +17,6 @@ class CreateAhoyDashboardAlertTables < ActiveRecord::Migration[6.0]
 
     add_index :ahoy_dashboard_alert_rules, :key, unique: true
 
-    # What actually happened. Written whether or not anything is delivered, so
-    # the dashboard has the record even where no notifier is configured, and so
-    # a rule switched on later can be read against what it would have caught.
     create_table :ahoy_dashboard_alert_events do |t|
       t.references :rule, null: false,
                    foreign_key: { to_table: :ahoy_dashboard_alert_rules, on_delete: :cascade },

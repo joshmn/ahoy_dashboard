@@ -1,10 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp::TrackedRangeQuery do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
 
   around { |example| travel_to(now) { example.run } }
 

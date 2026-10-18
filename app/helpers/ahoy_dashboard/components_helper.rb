@@ -144,6 +144,18 @@ module AhoyDashboard
       tag.div(safe_join(parts.compact), class: classes, **options)
     end
 
+    def dash_empty_card(title = nil, card_class: nil, **options)
+      dash_card(class: card_class) { dash_empty(title, **options) }
+    end
+
+    def dash_value(value)
+      value.nil? ? tag.span("&mdash;".html_safe, class: "nil") : value
+    end
+
+    def dash_hidden_fields(params)
+      safe_join(params.map { |name, value| hidden_field_tag(name, value, id: nil) })
+    end
+
     def dash_page_head(title = nil, lede: nil, back: nil, kicker: nil, actions: nil, clip: false, **options, &block)
       title ||= options.delete(:title)
       heading = clip ? tag.h1(title, class: "text-truncate", title: title) : tag.h1(title)
@@ -259,8 +271,6 @@ module AhoyDashboard
       form_with(**options, builder: AhoyDashboard::Components::FormBuilder, &block)
     end
 
-    # A select with its label, hidden, the same way dash_search_field carries
-    # its own.
     def dash_select(name, choices, selected = nil, label:, id:, size: :sm, **options)
       classes = class_names("form-select", options.delete(:class), "form-select-sm" => size == :sm)
       select = select_tag(name, options_for_select(choices, selected), id: id, class: classes, **options)
@@ -268,16 +278,11 @@ module AhoyDashboard
       safe_join([ tag.label(label, for: id, class: "visually-hidden"), select ])
     end
 
-    # A form control that holds more than one input: tokens, a chip, and the
-    # text box they sit in front of. The box draws the control; the input inside
-    # it draws nothing.
     def dash_token_field(**options, &block)
       tag.div(capture(&block), class: class_names("form-control d-flex flex-wrap align-items-center gap-1",
                                                   options.delete(:class)), **options)
     end
 
-    # Bootstrap's checkbox, drawn rather than used, for a row that is itself the
-    # toggle and says so with aria-pressed.
     def dash_check_mark(**options)
       tag.span(nil, class: class_names("form-check-input m-0 flex-shrink-0", options.delete(:class)),
                     "aria-hidden": "true", **options)
@@ -290,9 +295,6 @@ module AhoyDashboard
       safe_join([ tag.label(label, for: id, class: "visually-hidden"), input ])
     end
 
-    # A labelled date or datetime field. Here rather than in the two templates
-    # that draw a custom range, so the range on the dashboard and the range on a
-    # composed question cannot end up two different controls.
     def dash_range_field(name, value, label:, id:, type: "date", max: nil, size: :sm, hide_label: false, **options)
       classes = class_names("form-control", options.delete(:class), "form-control-sm" => size == :sm)
       required = options.delete(:required) { true }
@@ -301,10 +303,6 @@ module AhoyDashboard
       safe_join([ tag.label(label, class: hide_label ? "visually-hidden" : "form-label", for: id), input ])
     end
 
-    # Two shapes of the same control. An item with a url is a link and the strip
-    # is navigation; an item without one is a button and the strip is a group,
-    # for a choice that changes what is on screen without going anywhere. The
-    # markup is the same either way, which is the only reason it is one helper.
     def dash_segmented(items, label:, size: :sm, **options)
       buttons = items.none? { |item| item[:url] }
       classes = class_names("btn", "btn-sm" => size == :sm)
@@ -448,9 +446,8 @@ module AhoyDashboard
     end
 
     def dash_menu(id:, label: nil, icon: nil, toggle: :button, caret: true, chevron: false, align: :start, pressed: nil,
-                  aria_label: nil, button_id: nil, button_class: nil, menu_class: nil, panel_class: nil, after: nil,
-                  **options, &block)
-      button_id ||= "#{id}-button"
+                  aria_label: nil, button_class: nil, menu_class: nil, panel_class: nil, **options, &block)
+      button_id = "#{id}-button"
       body = safe_join([
         (dash_icon(icon, size: 14) if icon),
         tag.span(label),
@@ -471,7 +468,7 @@ module AhoyDashboard
                                        class: class_names("dropdown-menu tm-popover", panel_class,
                                                           "dropdown-menu-end" => align == :end))
 
-      tag.div(safe_join([ button, panel, after ].compact), class: class_names("dropdown", menu_class),
+      tag.div(safe_join([ button, panel ]), class: class_names("dropdown", menu_class),
               data: { controller: "dash--menu" }.merge(options.delete(:data).to_h), **options)
     end
 
@@ -509,14 +506,13 @@ module AhoyDashboard
       dash_menu_item(item[:label], item[:url], current: item[:active], note: item[:note], data: item[:data])
     end
 
-    def dash_menu_item(label = nil, url = nil, current: false, tick: false, note: nil, icon: nil, chevron: false,
+    def dash_menu_item(label = nil, url = nil, current: false, note: nil, icon: nil, chevron: false,
                        meta: nil, danger: false, method: nil, form_class: nil, **options, &block)
-      marked = current || tick
       main = safe_join([ (dash_icon(icon, size: 13) if icon), (block ? capture(&block) : dash_menu_item_label(label, meta)) ].compact)
       ending = safe_join([
         (tag.span(note) if note.present?),
-        (dash_icon(:check, size: 13, class_name: "ck") if marked),
-        (dash_icon(:chevron_right, size: 12) if chevron && !marked)
+        (dash_icon(:check, size: 13, class_name: "ck") if current),
+        (dash_icon(:chevron_right, size: 12) if chevron && !current)
       ].compact)
       body = safe_join([ tag.span(main, class: "menu-item-main"), (tag.span(ending, class: "menu-item-end") if ending.present?) ].compact, " ")
       classes = class_names("dropdown-item menu-item", options.delete(:class),
@@ -532,14 +528,10 @@ module AhoyDashboard
       tag.div(text, class: "dropdown-header menu-header", id: id)
     end
 
-    # A column of pills, for a rail down the side of a dialog or a page.
     def dash_nav_list(**options, &block)
       tag.ul(capture(&block), class: class_names("nav nav-pills flex-column", options.delete(:class)), **options)
     end
 
-    # One pill in dash_nav_list. A url makes it a link and a method a form of
-    # one button; neither, or disabled, is a button that is there and cannot be
-    # pressed. current marks it: true for a choice, or an aria-current token.
     def dash_nav_item(label, url = nil, icon: nil, current: false, count: nil, method: nil, params: {}, disabled: false,
                       **options)
       classes = class_names("nav-link d-flex align-items-center gap-2 w-100 text-start", options.delete(:class),
@@ -558,21 +550,6 @@ module AhoyDashboard
         end
 
       tag.li(control, class: "nav-item")
-    end
-
-    def dash_nav_menu(id:, label:, items:, active: false)
-      toggle = link_to(label, "#", class: class_names("nav-link dropdown-toggle", "active" => active), role: "button",
-                                   id: "#{id}-button", "aria-expanded": "false", "aria-controls": id,
-                                   data: { "dash--menu-target": "button", action: "dash--menu#toggle" })
-      entries = items.map do |item|
-        tag.li(link_to(item[:label], item[:url], class: class_names("dropdown-item", "active" => item[:active]),
-                                                 "aria-current": ("page" if item[:active]),
-                                                 data: { "dash--menu-target": "item" }.merge(item[:data].to_h)))
-      end
-      panel = tag.ul(safe_join(entries), class: "dropdown-menu", id: id, "aria-labelledby": "#{id}-button",
-                                         data: { "dash--menu-target": "panel" })
-
-      tag.li(safe_join([ toggle, panel ]), class: "nav-item dropdown", data: { controller: "dash--menu" })
     end
 
     private

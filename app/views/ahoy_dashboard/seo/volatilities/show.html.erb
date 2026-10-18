@@ -4,10 +4,8 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false %>
 
   <% if !@presenter.any? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.rank_empty(title: "Not enough readings yet",
-                                    hint: "Volatility compares two checks of the same search. Try a longer date range.") %>
-    <% end %>
+    <%= dash_empty_card **@presenter.rank_empty(title: "Not enough readings yet",
+                                       hint: "Volatility compares two checks of the same search. Try a longer date range.") %>
   <% else %>
     <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
 

@@ -1,11 +1,4 @@
 module AhoyDashboard
-  # The goal conversions card, which is its own section under the journey rather
-  # than a panel in the grid.
-  #
-  # Goals are the one breakdown the dashboard draws full width, because the row
-  # carries three numbers instead of one and a 554px card cannot hold them beside
-  # a name. That is also why it is not a Report: a Report is a card with tabs in
-  # a half-width column, and this has neither.
   class GoalConversionsPresenter
     FRAME = "dash_goal_conversions".freeze
     ROWS = 9
@@ -37,9 +30,6 @@ module AhoyDashboard
         goal&.revenue?
       end
 
-      # Printed beside the name rather than in a column of its own, because only
-      # some goals carry money and an empty fourth column on every other row
-      # reads as a number that failed to load.
       def revenue
         return if !revenue? || metrics["revenue_total"].nil?
 
@@ -115,24 +105,17 @@ module AhoyDashboard
       goals_by_name[name]
     end
 
-    # The bar is a share of the busiest goal, like every other list on the
-    # dashboard, rather than a share of everybody. Conversion rates are small
-    # and a bar drawn against the visitor total would be a hairline on all of
-    # them; the number beside it is already the honest one.
     def share(visitors)
-      return 0.0 unless busiest.positive?
-
-      (visitors.to_f / busiest).clamp(0.0, 1.0)
+      AhoyDashboard::Share.fraction(visitors, of: busiest)
     end
 
     def filtered?(name)
       !applied_index(name).nil?
     end
 
-    # Clicking a goal filters the whole dashboard by it, and clicking the one
-    # already applied takes it off, so the row is the control both ways.
     def filter_params(name)
-      return query.with(filters: removed(name).to_param).to_query if filtered?(name)
+      index = applied_index(name)
+      return query.without_filter_params(index) unless index.nil?
 
       query.filter_link_params(AhoyDashboard::Dimension::GOAL_KEY, name)
     end
@@ -157,10 +140,6 @@ module AhoyDashboard
 
     def busiest
       @busiest ||= rows.map(&:visitors).max.to_i
-    end
-
-    def removed(name)
-      query.filters.without(applied_index(name))
     end
 
     def applied_index(name)

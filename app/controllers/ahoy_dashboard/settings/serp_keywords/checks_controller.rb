@@ -1,7 +1,7 @@
 module AhoyDashboard
   module Settings
     module SerpKeywords
-      class ChecksController < AhoyDashboard::BaseController
+      class ChecksController < AhoyDashboard::Settings::BaseController
         requires_installed :serp
 
         def create

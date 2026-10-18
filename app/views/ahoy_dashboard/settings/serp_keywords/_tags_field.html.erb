@@ -1,3 +1,4 @@
+<% scope = form.object_name %>
 <% list_id = "#{scope}_tag_suggestions" %>
 <% hint = local_assigns.fetch(:hint, "Type a tag and press Enter. A tag is only a label, for reading your rankings one group at a time.") %>
 <div data-controller="dash--tag-field" data-dash--tag-field-name-value="<%= scope %>[tags][]">

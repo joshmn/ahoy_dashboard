@@ -1,17 +1,11 @@
 <% content_for :title, "Save a question" %>
 <% content_for :dash_settings_section, "saved_queries" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Save a question",
-          lede: "Name the question you built in Explore.",
-          actions: capture {
-            dash_button "Back to Explore", explore_path(@form.question), icon: :back, data: { tm_frame: "_top" }
-          } %>
+<%= dash_page_head title: "Save a question",
+      lede: "Name the question you built in Explore.",
+      actions: dash_button("Back to Explore", explore_path(@form.question), icon: :back, data: { tm_frame: "_top" }) %>
 
-    <%= dash_card do %>
-      <%= render "ahoy_dashboard/settings/saved_queries/form",
-            url: settings_saved_queries_path, method: :post, submit_label: "Save question" %>
-    <% end %>
-  </section>
-</div>
+<%= dash_card do %>
+  <%= render "ahoy_dashboard/settings/saved_queries/form",
+        url: settings_saved_queries_path, method: :post, submit_label: "Save question" %>
+<% end %>

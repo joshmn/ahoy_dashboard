@@ -1,11 +1,5 @@
 module AhoyDashboard
   module Reports
-    # What the traffic email is: four numbers for the window, the same four for
-    # the window before it, and the three lists.
-    #
-    # The scope is built here rather than taken from a QueryForm because there is
-    # no URL behind an email. Whole site, no filters, no segment, crawlers out,
-    # which is the dashboard with nothing switched on.
     class DigestQuery
       METRICS = %w[visitors visits pageviews bounce_rate].freeze
 

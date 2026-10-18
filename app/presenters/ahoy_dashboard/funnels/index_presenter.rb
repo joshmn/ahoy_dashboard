@@ -12,9 +12,7 @@ module AhoyDashboard
       end
 
       def funnel_presenters
-        @funnel_presenters ||= result.readings.map do |reading|
-          FunnelPresenter.new(query: query, funnel: reading.funnel, result: reading)
-        end
+        @funnel_presenters ||= FunnelPresenter.wrap(result.readings, query: query)
       end
 
       def funnels

@@ -1,16 +1,6 @@
 import { Controller } from "../runtime/controllers.js"
+import { sentence } from "../runtime/text.js"
 
-// The answer as it is written. It reads an event stream of the row the job is
-// filling in and paints the text straight into the turn, so the wait is the
-// answer arriving rather than a spinner.
-//
-// The streamed text is painted as text, never as markup: it is model output and
-// it is half written, so there is nothing to render yet. When the stream says
-// it is done the frame is reloaded once and the server hands back the same
-// answer rendered and sanitised properly.
-//
-// Falls back to reloading the frame on a timer, which is what this did before
-// there was a stream, so a browser with no EventSource still gets the answer.
 export default class extends Controller {
   static targets = ["body", "dots", "label"]
   static values = {
@@ -64,19 +54,11 @@ export default class extends Controller {
     if (this.hasBodyTarget && data.content) this.bodyTarget.textContent = data.content
     if (this.hasLabelTarget) this.labelTarget.textContent = this.label(data)
 
-    // The dots are the wait. Once there are words arriving the words are the
-    // wait, and three bouncing dots under them are decoration.
     if (this.hasDotsTarget) this.dotsTarget.hidden = Boolean(data.content)
 
-    // Only if they were already at the bottom. Somebody who has scrolled up to
-    // read something earlier is reading it, and yanking them back down is worse
-    // than letting the answer run on out of sight.
     if (following) this.scroll()
   }
 
-  // The page on the Ask screen, the panel's own box when it is in the panel.
-  // Scrolling the window from inside the panel would move the screen the
-  // question is about out from under the person reading the answer.
   get box() {
     return this.element.closest("[data-chat-scroll]")
   }
@@ -101,7 +83,7 @@ export default class extends Controller {
   }
 
   label({ content, tools }) {
-    if (tools?.length) return `Read ${tools.join(", ")}`
+    if (tools?.length) return `Read ${sentence(tools)}`
     if (content) return "Writing"
 
     return "Reading the data"

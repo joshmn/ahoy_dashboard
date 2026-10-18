@@ -1,8 +1,4 @@
 module AhoyDashboard
-  # The whole dashboard is one URL, so the query string is read once here and
-  # every controller, link and frame src is built back out of it. Malformed URL
-  # values fall back to defaults because people edit these by hand. Database
-  # failures still surface.
   class QueryForm < AhoyDashboard::Form
     DEFAULT_PERIOD = "30d".freeze
     COMPARISONS = %w[previous_period year_over_year].freeze
@@ -11,18 +7,9 @@ module AhoyDashboard
     NO_FILTERS = "none".freeze
     IS = "is".freeze
 
-    # What a remembered view is allowed to carry. Filters are deliberately not on
-    # the list. A filter is a question somebody asked once, and putting it back on
-    # the next visit means every number on the page is quietly scoped to
-    # something nobody asked for again, with a chip in the corner as the only
-    # warning.
     VIEW_KEYS = %i[period interval metric comparison crawlers internal from to].freeze
     CLOCK_PATTERN = /\A\d{2}:\d{2}\z/
 
-    # Any one of these in the URL and the URL wins whole, rather than the
-    # remembered view filling in the keys it left out. to_query leaves defaults
-    # out, so "?period=day" is not half a view: it is today with everything else
-    # default, and that is what somebody following the link has to land on.
     URL_KEYS = (VIEW_KEYS + %i[filters]).freeze
 
     attribute :period_key, :string
@@ -55,9 +42,6 @@ module AhoyDashboard
       )
     end
 
-    # The remembered view arrives as a query string and is read back in through
-    # the same reader as the URL, so a cookie somebody has edited is worth
-    # exactly what a hand-edited address bar is worth: a fall back to defaults.
     def self.remembered_view(remembered)
       parsed = remembered.is_a?(String) ? Rack::Utils.parse_nested_query(remembered) : remembered
 
@@ -66,14 +50,6 @@ module AhoyDashboard
       {}
     end
     private_class_method :remembered_view
-
-    def self.normalize(params)
-      hash = params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h : params
-      hash.to_h.symbolize_keys
-    rescue StandardError
-      {}
-    end
-    private_class_method :normalize
 
     def self.joined_bound(date, time)
       date = date.to_s.strip
@@ -125,10 +101,10 @@ module AhoyDashboard
       period.label_for(range, timed: timed?)
     end
 
-    # What the date control says it is showing. A custom range says its own
-    # bounds: "Custom range" is the name of the menu item somebody picked, not
-    # the window they are looking at, and on a range dragged off the chart that
-    # window is the one thing on the page nothing else prints.
+    def range_title
+      period.custom? ? range_label : period.label
+    end
+
     def period_label
       return period.running_label(range) unless period.custom?
       return range_label unless period.running?(range)
@@ -136,10 +112,6 @@ module AhoyDashboard
       "#{range_label} so far"
     end
 
-    # What the custom range's own fields are filled with. A range dragged out of
-    # the chart is minutes wide, so the fields have to be able to say minutes: a
-    # date input rounds both ends to the day, and applying one silently widened
-    # the window it was sitting there showing.
     def range_from_date
       zoned(range.begin).to_date.to_s
     end
@@ -166,10 +138,6 @@ module AhoyDashboard
       range_field(range.begin)
     end
 
-    # A timed closing bound is held as the last instant inside the range, so it
-    # goes back the way Period read it: one second past the end, floored to the
-    # minute, which is the time somebody typed. A dated one is its own day, and
-    # adding the second there rolls it onto the next.
     def range_to_field
       return range_field(range.end) unless timed?
 
@@ -253,8 +221,6 @@ module AhoyDashboard
       )
     end
 
-    # Everything a link needs to arrive at the view somebody is looking at now.
-    # Defaults are left out so a plain /telemetry stays a plain URL.
     def to_query
       {
         period: period.key,
@@ -269,11 +235,6 @@ module AhoyDashboard
       }.compact
     end
 
-    # The part of the view worth keeping until next time, in the same shape as
-    # the query string so there is only one syntax to read. Blank when the
-    # dashboard is sitting at its defaults: to_query always names the period, and
-    # storing "this operator likes the default" would leave a Reset view control
-    # on the bar forever with nothing to reset.
     def to_view
       params = to_query.slice(*VIEW_KEYS)
       params.delete(:period) if period.key == AhoyDashboard::Period.default.key

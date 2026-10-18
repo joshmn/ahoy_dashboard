@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 module AhoyDashboard
-
   class FaviconEnqueueService
     PENDING_TTL = 10.minutes
 
@@ -18,7 +17,7 @@ module AhoyDashboard
     def call
       return if AhoyDashboard.cache.is_a?(ActiveSupport::Cache::NullStore)
       return if FaviconFetchJob.queue_adapter.is_a?(ActiveJob::QueueAdapters::InlineAdapter)
-      return if AhoyDashboard.cache.exist?("#{FaviconService::ICON_KEY}/#{domain}")
+      return if AhoyDashboard.cache.exist?(FaviconService.cache_key(domain))
       return unless AhoyDashboard.cache.write(pending_key, true, expires_in: PENDING_TTL, unless_exist: true)
 
       FaviconFetchJob.perform_later(domain)

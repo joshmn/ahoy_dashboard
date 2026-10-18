@@ -13,8 +13,9 @@ module AhoyDashboard
         ActionController::Base.helpers
       end
 
-      def initialize(keyword: nil)
+      def initialize(keyword: nil, listed: [])
         @keyword = keyword
+        @listed = listed
       end
 
       def path
@@ -43,9 +44,6 @@ module AhoyDashboard
         end
       end
 
-      # A queued sweep is what the last click did, not a thing that is wrong, so
-      # it stays on the disabled button and never becomes a banner. Otherwise
-      # every use of the button would answer with a warning.
       def notice_reason
         reason unless blocker == :queued
       end
@@ -55,7 +53,7 @@ module AhoyDashboard
         return "This keyword is paused." unless row_keyword.enabled?
         return "Pick a site to look for first." if sites.zero?
 
-        "Sent for checking a moment ago." if SweepCommand.queued?(row_keyword)
+        "Sent for checking a moment ago." if queued?(row_keyword)
       end
 
       def fix
@@ -77,8 +75,24 @@ module AhoyDashboard
 
       private
 
+      attr_reader :listed
+
       def sweep
-        @sweep ||= SweepCommand.new(keyword: keyword)
+        @sweep ||= SweepPlanQuery.new(keyword: keyword)
+      end
+
+      def queued?(row_keyword)
+        return SweepPlanQuery.queued?(row_keyword) unless listed_ids.include?(row_keyword.id)
+
+        queued_ids.include?(row_keyword.id)
+      end
+
+      def listed_ids
+        @listed_ids ||= listed.map(&:id).to_set
+      end
+
+      def queued_ids
+        @queued_ids ||= SweepPlanQuery.queued_ids(listed)
       end
 
       def routes

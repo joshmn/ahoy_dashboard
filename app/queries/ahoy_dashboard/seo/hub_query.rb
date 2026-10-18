@@ -9,6 +9,9 @@ module AhoyDashboard
       TOP_OPPORTUNITIES = 3
       OPPORTUNITY_POOL = 20
 
+      Reading = Data.define(:search_console, :rankings, :opportunities, :tracking, :provider_ready, :sample_rankings,
+                            :alerts_on)
+
       class << self
         def call(**options)
           new(**options).call
@@ -26,10 +29,10 @@ module AhoyDashboard
         rankings = Serp::RankOverviewQuery.call(site: site, range: range) if tracking && site.present?
         provider = Serp.provider if Serp.installed?
 
-        HubReading.new(search_console: search_console, rankings: rankings,
-                       opportunities: opportunities(search_console), tracking: tracking,
-                       provider_ready: provider_ready?(provider), sample_rankings: provider == :fake,
-                       alerts_on: alerts_on?)
+        Reading.new(search_console: search_console, rankings: rankings,
+                    opportunities: opportunities(search_console), tracking: tracking,
+                    provider_ready: provider_ready?(provider), sample_rankings: provider == :fake,
+                    alerts_on: alerts_on?)
       end
 
       private

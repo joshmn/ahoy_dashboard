@@ -5,6 +5,13 @@ module AhoyDashboard
   module Seo
 
     class ConversionVisitsQuery
+      SESSIONS = 2
+      CONVERTING = 1
+
+      Visits = Data.define(:visits, :visitors, :converting)
+
+      NONE = Visits.new(visits: 0, visitors: 0, converting: 0)
+
       class << self
         def call(**options)
           new(**options).call
@@ -20,7 +27,11 @@ module AhoyDashboard
 
       def call
         AhoyDashboard.visit.connection.select_rows(sql).group_by(&:first).transform_values do |rows|
-          ConversionVisitResult.new(rows: rows)
+          sessions = rows.find { |row| row[1].to_i == SESSIONS }
+          conversions = rows.find { |row| row[1].to_i == CONVERTING }
+
+          Visits.new(visits: sessions ? sessions[2].to_i : 0, visitors: sessions ? sessions[3].to_i : 0,
+                     converting: conversions ? conversions[2].to_i : 0)
         end
       end
 
@@ -66,16 +77,13 @@ module AhoyDashboard
       end
 
       def sessions_sql
-        "select path, null::text as goal, 2 as level, count(*) as visits, " \
+        "select path, #{SESSIONS} as level, count(*) as visits, " \
           "count(distinct visitor_token) as visitors from dashboard_conversion_landings group by path"
       end
 
       def goals_sql
-        <<~SQL.squish
-          select path, goal, grouping(goal) as level, count(distinct visit_id) as visits, 0 as visitors
-          from (#{goal_events.to_sql}) dashboard_conversion_goals
-          group by grouping sets ((path), (path, goal))
-        SQL
+        "select path, #{CONVERTING} as level, count(distinct visit_id) as visits, 0 as visitors " \
+          "from (#{goal_events.to_sql}) dashboard_conversion_goals group by path"
       end
 
       def goal_events
@@ -84,7 +92,7 @@ module AhoyDashboard
           .where(time: range)
           .where(ScopeQuery::HUMAN_EVENT)
           .where("#{matcher} is not null")
-          .select(Arel.sql("dashboard_conversion_landings.path, ahoy_events.visit_id, #{matcher} as goal"))
+          .select(Arel.sql("dashboard_conversion_landings.path, ahoy_events.visit_id"))
       end
     end
   end

@@ -40,7 +40,7 @@ module AhoyDashboard
       attr_reader :query, :form, :options, :routes
 
       def destination_route
-        DashboardHelper::DESTINATIONS.fetch(form.return_to.to_s, :root_path)
+        FilterDestination.route(form.return_to)
       end
     end
   end

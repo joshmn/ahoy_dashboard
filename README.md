@@ -28,7 +28,7 @@ Each of these has its own tables, so you install only the ones you want, and eac
 - [AI visibility](docs/ai-visibility.md): whether ChatGPT, Claude, Gemini and Perplexity mention you or cite you for the prompts you write.
 - [Alerts](docs/alerts.md): hear about a ranking drop, falling search clicks, a goal that stopped converting, a failed job or a traffic spike, by email or in your own code.
 - [Email reports](docs/email-reports.md): a daily, weekly or monthly email of your traffic.
-- [Ask](docs/assistant.md): ask questions about your data in plain English, about the page and filters you're looking at, with the charts it read and links to each screen. Runs on Anthropic, OpenAI or a local model.
+- [Ask](docs/assistant.md): ask questions about your data in plain English, about the page and filters you're looking at, with the charts it read and links to each screen. Runs on Anthropic, OpenAI, DeepSeek, or any OpenAI-compatible server, local or hosted.
 
 ## Requirements
 

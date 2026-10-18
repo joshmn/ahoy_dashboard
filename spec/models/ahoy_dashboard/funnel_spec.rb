@@ -66,8 +66,6 @@ RSpec.describe AhoyDashboard::Funnel do
       expect { funnel.destroy! }.to change(AhoyDashboard::FunnelStep, :count).by(-2)
     end
 
-    # The database says so as well, so a delete that never loads the record still
-    # cannot leave orphaned steps behind.
     it "takes its steps with it on a delete that skips the callbacks" do
       funnel = create(:dash_funnel)
 

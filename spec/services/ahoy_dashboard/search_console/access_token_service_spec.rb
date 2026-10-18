@@ -1,9 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsole::AccessTokenService do
-  let(:token_url) { AhoyDashboard::SearchConsole::TOKEN_URL }
-
   before { search_console_enabled! }
 
   it "hands back a token that is still good without calling google" do
@@ -20,8 +17,6 @@ RSpec.describe AhoyDashboard::SearchConsole::AccessTokenService do
     expect(described_class.call(account: account)).to eq("fresh-access")
   end
 
-  # Refreshed a minute early, so a long request cannot start valid and finish
-  # expired.
   it "refreshes one that is about to expire" do
     account = create(:dash_google_account, access_token: "stale", expires_at: 30.seconds.from_now)
     stub_token
@@ -29,7 +24,6 @@ RSpec.describe AhoyDashboard::SearchConsole::AccessTokenService do
     expect(described_class.call(account: account)).to eq("fresh-access")
   end
 
-  # A token stored under a rotated secret_key_base reads back as nil.
   it "refreshes when the stored token will not decrypt" do
     account = create(:dash_google_account, expires_at: 30.minutes.from_now)
     account.update_columns(access_token: "not an envelope")

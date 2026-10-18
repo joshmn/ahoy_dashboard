@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class DefaultSegmentsController < AhoyDashboard::BaseController
+    class DefaultSegmentsController < AhoyDashboard::Settings::BaseController
       def create
         AhoyDashboard::DefaultSegments::SaveCommand.call(filters: AhoyDashboard::Filters.from_params(params)) do
           on(:ok) { redirect_to back_to_the_view, notice: "Saved. The dashboard opens with these filters from now on." }
@@ -23,7 +23,7 @@ module AhoyDashboard
       end
 
       def view_params
-        carried = params.permit(*AhoyDashboard::DashboardHelper::DESTINATION_KEYS).to_h.symbolize_keys.reject { |_key, value| value.blank? }
+        carried = AhoyDashboard::FilterDestination.read(params.permit(*AhoyDashboard::FilterDestination::KEYS), prefixed: false)
 
         query.to_query.merge(carried)
       end

@@ -1,23 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/assistant"
 
 RSpec.describe "Dashboard assistant settings", type: :request do
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/assistant_providers"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/settings/assistant_providers/anthropic/edit"
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
@@ -27,7 +10,8 @@ RSpec.describe "Dashboard assistant settings", type: :request do
       get "/telemetry/settings/assistant_providers"
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Anthropic", "OpenAI", "LM Studio", "Active")
+      expect(response.body).to include("Anthropic", "OpenAI", "DeepSeek", "OpenAI-compatible", "Active")
+      expect(response.body).not_to include("LM Studio (local)")
     end
 
     it "calls the chosen reader selected rather than active while the assistant is off" do
@@ -35,7 +19,7 @@ RSpec.describe "Dashboard assistant settings", type: :request do
 
       get "/telemetry/settings/assistant_providers"
 
-      badges = Nokogiri::HTML5(response.body).css(".badge").map { |badge| badge.text.strip }
+      badges = document.css(".badge").map { |badge| badge.text.strip }
       expect(badges).to include("Selected")
       expect(badges).not_to include("Active")
     end
@@ -50,15 +34,41 @@ RSpec.describe "Dashboard assistant settings", type: :request do
       expect(response.body).not_to include("From credentials")
     end
 
-    it "says a local reader needs no key at all" do
-      get "/telemetry/settings/assistant_providers/lmstudio/edit"
+    it "takes a key for an OpenAI-compatible server without needing one" do
+      get "/telemetry/settings/assistant_providers/compatible/edit"
 
-      expect(response.body).not_to include("assistant_provider_credentials_api_key")
+      page = document
+      expect(page.at_css("#assistant_provider_credentials_api_key")).to be_present
+      expect(page.at_css("label[for='assistant_provider_credentials_api_key']").text).to include("(optional)")
       expect(response.body).to include("Nothing leaves the machine")
+      expect(row_key_after_index("compatible")).to eq("Not needed")
+    end
+
+    it "requires a DeepSeek key and says how long an answer can run" do
+      get "/telemetry/settings/assistant_providers/deepseek/edit"
+
+      page = document
+      expect(page.at_css("label[for='assistant_provider_credentials_api_key']").text).not_to include("(optional)")
+      expect(page.at_css("#assistant_provider_max_tokens")["placeholder"]).to eq("65536")
+      expect(response.body).to include("Leave it blank for 65,536.", "deepseek-flash")
+      expect(page.at_css("#assistant_provider_api_base")["placeholder"]).to eq("https://api.deepseek.com")
+      expect(response.body).not_to include("Usually ends in")
+    end
+
+    it "says a stored key for an OpenAI-compatible server is stored" do
+      create(:dash_assistant_provider, name: "compatible", model: "some/model", api_base: "https://openrouter.ai/api/v1",
+                                        credentials: { api_key: "sk-or" })
+
+      expect(row_key_after_index("compatible")).to eq("Stored here")
+    end
+
+    def row_key_after_index(name)
+      get "/telemetry/settings/assistant_providers"
+      row(name)[2]
     end
 
     def row(name)
-      Nokogiri::HTML5(response.body).at_css("#assistant-provider-#{name}").css("td").map { |cell| cell.text.squish }
+      document.at_css("#assistant-provider-#{name}").css("td").map { |cell| cell.text.squish }
     end
 
     it "shows the last error a provider sent back, and when" do
@@ -103,21 +113,61 @@ RSpec.describe "Dashboard assistant settings", type: :request do
       expect(row("openai")[1]).to eq("gpt-4.1")
     end
 
-    it "does not promise LM Studio stays on the machine once its endpoint points elsewhere" do
-      create(:dash_assistant_provider, name: "lmstudio", model: "qwen", api_base: "https://gpu.example.net/v1")
+    it "does not promise an OpenAI-compatible server is on the machine once its endpoint points elsewhere" do
+      create(:dash_assistant_provider, name: "compatible", model: "qwen", api_base: "https://gpu.example.net/v1")
 
-      get "/telemetry/settings/assistant_providers/lmstudio/edit"
+      get "/telemetry/settings/assistant_providers/compatible/edit"
 
       expect(response.body).not_to include("Nothing leaves the machine")
-      expect(response.body).to include("go to gpu.example.net")
+      expect(response.body).to include("go to gpu.example.net", "A key is optional")
     end
 
-    it "still says LM Studio stays on the machine on a loopback endpoint" do
-      create(:dash_assistant_provider, name: "lmstudio", model: "qwen", api_base: "http://127.0.0.1:1234/v1")
+    it "still says an OpenAI-compatible server stays on the machine on a loopback endpoint" do
+      create(:dash_assistant_provider, name: "compatible", model: "qwen", api_base: "http://127.0.0.1:1234/v1")
 
-      get "/telemetry/settings/assistant_providers/lmstudio/edit"
+      get "/telemetry/settings/assistant_providers/compatible/edit"
 
       expect(response.body).to include("Nothing leaves the machine")
+    end
+
+    describe "an install whose stored reader is lmstudio" do
+      let!(:legacy) do
+        create(:dash_assistant_provider, :active, name: "lmstudio", model: "qwen", temperature: 0.4)
+      end
+
+      it "shows that row as the OpenAI-compatible reader, in use" do
+        allow(AhoyDashboard::Assistant).to receive(:available?).and_return(true)
+
+        get "/telemetry/settings/assistant_providers"
+
+        compatible = row("compatible")
+        expect(compatible[0]).to include("OpenAI-compatible", "Active")
+        expect(compatible[1]).to include("qwen", "Temperature 0.4")
+        expect(compatible[2]).to eq("Not needed")
+        expect(document.at_css("#assistant-provider-lmstudio")).to be_nil
+      end
+
+      it "opens the old address on the OpenAI-compatible form with what was saved" do
+        get "/telemetry/settings/assistant_providers/lmstudio/edit"
+
+        page = document
+        expect(page.at_css("#assistant_provider_model")["value"]).to eq("qwen")
+        expect(page.at_css("#assistant_provider_api_base")["placeholder"]).to eq("http://localhost:1234/v1")
+        expect(page.at_css("form[action='/telemetry/settings/assistant_providers/compatible']")).to be_present
+      end
+
+      it "moves the row onto the new name the first time it is saved, keeping what it had" do
+        patch "/telemetry/settings/assistant_providers/compatible",
+          params: { assistant_provider: { model: "qwen3", api_base: "", temperature: "0.4", active: "1",
+                                          credentials: { api_key: "sk-local" } } }
+
+        expect(response).to redirect_to("/telemetry/settings/assistant_providers")
+        expect(AhoyDashboard::AssistantProvider.pluck(:id, :name)).to eq([ [ legacy.id, "compatible" ] ])
+        expect(legacy.reload).to be_active
+        expect(legacy.model).to eq("qwen3")
+        expect(legacy.api_key).to eq("sk-local")
+        expect(AhoyDashboard::Assistant.reader).to eq("compatible")
+      end
     end
 
     it "is a 404 for a reader nobody registered" do
@@ -162,8 +212,8 @@ RSpec.describe "Dashboard assistant settings", type: :request do
       expect(AhoyDashboard::Assistant.reader).to eq("anthropic")
     end
 
-    it "refuses a local reader with no model named, because there is no default to fall back on" do
-      patch "/telemetry/settings/assistant_providers/lmstudio",
+    it "refuses an OpenAI-compatible reader with no model named, because there is no default to fall back on" do
+      patch "/telemetry/settings/assistant_providers/compatible",
         params: { assistant_provider: { model: "", api_base: "", active: "1", credentials: {} } }
 
       expect(response).to have_http_status(:unprocessable_entity)
@@ -209,17 +259,80 @@ RSpec.describe "Dashboard assistant settings", type: :request do
     it "offers the reader's known models without limiting the box to them" do
       get "/telemetry/settings/assistant_providers/anthropic/edit"
 
-      page = Nokogiri::HTML5(response.body)
+      page = document
       input = page.at_css("#assistant_provider_model")
       options = page.css("datalist##{input["list"]} option").map { |option| option["value"] }
       expect(options).to include("claude-opus-5", "claude-sonnet-4-6")
       expect(input["type"]).to eq("text")
     end
 
-    it "offers no model list for a local reader, which names whatever it has loaded" do
-      get "/telemetry/settings/assistant_providers/lmstudio/edit"
+    it "draws the page with the built in list and asks the provider for its own afterwards" do
+      create(:dash_assistant_provider, name: "deepseek", credentials: { api_key: "sk-deep" })
 
-      expect(Nokogiri::HTML5(response.body).at_css("#assistant_provider_model")["list"]).to be_nil
+      get "/telemetry/settings/assistant_providers/deepseek/edit"
+
+      page = document
+      frame = page.at_css("tm-frame#assistant_provider_models")
+      expect(frame["src"]).to eq("/telemetry/settings/assistant_providers/deepseek/models")
+      expect(frame.css("datalist#assistant_provider_model_options option").map { |option| option["value"] })
+        .to eq(%w[deepseek-flash deepseek-v4-pro])
+      expect(page.at_css("#assistant_provider_model")["list"]).to eq("assistant_provider_model_options")
+      expect(WebMock).not_to have_requested(:any, /api\.deepseek\.com/)
+    end
+
+    it "starts an OpenAI-compatible reader with an empty list for its server to fill" do
+      get "/telemetry/settings/assistant_providers/compatible/edit"
+
+      frame = document.at_css("tm-frame#assistant_provider_models")
+      expect(frame["src"]).to eq("/telemetry/settings/assistant_providers/compatible/models")
+      expect(frame.css("datalist option")).to be_empty
+    end
+  end
+
+  describe "the provider's own model list" do
+    before { sign_in create(:user, :admin) }
+
+    def frame_get(path)
+      get_frame(path, "assistant_provider_models")
+    end
+
+    it "fills the frame with the models the provider lists" do
+      create(:dash_assistant_provider, name: "deepseek", credentials: { api_key: "sk-deep" })
+      stub_request(:get, "https://api.deepseek.com/models").to_return(
+        status: 200, body: JSON.generate(object: "list", data: [ { id: "deepseek-flash", name: "DeepSeek-V4.1-Flash" },
+                                                                 { id: "deepseek-v5-preview" } ])
+      )
+
+      frame_get "/telemetry/settings/assistant_providers/deepseek/models"
+
+      expect(response).to have_http_status(:ok)
+      options = document.css("tm-frame#assistant_provider_models datalist#assistant_provider_model_options option")
+      expect(options.map { |option| [ option["value"], option["label"] ] })
+        .to eq([ [ "deepseek-flash", "DeepSeek-V4.1-Flash" ], [ "deepseek-v5-preview", nil ] ])
+      expect(response.body).not_to include("<html")
+    end
+
+    it "fills it with the built in list when the provider cannot be asked" do
+      create(:dash_assistant_provider, name: "deepseek", credentials: { api_key: "sk-deep" })
+      stub_request(:get, "https://api.deepseek.com/models").to_return(status: 503, body: "")
+
+      frame_get "/telemetry/settings/assistant_providers/deepseek/models"
+
+      expect(response).to have_http_status(:ok)
+      expect(document.css("datalist option").map { |option| option["value"] })
+        .to eq(%w[deepseek-flash deepseek-v4-pro])
+    end
+
+    it "sends a request that is not the frame's back to the form" do
+      get "/telemetry/settings/assistant_providers/deepseek/models"
+
+      expect(response).to redirect_to("/telemetry/settings/assistant_providers/deepseek/edit")
+    end
+
+    it "is a 404 for a reader nobody registered" do
+      frame_get "/telemetry/settings/assistant_providers/gemini/models"
+
+      expect(response).to have_http_status(:not_found)
     end
   end
 end

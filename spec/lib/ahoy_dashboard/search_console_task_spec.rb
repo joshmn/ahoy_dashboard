@@ -1,26 +1,8 @@
 require "rails_helper"
-require "rake"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe "ahoy_dashboard:search_console" do
-  around do |example|
-    original = Rake.application
-    Rake.application = Rake::Application.new
-    Rake::Task.define_task(:environment)
-    load AhoyDashboard::Engine.root.join("lib/tasks/ahoy_dashboard_search_console.rake").to_s
-    example.run
-  ensure
-    Rake.application = original
-  end
-
   def report
-    output = StringIO.new
-    original = $stdout
-    $stdout = output
-    Rake::Task["ahoy_dashboard:search_console"].execute
-    output.string
-  ensure
-    $stdout = original
+    run_dashboard_task("ahoy_dashboard:search_console")
   end
 
   it "reports a missing host instead of raising" do
@@ -36,7 +18,7 @@ RSpec.describe "ahoy_dashboard:search_console" do
 
   it "reads the client id and secret off the stored credential only" do
     stub_const("ENV", ENV.to_h.merge("SEARCH_CONSOLE_CLIENT_ID" => "from-env", "SEARCH_CONSOLE_CLIENT_SECRET" => "from-env"))
-    AhoyDashboard::Credential.fetch(AhoyDashboard::SearchConsole::CREDENTIAL_NAME).update!(values: { client_id: "cid" })
+    store_google_client(client_id: "cid", client_secret: nil)
 
     output = report
 
@@ -55,7 +37,7 @@ RSpec.describe "ahoy_dashboard:search_console" do
   end
 
   it "says the switch is off when the credentials are there" do
-    allow(AhoyDashboard::SearchConsole).to receive_messages(enabled?: false, client_id: "cid", client_secret: "secret")
+    search_console_switched_off!
 
     expect(report).to include("turn it on under settings, features")
   end

@@ -34,9 +34,8 @@ module AhoyDashboard
       def groups
         @groups ||= begin
           grouped = reading.answers.group_by { |answer| [ answer.assistant, answer.model ] }
-          order = ->(key) { [ AiVisibility::NAMES.index(key.first) || AiVisibility::NAMES.size, key.first, key.last.to_s ] }
 
-          grouped.keys.sort_by(&order).map do |name, asked|
+          grouped.keys.sort_by { |key| AiVisibility.target_order(*key) }.map do |name, asked|
             answers = grouped.fetch([ name, asked ])
             Group.new(assistant: name, model: asked, label: AiVisibility.target_label(name, asked),
                       answers: answers, total: answers.first[:prompt_answer_count])

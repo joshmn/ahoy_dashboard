@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::Seo::ConversionQuery do
-  let(:today) { AhoyDashboard.time_zone.local(2026, 8, 10, 12) }
+  let(:today) { dash_time(2026, 8, 10, 12) }
   let(:range) { (today - 6.days).beginning_of_day..today.end_of_day }
 
   def row!(query, page, device: "mobile", country: "usa", clicks: 5)
@@ -78,8 +78,8 @@ RSpec.describe AhoyDashboard::Seo::ConversionQuery do
     all = sole_item(described_class.call(range: range).rows)
     mobile = sole_item(described_class.call(range: range, slice: slice(device: "mobile")).rows)
 
-    expect([ all.conversions, all.converting ]).to eq([ 2, 2 ])
-    expect([ mobile.visits, mobile.conversions, mobile.converting ]).to eq([ 1, 1, 1 ])
+    expect(all.converting).to eq(2)
+    expect([ mobile.visits, mobile.converting ]).to eq([ 1, 1 ])
   end
 
   it "leaves out search rows from before device and country were stored once one is picked" do
@@ -100,9 +100,8 @@ RSpec.describe AhoyDashboard::Seo::ConversionQuery do
 
     result = described_class.call(range: range)
 
-    expect(sole_item(result.rows).conversions).to eq(1)
-    expect(sole_item(result.rows).goals.values.sum).to eq(2)
-    expect(result.conversions).to eq(1)
+    expect(sole_item(result.rows).converting).to eq(1)
+    expect(result.converting_visits).to eq(1)
     expect(result.rate).to eq(1.0)
   end
 
@@ -119,18 +118,17 @@ RSpec.describe AhoyDashboard::Seo::ConversionQuery do
     create(:dash_goal, event_name: "consult_booked")
     mixed = visit!(device_type: "desktop", country: "US")
     create(:page_view_event, :crawler, visit: mixed, time: today)
-    2.times { create(:ahoy_event, visit: mixed, name: "consult_booked", time: today, properties: {}) }
+    2.times { dash_goal(mixed, "consult_booked", at: today) }
     crawler = visit!(device_type: "desktop", country: "US")
-    create(:ahoy_event, visit: crawler, name: "consult_booked", time: today, properties: { crawler: "Bot" })
+    dash_goal(crawler, "consult_booked", at: today, crawler: "Bot")
     earlier = create(:ahoy_visit, :organic_search, started_at: range.begin - 1.hour,
                                                 landing_page: "https://example.com/consult")
-    create(:ahoy_event, visit: earlier, name: "consult_booked", time: today, properties: {})
+    dash_goal(earlier, "consult_booked", at: today)
 
     result = sole_item(described_class.call(range: range).rows)
 
     expect(result.visits).to eq(1)
     expect(result.converting).to eq(1)
-    expect(result.goals.values).to eq([ 1 ])
   end
 
   it "does not count a goal completed after the range ends" do
@@ -142,7 +140,7 @@ RSpec.describe AhoyDashboard::Seo::ConversionQuery do
     row = sole_item(described_class.call(range: range).rows)
 
     expect(row.visits).to eq(1)
-    expect([ row.conversions, row.converting ]).to eq([ 0, 0 ])
+    expect(row.converting).to eq(0)
   end
 
   it "matches visits to Google's page when only one of them has a trailing slash" do
@@ -184,15 +182,14 @@ RSpec.describe AhoyDashboard::Seo::ConversionQuery do
     end
 
     it "leaves out a visit a saved exclusion hides, and its conversion with it" do
-      AhoyDashboard::Exclusion.create!(name: "Datacenters",
-                                       filters: [ { "dimension" => "asn", "operator" => "contains", "value" => "DATACENTER" } ])
+      dash_exclusion("Datacenters", [ "asn", "contains", "DATACENTER" ])
       converted!(asn: "BIG DATACENTER LLC")
       converted!(asn: nil)
       converted!(asn: "HOME BROADBAND")
 
       row = sole_item(described_class.call(range: range).rows)
 
-      expect([ row.visits, row.conversions, row.converting ]).to eq([ 2, 2, 2 ])
+      expect([ row.visits, row.converting ]).to eq([ 2, 2 ])
     end
 
     it "leaves out internal addresses, which it used to count" do
@@ -201,7 +198,7 @@ RSpec.describe AhoyDashboard::Seo::ConversionQuery do
 
       row = sole_item(described_class.call(range: range).rows)
 
-      expect([ row.visits, row.conversions ]).to eq([ 1, 1 ])
+      expect([ row.visits, row.converting ]).to eq([ 1, 1 ])
     end
   end
 
@@ -231,10 +228,6 @@ RSpec.describe AhoyDashboard::Seo::ConversionQuery do
       expect(result.converting).to eq(1)
     end
 
-    it "deduplicates repeated events for each goal" do
-      expect(result.goals).to eq("consult_booked" => 1, "guide_downloaded" => 1)
-    end
-
     it "excludes paid search sessions and their matching goals" do
       paid = create(:ahoy_visit, :paid_search, started_at: today, landing_page: "https://example.com/consult")
       create(:ahoy_event, visit: paid, name: "consult_booked", time: today)
@@ -245,7 +238,7 @@ RSpec.describe AhoyDashboard::Seo::ConversionQuery do
     it "preserves visits with human activity outside the range without counting crawler goals" do
       mixed = visit!(device_type: "mobile", country: "US")
       create(:page_view_event, visit: mixed, time: range.end + 1.hour)
-      create(:ahoy_event, visit: mixed, name: "consult_booked", time: today, properties: { crawler: "Bot" })
+      dash_goal(mixed, "consult_booked", at: today, crawler: "Bot")
 
       expect([result.visits, result.converting]).to eq([3, 1])
     end
@@ -253,7 +246,7 @@ RSpec.describe AhoyDashboard::Seo::ConversionQuery do
     it "does not require a matching goal to count sessions when no goals are defined" do
       AhoyDashboard::Goal.delete_all
 
-      expect([result.visits, result.converting, result.goals]).to eq([2, 0, {}])
+      expect([ result.visits, result.converting ]).to eq([ 2, 0 ])
     end
 
     it "leaves unrelated landing paths outside the selected search pages" do

@@ -1,14 +1,4 @@
 module AhoyDashboard
-  # What a saved question says, in one line.
-  #
-  # Read off the stored params every time rather than written down beside them,
-  # so a question cannot describe itself as something it is not: rename a metric
-  # or retire a dimension and the sentence changes with it instead of going
-  # stale in a column nobody would think to update.
-  #
-  # It answers with what it can read and leaves out what it cannot. A dimension
-  # that no longer exists is the case that matters: the sentence says the rest of
-  # the question rather than printing a raw key or refusing to render.
   class SavedQuerySentence
     SEPARATOR = " · ".freeze
 

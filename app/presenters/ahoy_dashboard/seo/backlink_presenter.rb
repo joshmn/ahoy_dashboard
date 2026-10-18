@@ -1,6 +1,15 @@
 module AhoyDashboard
   module Seo
     class BacklinkPresenter < BasePresenter
+      STEPS = {
+        disabled: :backlinks, no_host: :backlink_host, sample: :backlink_sample,
+        unsupported: :backlink_provider, unconfigured: :provider_credentials
+      }.freeze
+
+      delegate :domains, :anchors, :gained, :lost, :nofollow, :authority_known?, to: :result
+      delegate :refusal, :setup_notice, to: :gate
+      delegate :reason, :fix, to: :gate, prefix: :sync
+
       def tiles
         [
           Tile.new(label: "Referring domains", value: number(result.total_domains), note: net_note, tone: tone_for(result.net)),
@@ -42,58 +51,8 @@ module AhoyDashboard
         result.series.map { |on, count| [ on_label(on), count ] }
       end
 
-      def domains
-        result.domains
-      end
-
-      def anchors
-        result.anchors
-      end
-
-      def pages
-        result.pages
-      end
-
-      def gained
-        result.gained
-      end
-
-      def lost
-        result.lost
-      end
-
-      def nofollow
-        result.nofollow
-      end
-
-      def enabled?
-        ::AhoyDashboard::Backlinks.enabled?
-      end
-
-      def available?
-        ::AhoyDashboard::Backlinks.available?
-      end
-
-      def refusal
-        memo(:refusal) { ::AhoyDashboard::Backlinks.refusal }
-      end
-
-      def syncable?
-        refusal.nil?
-      end
-
-      def setup_notice
-        case refusal
-        when :disabled then AhoyDashboard::SetupNotice.call(:backlinks)
-        when :no_host then AhoyDashboard::SetupNotice.call(:backlink_host, url: routes.edit_settings_general_path)
-        when :sample then AhoyDashboard::SetupNotice.call(:backlink_sample, url: providers_path)
-        when :unsupported then AhoyDashboard::SetupNotice.call(:backlink_provider, url: providers_path)
-        when :unconfigured then AhoyDashboard::SetupNotice.call(:provider_credentials, url: providers_path)
-        end
-      end
-
       def empty_hint
-        return "Press Sync now to pull the sites that link to you." if syncable?
+        return "Press Sync now to pull the sites that link to you." if gate.open?
 
         "Sites that link to you show here once backlinks are ready and the first sync runs."
       end
@@ -106,20 +65,6 @@ module AhoyDashboard
 
       def sync_path
         routes.seo_backlink_syncs_path
-      end
-
-      def sync_reason
-        refusal && ::AhoyDashboard::Backlinks.refusal_message(refusal)
-      end
-
-      def sync_fix
-        return unless %i[sample unsupported unconfigured capped].include?(refusal)
-
-        { label: "Search provider", url: providers_path }
-      end
-
-      def authority_known?
-        result.authority_known?
       end
 
       def kinds?
@@ -164,6 +109,13 @@ module AhoyDashboard
       end
 
       private
+
+      def gate
+        memo(:gate) do
+          ProviderGate.new(::AhoyDashboard::Backlinks, steps: STEPS, providers_path: providers_path,
+                           urls: { no_host: routes.edit_settings_general_path })
+        end
+      end
 
       def domains_headers
         [ "Domain", "Authority", "Links", *("Kind" if kinds?), "First seen", "Follow" ]

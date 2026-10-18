@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class DefaultInternalAddressesController < AhoyDashboard::BaseController
+    class DefaultInternalAddressesController < AhoyDashboard::Settings::BaseController
       def create
         AhoyDashboard::GeneralSettings::RestoreInternalAddressesCommand.call do
           on(:ok) do

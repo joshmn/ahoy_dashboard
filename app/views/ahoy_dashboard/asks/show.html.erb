@@ -1,6 +1,3 @@
-<%# The panel's whole contents, frame and all, with no layout around it: the
-    layout renders the panel's opener, so a response wrapped in it would carry a
-    second frame with this id and the swap would find the empty one first. %>
 <%= dash_frame_tag AhoyDashboard::AsksController::FRAME, rendered: true do %>
   <%= render "ahoy_dashboard/asks/panel", panel: @panel, focus: true %>
 <% end %>

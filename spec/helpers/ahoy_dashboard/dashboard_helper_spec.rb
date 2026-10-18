@@ -71,43 +71,29 @@ RSpec.describe AhoyDashboard::DashboardHelper, type: :helper do
     end
   end
 
-  describe "#dash_drilldown_tab" do
-    def query_with(*items)
-      double(filters: AhoyDashboard::Filters.new(items))
+  describe "#dash_row_name" do
+    it "puts the chip off the raw label in front of the printed one" do
+      name = Nokogiri::HTML5.fragment(helper.dash_row_name("France", chip: :flag, chip_label: "FR", class_name: "x"))
+        .at_css("span.rn")
+
+      expect(name["class"]).to eq("rn x")
+      expect(name.at_css(".flg")).to be_present
+      expect(name.at_css(".nm").text).to eq("France")
     end
 
-    def filter(key, operator: "is")
-      AhoyDashboard::Filter.new(dimension: AhoyDashboard::Dimension.find(key), value: "x", operator: operator)
+    it "sets a path in mono and splits it" do
+      name = Nokogiri::HTML5.fragment(helper.dash_row_name("/analysis/history/repeat-seizures.md", mono: true))
+        .at_css("span.rn")
+
+      expect(name["class"]).to eq("rn mono")
+      expect(name.at_css(".nm__tail").text).to eq("/repeat-seizures.md")
     end
+  end
 
-    let(:locations) { AhoyDashboard::Report.find("locations") }
-    let(:sources) { AhoyDashboard::Report.find("sources") }
-
-    it "opens the next tab down under a filter on the card's own dimension" do
-      expect(helper.dash_drilldown_tab(locations, query_with(filter("country")))).to eq("regions")
-      expect(helper.dash_drilldown_tab(sources, query_with(filter("channel")))).to eq("sources")
-      expect(helper.dash_drilldown_tab(sources, query_with(filter("source")))).to eq("referrers")
-    end
-
-    it "takes the deepest step when more than one applies" do
-      expect(helper.dash_drilldown_tab(locations, query_with(filter("country"), filter("region")))).to eq("cities")
-    end
-
-    it "does not drill on a filter that does not narrow to one value" do
-      expect(helper.dash_drilldown_tab(locations, query_with(filter("country", operator: "is_not")))).to be_nil
-    end
-
-    it "does not drill on a group of countries, which does not narrow to one" do
-      either = AhoyDashboard::FilterGroup.new([ filter("country"), AhoyDashboard::Filter.new(
-        dimension: AhoyDashboard::Dimension.find("country"), value: "y", operator: "is"
-      ) ])
-
-      expect(helper.dash_drilldown_tab(locations, query_with(either))).to be_nil
-      expect(helper.dash_drilldown_tab(locations, query_with(either, filter("region")))).to eq("cities")
-    end
-
-    it "leaves a card with no steps alone" do
-      expect(helper.dash_drilldown_tab(AhoyDashboard::Report.find("pages"), query_with(filter("page")))).to be_nil
+  describe "#dash_chip_kind" do
+    it "can leave the favicon off for a list that has no room for one" do
+      expect(helper.dash_chip_kind("referrer", favicon: false)).to be_nil
+      expect(helper.dash_chip_kind("country", favicon: false)).to eq(:flag)
     end
   end
 

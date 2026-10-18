@@ -1,12 +1,6 @@
-<%# The whole funnel, drawn the way the design draws one: a numbered step, its
-    count and its share of the top, then a full width bar under it, and between
-    every pair the line that says how many carried on and how many did not. A
-    funnel is the one card whose shape is the answer, so this is not the .m-list
-    the other dialogs use. %>
-<div class="modal-body fn-body">
+<%= dash_dialog_body class: "fn-body" do %>
   <% if presenter.empty? %>
-    <%= dash_empty "Nobody reached the first step", compact: true,
-          hint: query.filters.any? ? "Try a wider date range, or drop one of the filters." : "Try a wider date range." %>
+    <%= dash_empty "Nobody reached the first step", compact: true, hint: dash_range_hint %>
   <% else %>
     <% previous_row = nil %>
     <% presenter.rows.each do |row| %>
@@ -45,5 +39,4 @@
       <span><%= presenter.summary_line %></span>
     </div>
   <% end %>
-
-</div>
+<% end %>

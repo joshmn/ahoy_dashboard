@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::FilterOptionsQuery do
   let(:range) { dash_day_range(2026, 8, 10) }
@@ -9,18 +8,8 @@ RSpec.describe AhoyDashboard::FilterOptionsQuery do
     described_class.call(scope: scope, dimension: AhoyDashboard::Dimension.find(key), **arguments)
   end
 
-  def grouped_statements
-    statements = []
-    subscriber = lambda do |*, payload|
-      next if payload[:name] == "SCHEMA" || payload[:cached]
-      next unless payload[:sql].match?(/\bgroup by\b/i)
-
-      statements << payload[:sql]
-    end
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
-      ActiveRecord::Base.uncached { yield }
-    end
-    statements
+  def grouped_statements(&block)
+    captured_sql(/\bgroup by\b/i, uncached: true, &block)
   end
 
   it "returns nothing against an empty database" do
@@ -29,13 +18,11 @@ RSpec.describe AhoyDashboard::FilterOptionsQuery do
 
   describe "with traffic" do
     before do
-      first = dash_visit(started_at: dash_time(2026, 8, 10, 9), visitor: "a", country: "US")
-      dash_page_view(first, path: "/going-in/faq", at: dash_time(2026, 8, 10, 9))
+      first = dash_landing("/going-in/faq", at: dash_time(2026, 8, 10, 9), visitor: "a", country: "US")
       dash_page_view(first, path: "/going-in/faq", at: dash_time(2026, 8, 10, 9, 1))
       dash_page_view(first, path: "/resources", at: dash_time(2026, 8, 10, 9, 2))
 
-      second = dash_visit(started_at: dash_time(2026, 8, 10, 10), visitor: "b", country: "CA")
-      dash_page_view(second, path: "/for-families", at: dash_time(2026, 8, 10, 10))
+      dash_landing("/for-families", at: dash_time(2026, 8, 10, 10), visitor: "b", country: "CA")
     end
 
     it "lists the most common values first" do
@@ -78,7 +65,7 @@ RSpec.describe AhoyDashboard::FilterOptionsQuery do
     end
 
     before do
-      AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "site_searched", display_name: "Searches")
+      create(:dash_goal, event_name: "site_searched", display_name: "Searches")
       { "city_char" => 'ahoy_visits.city::char(24) collate "C"',
         "city_posix" => 'ahoy_visits.city::char(24) collate "POSIX"',
         "city_copy" => "ahoy_visits.city" }.each do |key, sql|
@@ -98,29 +85,40 @@ RSpec.describe AhoyDashboard::FilterOptionsQuery do
       returning = dash_visit(started_at: range.begin + 3.hours, visitor: "a", country: nil, city: "",
         utm_source: "", referring_domain: "mail.google.com")
       dash_page_view(returning, path: "/a")
-      anonymous = dash_visit(started_at: range.begin + 4.hours, visitor_token: nil, city: nil)
-      dash_page_view(anonymous, path: "/anonymous")
+      dash_landing("/anonymous", at: range.begin + 4.hours, visitor_token: nil, city: nil)
       robot = dash_visit(started_at: range.begin + 5.hours, visitor: "robot", city: "Robots")
       dash_page_view(robot, path: "/bot.md", crawler: "GPTBot")
       unbrowsed = dash_visit(started_at: range.begin + 6.hours, visitor: "unbrowsed", landing_page: nil)
       dash_goal(unbrowsed, "site_searched", controller: "searches", cohort: "unbrowsed")
     end
 
-    it "matches independent lists with their own counts, grains, exclusions, types, ordering and caps" do
+    it "matches independent lists with their own counts, grains, exclusions, types, ordering and caps", :equivalence do
       scopes = [ scope, dash_scope(range: range, include_crawlers: true),
         dash_scope(range: range, filters: dash_filters([ "page", "is", "/b" ])),
         dash_scope(range: dash_day_range(2026, 8, 1)) ]
       arguments = [ { limit: 1 }, { limit: 20 }, { limit: 1_000 },
         { query: "a" }, { query: "%" }, { query: "_" }, { query: "\\" }, { query: "'; --" } ]
 
-      scopes.product(arguments, [ false, true ]).each do |current, settings, counted|
+      scopes.each_with_index.to_a.product(arguments, [ false, true ]).each do |(current, index), settings, counted|
         expected = dimensions.map do |dimension|
           [ dimension.key, described_class.call(scope: current, dimension: dimension, counted: counted, **settings) ]
         end.to_h
         actual = described_class.for_dimensions(scope: current, dimensions: dimensions, counted: counted, **settings)
 
-        expect(actual).to eq(expected), "#{settings.inspect}, counted=#{counted}"
+        expect(actual).to eq(expected), "scope #{index}, #{settings.inspect}, counted=#{counted}"
         expect(actual.to_json).to eq(expected.to_json)
+      end
+    end
+
+    it "ranks an event dimension by its own rows when page view dimensions share its population" do
+      chosen = %w[page format].map { |key| AhoyDashboard::Dimension.find(key) }
+
+      [ scope, dash_scope(range: range, include_crawlers: true) ].each do |current|
+        found = described_class.for_dimensions(scope: current, dimensions: chosen, limit: 1)
+        counted = described_class.for_dimensions(scope: current, dimensions: chosen, limit: 1, counted: true)
+
+        expect(found).to eq("page" => [ "/a" ], "format" => [ "html" ])
+        expect(counted.fetch("format").first.first).to eq("html")
       end
     end
 
@@ -140,7 +138,7 @@ RSpec.describe AhoyDashboard::FilterOptionsQuery do
       end
 
       expect(statements.size).to eq(1)
-      expect(statements.first).to include("grouping sets")
+      expect(statements.first).to include("as materialized")
     end
 
     it "reads a shared event population once for page, format and controller options" do
@@ -153,12 +151,12 @@ RSpec.describe AhoyDashboard::FilterOptionsQuery do
     end
 
     it "preserves custom dimensions whose source is the derived exit relation" do
-      chosen = [:page_views, :any].map do |events|
+      chosen = [ :page_views, :any ].map do |events|
         AhoyDashboard::Dimension.new(key: "custom_exit_#{events}", label: "Custom exit", group: "Page",
           scope: :event, sql: Arel.sql("dash_exits.path"), events: events)
       end
       expected = chosen.map do |dimension|
-        [dimension.key, described_class.call(scope: scope, dimension: dimension)]
+        [ dimension.key, described_class.call(scope: scope, dimension: dimension) ]
       end.to_h
 
       expect(described_class.for_dimensions(scope: scope, dimensions: chosen)).to eq(expected)

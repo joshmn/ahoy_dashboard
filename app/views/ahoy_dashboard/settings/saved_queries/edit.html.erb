@@ -3,18 +3,12 @@
 
 <% explore = explore_path(@form.question.merge(saved: @record.id)) %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Edit #{@record.name}",
-          lede: "Rename it or change whether it is pinned.",
-          actions: capture {
-            dash_button "Back to Explore", explore, icon: :back, data: { tm_frame: "_top" }
-          } %>
+<%= dash_page_head title: "Edit #{@record.name}",
+      lede: "Rename it or change whether it is pinned.",
+      actions: dash_button("Back to Explore", explore, icon: :back, data: { tm_frame: "_top" }) %>
 
-    <%= dash_card do %>
-      <%= render "ahoy_dashboard/settings/saved_queries/form",
-            change_path: explore,
-            url: settings_saved_query_path(@record), method: :patch, submit_label: "Save changes" %>
-    <% end %>
-  </section>
-</div>
+<%= dash_card do %>
+  <%= render "ahoy_dashboard/settings/saved_queries/form",
+        change_path: explore,
+        url: settings_saved_query_path(@record), method: :patch, submit_label: "Save changes" %>
+<% end %>

@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class AssistantProvidersController < AhoyDashboard::BaseController
+    class AssistantProvidersController < AhoyDashboard::Settings::BaseController
       requires_installed :assistant
 
       before_action :set_name, only: [ :edit, :update ]
@@ -20,25 +20,20 @@ module AhoyDashboard
 
         AhoyDashboard::Assistant::Providers::SaveCommand.call(form: @form) do
           on(:ok) { redirect_to settings_assistant_providers_path, notice: "Reader saved." }
-          on(:invalid) do |form|
-            @form = form
-            render :edit, status: :unprocessable_entity
-          end
+          on(:invalid) { |form| rejected(form) }
         end
       end
 
       private
 
       def set_name
-        @name = params[:name].to_s
+        @name = AhoyDashboard::Assistant.reader_key(params[:name])
         raise ActiveRecord::RecordNotFound unless AhoyDashboard::AssistantProvider::NAMES.include?(@name)
       end
 
       def set_secret
-        return if AhoyDashboard::Assistant::READERS.fetch(@name)[:local].present?
-
         @secret = AhoyDashboard::Settings::StoredSecretPresenter.assistant(@name)
-        @removing = @secret if @secret.stored? && params[:remove] == @secret.key.to_s
+        @removing = @secret if @secret.removing?(params[:remove])
       end
 
       def record

@@ -1,5 +1,3 @@
-<%# A disconnect revokes the token, it does not delete history, so rows already
-    pulled still show. Only an account with nothing stored reads as unconnected. %>
 <% if presenter.unconfigured? %>
   <%= render "ahoy_dashboard/search_console/unconnected" %>
 <% elsif presenter.empty? %>

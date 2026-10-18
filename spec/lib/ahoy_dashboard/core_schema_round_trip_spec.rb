@@ -3,14 +3,15 @@ require "rails_helper"
 RSpec.describe "Dashboard core schema round trip" do
   let(:connection) { ActiveRecord::Base.connection }
 
-  around do |example|
+  before(:all) do
+    connection = ActiveRecord::Base.connection
     original = connection.schema_search_path
-    connection.transaction(requires_new: true) do
+    begin
+      connection.execute("DROP SCHEMA IF EXISTS dashboard_core_round_trip CASCADE")
       connection.execute("CREATE SCHEMA dashboard_core_round_trip")
       connection.schema_search_path = "dashboard_core_round_trip"
       connection.schema_cache.clear!
-      migration = AhoyDashboard::Engine.root.join("db/migrate/core/create_ahoy_dashboard_core.rb")
-      load(migration.to_s) unless defined?(CreateAhoyDashboardCore)
+      engine_migration("core/create_ahoy_dashboard_core.rb")
       ActiveRecord::Migration.suppress_messages { CreateAhoyDashboardCore.new.migrate(:up) }
       schema = StringIO.new
       source = ActiveRecord.version >= Gem::Version.new("7.2") ? connection.pool : connection
@@ -20,9 +21,21 @@ RSpec.describe "Dashboard core schema round trip" do
       connection.schema_cache.clear!
       definitions = schema.string.lines.reject { |line| line.strip.start_with?("create_schema ") }.join
       ActiveRecord::Migration.suppress_messages { eval(definitions, TOPLEVEL_BINDING, "round_trip_schema.rb") }
-      example.run
-      raise ActiveRecord::Rollback
+    ensure
+      connection.schema_search_path = original
+      connection.schema_cache.clear!
     end
+  end
+
+  after(:all) do
+    ActiveRecord::Base.connection.execute("DROP SCHEMA IF EXISTS dashboard_core_round_trip CASCADE")
+  end
+
+  around do |example|
+    original = connection.schema_search_path
+    connection.schema_search_path = "dashboard_core_round_trip"
+    connection.schema_cache.clear!
+    example.run
   ensure
     connection.schema_search_path = original
     connection.schema_cache.clear!
@@ -49,6 +62,6 @@ RSpec.describe "Dashboard core schema round trip" do
 
     AhoyDashboard::FunnelSteps::MoveCommand.call(funnel: funnel, step_id: first.id, direction: "down")
 
-    expect(funnel.funnel_steps.reload.pluck(:id)).to eq([second.id, first.id])
+    expect(funnel.funnel_steps.reload.pluck(:id)).to eq([ second.id, first.id ])
   end
 end

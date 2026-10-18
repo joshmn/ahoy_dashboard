@@ -1,13 +1,10 @@
 import { Controller } from "../runtime/controllers.js"
+import { format, tick } from "../runtime/format.js"
+import { escapeHtml } from "../runtime/html.js"
 import { smoothPath, areaPath } from "../runtime/path.js"
 
 const GEOMETRY = { height: 300, left: 46, right: 14, top: 16, bottom: 28 }
-// The design's own three. A deploy reads as the accent because it is the one
-// that usually explains a step in the line; the rest are quieter.
 const ANNOTATION_COLOURS = { deploy: "#7d87ea", campaign: "#4fc08d", note: "#9099a3" }
-
-const escapeAttribute = (value) =>
-  String(value ?? "").replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;")
 
 const DOT_RADIUS = 4
 const TICK_SPACING = 95
@@ -22,8 +19,6 @@ const TICK_MINUTES = [1, 2, 5, 10, 15, 30, 60, 120, 180, 240, 360, 720, 1440]
 const DAY_MINUTES = 1440
 
 const NICE = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]
-const UNITS = [[1e9, "B"], [1e6, "M"], [1e3, "k"]]
-const COMPACT_DECIMALS_BELOW = 100
 
 let charts = 0
 
@@ -56,72 +51,6 @@ const TIPS = {
 }
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
-const esc = (s) =>
-  String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c])
-const trim = (n) => (n % 1 === 0 ? String(n) : String(n))
-
-function delimited(n) {
-  return Math.round(n).toLocaleString("en-US")
-}
-
-function compact(n) {
-  let index = UNITS.findIndex(([size]) => Math.round(Math.abs(n)) >= size)
-  if (index === -1) return delimited(n)
-
-  let scaled = n / UNITS[index][0]
-  if (Math.round(Math.abs(scaled)) >= 1000 && index > 0) {
-    index -= 1
-    scaled = n / UNITS[index][0]
-  }
-
-  const text = Math.abs(Math.round(scaled * 10) / 10) < COMPACT_DECIMALS_BELOW ? scaled.toFixed(1) : String(Math.round(scaled))
-
-  return text + UNITS[index][1]
-}
-
-function duration(n) {
-  const total = Math.round(n)
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.floor((total % 3600) / 60)
-  const seconds = total % 60
-
-  if (hours > 0) return `${hours}h ${minutes}m`
-  if (minutes > 0) return `${minutes}m ${seconds}s`
-  return `${seconds}s`
-}
-
-// Mirrors AhoyDashboard::Metric#format. The server cannot format a y-axis tick it
-// never computed, so the six cases live on both sides.
-function format(value, type) {
-  const n = Number(value) || 0
-
-  switch (type) {
-    case "decimal":
-      return n.toFixed(2)
-    case "percent":
-      return `${Math.round(n)}%`
-    case "rate":
-      return `${trim(Math.round(n * 10) / 10)}%`
-    case "duration":
-      return duration(n)
-    case "currency":
-      return `$${delimited(n)}`
-    default:
-      return delimited(n)
-  }
-}
-
-// Ticks are shorter than the value they label, so an integer axis compacts and
-// a duration axis drops its seconds.
-function tick(value, type) {
-  const n = Number(value) || 0
-
-  if (type === "duration") return n >= 60 ? `${Math.round(n / 60)}m` : `${Math.round(n)}s`
-  if (type === "decimal") return n.toFixed(1)
-  if (!type || type === "integer") return compact(n)
-
-  return format(n, type)
-}
 
 function niceCeil(value) {
   if (!(value > 0)) return 1
@@ -225,7 +154,6 @@ export default class extends Controller {
   static values = {
     data: Array,
     options: Object,
-    kind: { type: String, default: "area" },
     height: { type: Number, default: GEOMETRY.height }
   }
 
@@ -259,8 +187,6 @@ export default class extends Controller {
     this.table = null
   }
 
-  // The metric switcher hands new numbers in without a page load. Returning
-  // false is what tells it to fall back to a normal navigation.
   update(data, options = null) {
     if (!this.svg || !data) return false
 
@@ -271,9 +197,6 @@ export default class extends Controller {
     return true
   }
 
-  // The series is already on the page, so the CSV is built here rather than
-  // asked for. The report exports in the bar are a different thing: those are a
-  // breakdown's rows, this is the line on screen.
   export(event) {
     event?.preventDefault()
 
@@ -325,9 +248,6 @@ export default class extends Controller {
     this.tip.hidden = true
     this.host.appendChild(this.tip)
 
-    // Its own tip rather than the reading one. A flag is hovered on purpose and
-    // says something the numbers do not, so the two never share a box and never
-    // fight over the same corner.
     this.annoTip = document.createElement("div")
     this.annoTip.className = "tip anno-tip"
     this.annoTip.hidden = true
@@ -380,24 +300,14 @@ export default class extends Controller {
     return this.options?.library?.scales?.y?.max
   }
 
-  // A floor, so a measure that never goes near zero is not drawn as a flat line
-  // along the top of an axis that is mostly empty. Search position is the case:
-  // every value sits between 1 and 20 and the interesting movement is a tenth.
   get floor() {
     return this.options?.library?.scales?.y?.min ?? 0
   }
 
-  // Position counts the wrong way round. One is the best a page can do, so the
-  // axis runs the other way and a line going up is a page doing worse. Anything
-  // reading this chart has to be told that, which is what the caption beside the
-  // metric tabs is for.
   get reversed() {
     return this.options?.library?.scales?.y?.reverse === true
   }
 
-  // The line's own colour, and whether it carries an area under it. A banded
-  // axis has no zero to fill down to, so a fill under it would shade from the
-  // floor rather than from nothing and read as a quantity.
   get stroke() {
     return this.options?.library?.tmStroke || null
   }
@@ -539,8 +449,6 @@ export default class extends Controller {
     }
   }
 
-  // A little air either side of what the numbers actually did, rounded to a
-  // tenth, so the line does not touch the top or the bottom of the plot.
   band(trough, peak) {
     const pad = Math.max((peak - trough) * 0.25, 0.2)
 
@@ -557,9 +465,6 @@ export default class extends Controller {
     return { min, max: max > min ? max : min + 1 }
   }
 
-  // Four gridlines means the axis is quartered, and on a quiet day the quarters
-  // of 2.5 round to 1, 1, 2, 3 — the same label twice. A whole-number metric
-  // gets a ceiling divisible by four so every tick is its own integer.
   roof(peak) {
     const nice = niceCeil(peak * 1.06 || 1)
     const whole = !this.type || this.type === "integer"
@@ -582,9 +487,6 @@ export default class extends Controller {
     )
   }
 
-  // Saturday and Sunday sit on a slightly lighter ground, so a weekly rhythm
-  // reads without anybody counting gridlines. Only when a bucket is a day; on an
-  // hourly or monthly axis the band would mean nothing.
   bands(times, geometry) {
     if (this.interval !== "day") return ""
 
@@ -618,18 +520,6 @@ export default class extends Controller {
     return `${out}<line class="gl base" x1="${pl}" x2="${width - pr}" y1="${baseY}" y2="${baseY}"/>`
   }
 
-  // The flags. An annotation is a moment and the axis is buckets, so each one
-  // lands on the bucket that holds it rather than at a computed x: the last one
-  // starting at or before it. A range grouped by week has no Tuesday to sit on,
-  // and the week that holds it is the honest answer.
-  //
-  // The buckets and the annotation are both read as the dashboard's own wall
-  // clock, so a deploy at nine in the evening hangs on the day it happened
-  // wherever the browser is.
-  //
-  // The whole marker is one group so the line, the flag and the hit area move
-  // together, and the hit area is a rect rather than the flag itself because a
-  // 5px pennant is not something anybody can hit with a mouse.
   annotations(times, { pt, baseY, X, n }) {
     const notes = this.options?.library?.plugins?.tmAnnotations
     if (!Array.isArray(notes) || notes.length === 0 || n === 0) return ""
@@ -647,9 +537,9 @@ export default class extends Controller {
       const x = X(index)
       const at1 = x.toFixed(1)
 
-      return `<g class="anno-hit" data-anno-label="${escapeAttribute(note.label)}"` +
-        ` data-anno-when="${escapeAttribute(note.when_label || "")}"` +
-        ` data-anno-kind="${escapeAttribute(note.kind_label || "")}" data-x="${at1}">` +
+      return `<g class="anno-hit" data-anno-label="${escapeHtml(note.label)}"` +
+        ` data-anno-when="${escapeHtml(note.when_label || "")}"` +
+        ` data-anno-kind="${escapeHtml(note.kind_label || "")}" data-x="${at1}">` +
         `<line class="anno-line" stroke="${colour}" x1="${at1}" x2="${at1}" y1="${pt + 13}" y2="${baseY}"/>` +
         `<path class="anno-flag" fill="${colour}" d="M${at1} ${pt + 12}V${pt + 1}h5.4l-1.7 2.6 1.7 2.6H${at1}Z"/>` +
         `<rect class="anno-tap" x="${(x - 8).toFixed(1)}" y="${pt - 3}" width="17" height="19" rx="3"/></g>`
@@ -659,11 +549,9 @@ export default class extends Controller {
   labels(times, { pl, pr, width, H, Y, max, min, n, X, timed }) {
     let out = ""
 
-    // Four ticks across whatever the axis spans. On a band that is the band; on
-    // an axis rooted at zero it is the same quarters it always was.
     for (let k = 0; k <= 4; k++) {
       const value = (min ?? 0) + (((max - (min ?? 0)) * k) / 4)
-      out += `<text class="yl" x="${pl - 9}" y="${(Y(value) + 3.5).toFixed(1)}">${esc(tick(value, this.type))}</text>`
+      out += `<text class="yl" x="${pl - 9}" y="${(Y(value) + 3.5).toFixed(1)}">${escapeHtml(tick(value, this.type))}</text>`
     }
 
     const across = Boolean(BUCKET_MINUTES[this.interval]) && n > 1 && isoDay(times[0]) !== isoDay(times[n - 1])
@@ -675,9 +563,8 @@ export default class extends Controller {
 
     shown.forEach((i) => {
       const x = X(i)
-      // The first and last labels anchor inward so neither runs off the plot.
       const anchor = n > 1 && i === n - 1 ? ' style="text-anchor:end"' : x - pl < 28 ? ' style="text-anchor:start"' : ""
-      out += `<text class="xl" x="${x}" y="${H - 9}"${anchor}>${esc(stamp(formats, key, times[i]))}</text>`
+      out += `<text class="xl" x="${x}" y="${H - 9}"${anchor}>${escapeHtml(stamp(formats, key, times[i]))}</text>`
     })
 
     return out
@@ -751,7 +638,6 @@ export default class extends Controller {
 
       lineEl.setAttribute("d", line)
       openEl?.setAttribute("d", line)
-      // A banded axis draws no area, so there may be nothing to tween under it.
       areaEl?.setAttribute("d", area)
       if (loneEl) loneEl.innerHTML = lone
 
@@ -787,10 +673,10 @@ export default class extends Controller {
         const colour = flag.querySelector(".anno-flag")?.getAttribute("fill") || ""
 
         this.annoTip.innerHTML =
-          `<div class="ak" style="color:${colour}">` +
-          `<span class="adot" style="background:${colour}"></span>${flag.dataset.annoKind || ""}</div>` +
-          `<div class="anno-lbl">${escapeAttribute(flag.dataset.annoLabel)}</div>` +
-          (when ? `<div class="anno-when">${escapeAttribute(when)}</div>` : "")
+          `<div class="ak" style="color:${escapeHtml(colour)}">` +
+          `<span class="adot" style="background:${escapeHtml(colour)}"></span>${escapeHtml(flag.dataset.annoKind)}</div>` +
+          `<div class="anno-lbl">${escapeHtml(flag.dataset.annoLabel)}</div>` +
+          (when ? `<div class="anno-when">${escapeHtml(when)}</div>` : "")
         this.annoTip.hidden = false
 
         const scale = box.width / width
@@ -807,8 +693,6 @@ export default class extends Controller {
 
       flag.addEventListener("pointerenter", show)
       flag.addEventListener("pointerleave", hide)
-      // Reachable without a pointer. The rect is the hit area, so it is the
-      // thing that takes focus.
       const tap = flag.querySelector(".anno-tap")
       if (!tap) return
 
@@ -997,14 +881,14 @@ export default class extends Controller {
   tableHtml(times, values, shadows, partial) {
     const compared = shadows.length === values.length
     const rows = values.map((value, i) => {
-      const cells = [`<th scope="row">${esc(stamp(TIPS, this.interval, times[i]))}${partial && i === values.length - 1 ? " so far" : ""}</th>`,
-        `<td>${esc(this.reading(value))}</td>`]
-      if (compared) cells.push(`<td>${esc(format(shadows[i], this.type))}</td>`)
+      const cells = [`<th scope="row">${escapeHtml(stamp(TIPS, this.interval, times[i]))}${partial && i === values.length - 1 ? " so far" : ""}</th>`,
+        `<td>${escapeHtml(this.reading(value))}</td>`]
+      if (compared) cells.push(`<td>${escapeHtml(format(shadows[i], this.type))}</td>`)
       return `<tr>${cells.join("")}</tr>`
     })
 
-    return `<table><caption>${esc(this.label)} by ${esc(this.interval.replaceAll("_", " "))}</caption>` +
-      `<thead><tr><th scope="col">When</th><th scope="col">${esc(this.label)}</th>` +
+    return `<table><caption>${escapeHtml(this.label)} by ${escapeHtml(this.interval.replaceAll("_", " "))}</caption>` +
+      `<thead><tr><th scope="col">When</th><th scope="col">${escapeHtml(this.label)}</th>` +
       `${compared ? '<th scope="col">Previous period</th>' : ""}</tr></thead>` +
       `<tbody>${rows.join("")}</tbody></table>`
   }
@@ -1012,7 +896,7 @@ export default class extends Controller {
   rangeTipHtml(range) {
     return (
       '<div class="t-date">Custom range</div>' +
-      `<div class="t-val">${esc(range.label)}</div>` +
+      `<div class="t-val">${escapeHtml(range.label)}</div>` +
       `<div class="t-lbl">${range.whole ? "Already showing all of it" : "Let go to apply, Esc to cancel"}</div>`
     )
   }
@@ -1029,7 +913,6 @@ export default class extends Controller {
 
       if (shadow > 0) {
         const delta = ((value - shadow) / shadow) * 100
-        // Bounce rate is the one metric where down is the good direction.
         const good = this.type === "percent" && this.label.toLowerCase().includes("bounce") ? delta <= 0 : delta >= 0
 
         change = `<span class="${good ? "up" : "down"}">${delta >= 0 ? "\u2191" : "\u2193"}${Math.abs(delta).toFixed(0)}%</span>`
@@ -1039,13 +922,13 @@ export default class extends Controller {
 
       compare =
         '<div class="t-cmp"><span>Previous</span>' +
-        `<b>${esc(format(shadow, this.type))}</b>${change}</div>`
+        `<b>${escapeHtml(format(shadow, this.type))}</b>${change}</div>`
     }
 
     return (
-      `<div class="t-date">${esc(stamp(TIPS, this.interval, time))}</div>` +
-      `<div class="t-val">${esc(this.reading(value))}</div>` +
-      `<div class="t-lbl">${esc(this.label)}${open ? " so far" : ""}</div>${compare}`
+      `<div class="t-date">${escapeHtml(stamp(TIPS, this.interval, time))}</div>` +
+      `<div class="t-val">${escapeHtml(this.reading(value))}</div>` +
+      `<div class="t-lbl">${escapeHtml(this.label)}${open ? " so far" : ""}</div>${compare}`
     )
   }
 }

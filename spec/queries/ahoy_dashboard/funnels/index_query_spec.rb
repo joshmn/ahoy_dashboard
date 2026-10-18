@@ -8,12 +8,7 @@ RSpec.describe AhoyDashboard::Funnels::IndexQuery do
   let!(:funnels) { Array.new(6) { |index| create(:dash_funnel, position: index + 1, goals: goals) } }
 
   it "only executes funnel aggregates for the displayed page" do
-    statements = []
-    subscriber = ->(*arguments) do
-      sql = arguments.last.fetch(:sql)
-      statements << sql if sql.match?(/with tm_funnel as materialized/i)
-    end
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+    statements = captured_sql(/with tm_funnel as materialized/i, cached: true) do
       described_class.call(query: query, page: 1)
     end
 

@@ -1,6 +1,4 @@
 module AhoyDashboard
-  # One applied filter chip. It knows how to say itself and how to add itself to
-  # a relation, and it binds every value rather than writing it into the SQL.
   class Filter
     include ActiveModel::Model
 
@@ -15,6 +13,10 @@ module AhoyDashboard
     NEGATIVE_OPERATORS = %w[is_not not_contains].freeze
 
     attr_reader :dimension, :operator, :value
+
+    def self.operator_options
+      OPERATORS.map { |key, text| [ text, key ] }
+    end
 
     def initialize(dimension:, value:, operator: DEFAULT_OPERATOR)
       @dimension = dimension
@@ -39,7 +41,7 @@ module AhoyDashboard
     end
 
     def exit?
-      dimension.sql.to_s.include?(ExitPagesQuery::ALIAS)
+      dimension.exits?
     end
 
     def to_param
@@ -62,15 +64,11 @@ module AhoyDashboard
     def candidate_predicate(sql: dimension.sql)
       return predicate(sql: sql) unless dimension.page_views_only?
 
-      "(ahoy_events.name = #{quote(AhoyDashboard::PAGE_VIEW)} AND #{predicate(sql: sql)})"
+      "(#{Sql::PAGE_VIEW_EVENT} AND #{predicate(sql: sql)})"
     end
 
     private
 
-    # A filter value is somebody's own text, so its % and _ are characters rather
-    # than wildcards. FilterOptionsQuery already escapes them for the typeahead,
-    # and the two have to agree: picking a value with an underscore out of the
-    # dropdown matched more rows than the dropdown had offered.
     def term
       "%#{ActiveRecord::Base.sanitize_sql_like(value)}%"
     end
@@ -87,8 +85,6 @@ module AhoyDashboard
       "(#{sql} = #{quote(value)})"
     end
 
-    # "is not (not set)" means drop the rows that have nothing, which is the one
-    # case IS DISTINCT FROM gets backwards: it keeps every NULL.
     def negated(sql)
       return "(#{sql} IS NOT NULL AND #{sql} <> '')" if unknown?
       predicate = Sql::CHANNEL_PREDICATES[value] if sql == Sql::CHANNEL

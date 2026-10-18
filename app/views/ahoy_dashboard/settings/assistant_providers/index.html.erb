@@ -1,91 +1,87 @@
 <% content_for :title, "Assistant" %>
 <% content_for :dash_settings_section, "assistant_providers" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Assistant",
-          lede: "The model that answers questions in Ask. Keys saved here are encrypted.",
-          actions: dash_button("Open Ask", chats_path, data: { tm_frame: "_top" }) %>
+<%= dash_page_head title: "Assistant",
+      lede: "The model that answers questions in Ask. Keys saved here are encrypted.",
+      actions: dash_button("Open Ask", chats_path, data: { tm_frame: "_top" }) %>
 
-    <% unless AhoyDashboard::Assistant.available? %>
-      <%= dash_notice detail: AhoyDashboard::Settings::Display.assistant_notice %>
-    <% end %>
+<% unless AhoyDashboard::Assistant.available? %>
+  <%= dash_notice detail: AhoyDashboard::Settings::Display.assistant_notice %>
+<% end %>
 
-    <%= dash_card do %>
-      <%= dash_card_header "Providers" %>
+<%= dash_card do %>
+  <%= dash_card_header "Providers" %>
 
-      <%= dash_table label: "Providers", cols: "minmax(0, 1fr) minmax(0, 1fr) 132px minmax(0, 1fr) 72px" do %>
-        <thead>
-          <tr>
-            <th scope="col">Provider</th>
-            <th scope="col">Model</th>
-            <th scope="col">Key</th>
-            <th scope="col">Last error</th>
-            <th scope="col"><span class="visually-hidden">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @rows.each do |row| %>
-            <tr id="assistant-provider-<%= row.name %>">
-              <td>
-                <div class="t-main">
-                  <%= link_to row.label, edit_settings_assistant_provider_path(row.name), class: "set-row-link",
-                        data: { tm_frame: "_top" } %>
-                  <% if (badge = row.badge) %>
-                    <%= dash_badge badge[:label], tone: badge[:tone] %>
-                  <% end %>
-                </div>
-                <% if row.note %>
-                  <p class="small text-body-secondary mb-0"><%= row.note %></p>
-                <% end %>
-              </td>
-
-              <td>
-                <div class="t-mono"><%= row.model %></div>
-                <% if (tuning = row.tuning) %>
-                  <p class="small text-body-secondary mb-0"><%= tuning %></p>
-                <% end %>
-              </td>
-
-              <td class="t-when"><%= row.key %></td>
-
-              <td class="t-when">
-                <% if row.last_error %>
-                  <div class="text-truncate" title="<%= row.last_error %>"><%= row.last_error %></div>
-                  <div><%= dash_ago(row.last_error_at) %></div>
-                <% else %>
-                  None
-                <% end %>
-              </td>
-
-              <td class="row-actions row-actions-visible">
-                <%= dash_button "Edit", edit_settings_assistant_provider_path(row.name),
-                      aria: { label: "Set up #{row.label}" }, data: { tm_frame: "_top" } %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      <% end %>
-    <% end %>
-
-    <%= dash_card class: "mt-3" do %>
-      <%= dash_card_header "Kept from the assistant" do %>
-        <%= dash_button "Edit", edit_settings_assistant_dimensions_path,
-              aria: { label: "Choose what is kept from the assistant" }, data: { tm_frame: "_top" } %>
-      <% end %>
-
-      <div class="p-3" id="assistant-withheld">
-        <% if (withheld = @withheld).any? %>
-          <p class="small text-body-secondary mb-2">The assistant never reads these.</p>
-          <ul class="list-unstyled d-flex flex-wrap gap-2 mb-0" aria-label="Kept from the assistant">
-            <% withheld.each do |key| %>
-              <li><%= dash_badge key, class: "font-monospace" %></li>
+  <%= dash_table label: "Providers", cols: "minmax(0, 1fr) minmax(0, 1fr) 132px minmax(0, 1fr) 72px" do %>
+    <thead>
+      <tr>
+        <th scope="col">Provider</th>
+        <th scope="col">Model</th>
+        <th scope="col">Key</th>
+        <th scope="col">Last error</th>
+        <th scope="col"><span class="visually-hidden">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @rows.each do |row| %>
+        <tr id="assistant-provider-<%= row.name %>">
+          <td>
+            <div class="t-main">
+              <%= link_to row.label, edit_settings_assistant_provider_path(row.name), class: "set-row-link",
+                    data: { tm_frame: "_top" } %>
+              <% if (badge = row.badge) %>
+                <%= dash_badge badge[:label], tone: badge[:tone] %>
+              <% end %>
+            </div>
+            <% if row.note %>
+              <p class="small text-body-secondary mb-0"><%= row.note %></p>
             <% end %>
-          </ul>
-        <% else %>
-          <p class="small text-body-secondary mb-0">Nothing. The assistant can read every dimension the dashboard has.</p>
+          </td>
+
+          <td>
+            <div class="t-mono"><%= row.model %></div>
+            <% if (tuning = row.tuning) %>
+              <p class="small text-body-secondary mb-0"><%= tuning %></p>
+            <% end %>
+          </td>
+
+          <td class="t-when"><%= row.key %></td>
+
+          <td class="t-when">
+            <% if row.last_error %>
+              <div class="text-truncate" title="<%= row.last_error %>"><%= row.last_error %></div>
+              <div><%= dash_ago(row.last_error_at) %></div>
+            <% else %>
+              None
+            <% end %>
+          </td>
+
+          <td class="row-actions row-actions-visible">
+            <%= dash_button "Edit", edit_settings_assistant_provider_path(row.name),
+                  aria: { label: "Set up #{row.label}" }, data: { tm_frame: "_top" } %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  <% end %>
+<% end %>
+
+<%= dash_card class: "mt-3" do %>
+  <%= dash_card_header "Kept from the assistant" do %>
+    <%= dash_button "Edit", edit_settings_assistant_dimensions_path,
+          aria: { label: "Choose what is kept from the assistant" }, data: { tm_frame: "_top" } %>
+  <% end %>
+
+  <div class="p-3" id="assistant-withheld">
+    <% if (withheld = @withheld).any? %>
+      <p class="small text-body-secondary mb-2">The assistant never reads these.</p>
+      <ul class="list-unstyled d-flex flex-wrap gap-2 mb-0" aria-label="Kept from the assistant">
+        <% withheld.each do |key| %>
+          <li><%= dash_badge key, class: "font-monospace" %></li>
         <% end %>
-      </div>
+      </ul>
+    <% else %>
+      <p class="small text-body-secondary mb-0">Nothing. The assistant can read every dimension the dashboard has.</p>
     <% end %>
-  </section>
-</div>
+  </div>
+<% end %>

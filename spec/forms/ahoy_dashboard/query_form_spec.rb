@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::QueryForm do
   let(:now) { Time.utc(2026, 8, 11, 14, 30, 17) }

@@ -5,7 +5,7 @@ module AhoyDashboard
     HOST_NAME = /\A(?=.{1,253}\z)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*\z/
     LABELS = { host: "Site host", canonical_host: "Canonical host", internal_ips: "Internal addresses" }.freeze
 
-    attribute :time_zone, :string
+    attribute :time_zone, TRIMMED
     attribute :host, :string
     attribute :canonical_host, :string
     attribute :internal_ips, :string
@@ -24,10 +24,6 @@ module AhoyDashboard
           precomputed_dashboard: Preferences.read(:site, :precomputed_dashboard))
     end
 
-    def self.human_attribute_name(attribute, options = {})
-      LABELS.fetch(attribute.to_sym) { super }
-    end
-
     def self.zones
       ActiveSupport::TimeZone.all.map { |zone| [ zone.to_s, zone.name ] }
     end
@@ -44,10 +40,6 @@ module AhoyDashboard
       text = value.to_s.strip.downcase
       text = text.sub(%r{\A[a-z][a-z0-9+.-]*://}, "")
       text.split(%r{[/?#]}, 2).first.to_s.sub(/\.\z/, "").presence
-    end
-
-    def time_zone
-      super().to_s.strip.presence
     end
 
     def zone

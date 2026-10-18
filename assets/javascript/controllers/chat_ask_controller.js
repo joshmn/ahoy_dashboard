@@ -1,12 +1,5 @@
 import { Controller } from "../runtime/controllers.js"
 
-// The composer. It sits above the form rather than on it, because the three
-// questions in an empty thread submit it too and they are the other side of the
-// panel from the box you type in.
-//
-// Enter sends, shift and enter writes a line. A textarea is the right control
-// because an answer can be a paragraph long, but a textarea that needs the mouse
-// to send does not read as a conversation.
 export default class extends Controller {
   static targets = ["input", "form", "send"]
 
@@ -16,8 +9,6 @@ export default class extends Controller {
     this.grow()
   }
 
-  // The panel's thread scrolls inside its own box, and taking the window to the
-  // bottom from there would move the page the question is about.
   jump() {
     if (this.element.dataset.chatFresh === "true") return
 
@@ -31,9 +22,6 @@ export default class extends Controller {
     window.scrollTo({ top: document.documentElement.scrollHeight })
   }
 
-  // autofocus fires once, at page load. In the panel the whole composer is
-  // rendered again after every answer, so without this the caret is nowhere
-  // after the first question.
   take() {
     if (!this.hasInputTarget || this.inputTarget.autofocus !== true) return
 
@@ -57,9 +45,6 @@ export default class extends Controller {
     this.send()
   }
 
-  // One row until there is more than one, up to the cap the stylesheet sets, so
-  // a one line question does not sit in a box built for a paragraph and a long
-  // one is not read through a slot.
   grow() {
     if (!this.hasInputTarget) return
 

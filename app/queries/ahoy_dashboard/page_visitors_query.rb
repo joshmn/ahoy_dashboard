@@ -8,19 +8,31 @@ module AhoyDashboard
 
     attr_reader :limit
 
-    def initialize(events:, limit:)
+    class << self
+      def searched(relation, value:, search:)
+        return relation if search.blank?
+
+        relation.having(
+          "grouping(#{value}) = 1 or #{value} is null or #{value} ilike :term",
+          term: "%#{ActiveRecord::Base.sanitize_sql_like(search)}%"
+        )
+      end
+
+      def ordering(value)
+        "grouping(#{value}) desc, (#{value} is null) desc, #{VISITORS} desc, #{value} asc"
+      end
+    end
+
+    def initialize(events:, limit:, search: "")
       @events = events
       @limit = limit
+      @search = search
       @source_identity = identity_for(events)
     end
 
     def call
-      @rows ||= begin
-        columns = [Arel.sql("grouping(step_value)"), Arel.sql("step_value"), Arel.sql(VISITORS)]
-        AnalyticsCache.fetch(key: relation.reselect(*columns).to_sql, connection: AhoyDashboard.visit.connection) do
-          relation.pluck(*columns)
-        end
-      end
+      @rows ||= AnalyticsCache.pluck(relation: relation, connection: AhoyDashboard.visit.connection,
+        columns: [ Arel.sql("grouping(step_value)"), Arel.sql("step_value"), Arel.sql(VISITORS) ])
     end
 
     def report_result(scope:, dimension:, limit:)
@@ -40,7 +52,7 @@ module AhoyDashboard
 
     private
 
-    attr_reader :events, :source_identity
+    attr_reader :events, :search, :source_identity
 
     def identity_for(source)
       event_identity = AnalyticsCache.key(key: source.to_sql, connection: source.connection)
@@ -49,16 +61,15 @@ module AhoyDashboard
 
     def relation
       @relation ||= begin
-        expression = "(case when ahoy_events.name = #{Sql.literal(AhoyDashboard::PAGE_VIEW)} " \
-          "then nullif(#{Sql::EVENT_PATH}, '') end) collate \"C\""
         source = events.select(Arel.sql("ahoy_visits.visitor_token as visitor_token"),
-          Arel.sql("#{expression} as step_value")).to_sql
+          Arel.sql("#{Sql::PAGE_VIEW_STEP} as step_value")).to_sql
 
-        AhoyDashboard.visit.unscoped.from(Arel.sql("(#{source}) tm_journey"))
+        counted = AhoyDashboard.visit.unscoped.from(Arel.sql("(#{source}) tm_journey"))
           .where("step_value is not null")
           .group(Arel.sql("grouping sets ((step_value), ())"))
-          .order(Arel.sql("grouping(step_value) desc, (step_value is null) desc, #{VISITORS} desc, step_value asc"))
+          .order(Arel.sql(self.class.ordering("step_value")))
           .limit(limit + EXTRA_ROWS)
+        self.class.searched(counted, value: "step_value", search: search)
       end
     end
   end

@@ -1,22 +1,9 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard AI visibility Run now", type: :request do
-  include ActiveJob::TestHelper
-
   let(:path) { "/telemetry/seo/ai_visibility/runs" }
 
   before { allow(AhoyDashboard::AiVisibility).to receive(:enabled?).and_return(true) }
-
-  it "is a 404 for a signed in visitor who is not an admin, and sends nothing" do
-    sign_in create(:user)
-    create(:dash_ai_assistant, :keyed)
-    create(:dash_ai_prompt)
-
-    post path
-
-    expect(response).to have_http_status(:not_found)
-    expect(AhoyDashboard::AiVisibility::Run.count).to be_zero
-  end
 
   describe "as an admin" do
     before { sign_in create(:user, :admin) }

@@ -1,10 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp::AiVisibilityQuery do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:range) { (now - 30.days)..now }
   let(:site) { create(:dash_serp_site, domain: "example.com") }
   let(:keyword) { create(:dash_serp_keyword) }
@@ -12,10 +9,8 @@ RSpec.describe AhoyDashboard::Serp::AiVisibilityQuery do
   around { |example| travel_to(now) { example.run } }
 
   def reading(at:, overview:, cited:, citations: [])
-    run = create(:dash_serp_run, keyword: keyword, checked_at: at)
-    target = AhoyDashboard::SerpKeywordTarget.find_or_create_by!(keyword: keyword, site: site)
-    create(:dash_serp_check, run: run, keyword: keyword, site: site, target: target,
-           checked_at: at, position: 4, ai_overview_present: overview, ai_overview_cited: cited)
+    run = serp_reading(keyword, site: site, at: at, position: 4, ai_overview_present: overview,
+                                ai_overview_cited: cited).run
     citations.each_with_index do |domain, index|
       create(:dash_serp_ai_citation, run: run, slot: index + 1, link: "https://#{domain}/x",
              domain: domain, checked_at: at)
@@ -71,10 +66,7 @@ RSpec.describe AhoyDashboard::Serp::AiVisibilityQuery do
   end
 
   it "leaves out a check that was never asked about an overview" do
-    run = create(:dash_serp_run, keyword: keyword, checked_at: now - 1.day)
-    target = AhoyDashboard::SerpKeywordTarget.find_or_create_by!(keyword: keyword, site: site)
-    create(:dash_serp_check, run: run, keyword: keyword, site: site, target: target,
-           checked_at: now - 1.day, ai_overview_present: nil)
+    serp_reading(keyword, site: site, at: now - 1.day, position: 3, ai_overview_present: nil)
 
     expect(described_class.call(site: site, range: range).checks).to be_zero
   end

@@ -1,6 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe "AhoyDashboard feature modules with their tables not installed" do
   before do

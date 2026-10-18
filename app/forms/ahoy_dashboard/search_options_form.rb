@@ -1,18 +1,18 @@
 module AhoyDashboard
   class SearchOptionsForm < AhoyDashboard::Form
-    LANGUAGE = /\A[a-z]{2,3}(-[a-z0-9]{2,4})?\z/
+    LANGUAGE = /\A[a-z]{2,3}(-[a-z0-9]{2,4})?\z/i
     LABELS = {
       keywords_provider: "Keyword research provider", keywords_location: "Search from",
       keywords_language: "Language", backlinks_provider: "Backlinks provider",
       places_postal_codes: "Postal codes", places_source: "Monthly list address"
     }.freeze
 
-    attribute :keywords_provider, :string
+    attribute :keywords_provider, TRIMMED
     attribute :keywords_location, :string
     attribute :keywords_language, :string
-    attribute :backlinks_provider, :string
+    attribute :backlinks_provider, TRIMMED
     attribute :places_postal_codes, :boolean, default: false
-    attribute :places_source, :string
+    attribute :places_source, TRIMMED
 
     validate :providers_known
     validate :location_readable
@@ -28,24 +28,12 @@ module AhoyDashboard
           places_source: Preferences.read(:places, :source))
     end
 
-    def self.human_attribute_name(attribute, options = {})
-      LABELS.fetch(attribute.to_sym) { super }
-    end
-
     def self.providers
       Serp.adapter_names.map { |name| [ Settings::Display.serp_label(name.to_s), name.to_s ] }
     end
 
     def self.countries
-      Serp::Location.country_names.map { |code, name| [ name, code ] }.sort_by(&:first)
-    end
-
-    def keywords_provider
-      super().to_s.strip.presence
-    end
-
-    def backlinks_provider
-      super().to_s.strip.presence
+      Serp::Location.country_options
     end
 
     def keywords_location
@@ -54,10 +42,6 @@ module AhoyDashboard
 
     def keywords_language
       super().to_s.strip.downcase.presence
-    end
-
-    def places_source
-      super().to_s.strip.presence
     end
 
     def preferences

@@ -1,8 +1,5 @@
 module AhoyDashboard
   module Countries
-    # There is no country-name gem in this app and geocoder does not ship one,
-    # so the ISO alpha-2 names live here. Anything not in the table prints the
-    # raw value, which is also what happens when ahoy stored a full name.
     NAMES = {
       "AD" => "Andorra", "AE" => "United Arab Emirates", "AF" => "Afghanistan",
       "AG" => "Antigua and Barbuda", "AI" => "Anguilla", "AL" => "Albania", "AM" => "Armenia",

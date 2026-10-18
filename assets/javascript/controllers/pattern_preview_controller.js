@@ -1,12 +1,11 @@
 import { Controller } from "../runtime/controllers.js"
+import { counted, plural } from "../runtime/text.js"
 
 const SHOWN = 8
 const WILDCARD = "*"
 const MAX_PATTERNS = 20
 const POOL = 100
 const MODAL_KEY = "page-group-matches"
-
-const plural = (count, word) => `${count.toLocaleString("en-US")} ${count === 1 ? word : `${word}s`}`
 
 export default class extends Controller {
   static targets = ["input", "list", "summary", "all", "allTitle"]
@@ -38,13 +37,13 @@ export default class extends Controller {
 
     const pool = total >= POOL
       ? `the ${POOL} most visited pages in the last 30 days`
-      : `${total} ${total === 1 ? "page" : "pages"} visited in the last 30 days`
+      : `${total} ${plural(total, "page")} visited in the last 30 days`
 
     return `Matches ${matched === 0 ? "none" : matched} of ${pool}.`
   }
 
   title(matched) {
-    return `All ${matched} ${matched === 1 ? "page" : "pages"} it groups`
+    return `All ${matched} ${plural(matched, "page")} it groups`
   }
 
   rows(matches) {
@@ -63,14 +62,12 @@ export default class extends Controller {
     name.className = "grp-path"
     name.textContent = path
     count.className = "grp-count"
-    count.textContent = plural(Number(visitors) || 0, "visitor")
+    count.textContent = counted(Number(visitors) || 0, "visitor")
     row.append(name, count)
 
     return row
   }
 
-  // The same button the server renders. The action is read off the element when
-  // the click happens, so a row built here opens the dialog without any wiring.
   moreRow(rest) {
     const row = document.createElement("li")
     const button = document.createElement("button")

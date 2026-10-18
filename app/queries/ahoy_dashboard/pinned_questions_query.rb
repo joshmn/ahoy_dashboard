@@ -1,23 +1,9 @@
 module AhoyDashboard
-  # What the pinned questions say on the dashboard.
-  #
-  # Each one is read by building the query its params describe and asking the
-  # same two questions the top of the dashboard asks: what the number is over the
-  # range, and what it was over the range before. Numerical aggregates share
-  # the dashboard's short cache; question labels are read on every request.
-  #
-    # Three at most, each reading only its chosen metric and sparkline.
-  class PinnedQuestionsQuery
-    # The sparkline is a shape, not a reading. Thirty points is enough to see a
-    # trend and few enough to draw in 200px without turning into noise.
+  class PinnedQuestionsQuery < AhoyDashboard::Query
     POINTS = 30
     PREVIOUS = "previous_period".freeze
 
     Reading = Data.define(:question, :metric, :value, :change, :period, :range, :series)
-
-    def self.call(**options)
-      new(**options).call
-    end
 
     def initialize(questions: nil, headline: nil)
       @questions = questions || AhoyDashboard::SavedQuery.on_the_dashboard
@@ -32,9 +18,6 @@ module AhoyDashboard
 
     attr_reader :questions, :headline
 
-    # The card always reads against the period before it, whatever the saved
-    # question had set, because the delta beside the number is the whole reason
-    # the number is worth a card rather than a line in a list.
     def reading(question)
       form = form_for(question)
       return unless form

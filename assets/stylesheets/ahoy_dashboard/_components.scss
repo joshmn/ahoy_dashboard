@@ -103,13 +103,16 @@
   align-items: center;
 }
 
-.link-quiet {
+.link-quiet,
+.jr-why a,
+.card-footer a:not(.btn) {
   color: var(--t2);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-.link-quiet:hover {
+.link-quiet:hover,
+.jr-why a:hover {
   color: var(--t1);
 }
 
@@ -482,12 +485,6 @@ fieldset > legend.form-label {
 .card-footer {
   font-size: $font-size-sm;
   color: var(--t3);
-}
-
-.card-footer a:not(.btn) {
-  color: var(--t2);
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 .card-footer-action {
@@ -896,13 +893,11 @@ button.tile:focus-visible {
 .dialog-header .modal-title {
   min-width: 0;
   margin: 0;
-  overflow: hidden;
+  @include text-truncate;
   font-size: $font-size-lg;
   font-weight: 600;
   line-height: 1.45;
   letter-spacing: -0.01em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .dialog-heading {
@@ -1064,9 +1059,7 @@ button.tile:focus-visible {
 
 .disclosure-danger .disclosure-label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include text-truncate;
 }
 
 .disclosure pre {

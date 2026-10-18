@@ -17,11 +17,7 @@ module AhoyDashboard
     end
 
     def installed?
-      features.any?(&:installed?)
-    end
-
-    def state
-      installed? ? :ready : :not_installed
+      Installation.any_installed?(names)
     end
 
     def label
@@ -43,6 +39,10 @@ module AhoyDashboard
 
     def commands
       Installation.install_commands(names)
+    end
+
+    def terminal_line
+      "#{label.downcase} is not installed. #{Schedule.install_steps(names)}"
     end
 
     def badge

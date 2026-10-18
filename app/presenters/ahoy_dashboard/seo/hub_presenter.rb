@@ -15,6 +15,8 @@ module AhoyDashboard
         end
       end
 
+      delegate :opportunities, to: :reading
+
       def initialize(reading:, **options)
         super(**options)
         @reading = reading
@@ -52,7 +54,7 @@ module AhoyDashboard
         AhoyDashboard::FeatureState.for(:serp)
       end
 
-      def search_console?
+      def search_console_data?
         search_console_installed? && search_console.any?
       end
 
@@ -62,10 +64,6 @@ module AhoyDashboard
 
       def performance_path
         routes.search_console_report_path(query.to_query)
-      end
-
-      def opportunities
-        reading.opportunities
       end
 
       def opportunities_path

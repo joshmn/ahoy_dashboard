@@ -16,7 +16,7 @@
 
         <label class="visually-hidden" for="funnel_step_<%= index + 1 %>">Step <%= index + 1 %></label>
         <%= form.select :goal_ids,
-              options_for_select(goals.map { |goal| [ goal.name, goal.id ] }, goal_id),
+              options_for_select(@form.goal_options, goal_id),
               { include_blank: "Choose a goal" },
               name: "funnel[goal_ids][]",
               id: "funnel_step_#{index + 1}",

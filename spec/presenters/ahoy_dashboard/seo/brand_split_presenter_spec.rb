@@ -32,17 +32,18 @@ RSpec.describe AhoyDashboard::Seo::BrandSplitPresenter do
 
     notes = presenter.tiles.index_by(&:label).transform_values(&:note)
 
-    expect(notes.values_at("Brand", "Non-brand")).to eq(["25% of clicks", "75% of clicks"])
+    expect(notes.values_at("Brand", "Non-brand")).to eq([ "25% of clicks", "75% of clicks" ])
   end
 
-  it "reads the last date from the prepared property totals without another query" do
+  it "dates the data note from the prepared property totals without another query" do
     create(:dash_search_console_total, date: today)
     shown = presenter
-    statements = []
-    subscriber = ->(*args) { statements << args.last[:sql] if args.last[:sql].match?(/\ASELECT/) }
+    result = nil
+    statements = captured_sql(/\ASELECT/, cached: true) { result = shown.data_note }
 
-    result = ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { shown.last_date }
-
-    expect([result, statements]).to eq([today, []])
+    expect([ result, statements.grep(/search_console/) ]).to eq([
+      "Data runs through #{AhoyDashboard::DateFormat.short(today)}. " \
+      "#{AhoyDashboard::SearchConsoleReportPresenter::UNSLICED_NOTE}", []
+    ])
   end
 end

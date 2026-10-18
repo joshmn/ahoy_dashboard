@@ -6,23 +6,8 @@
   <% end %>
 
   <% if stacks.any? %>
-    <div class="seo-dist__plot">
-      <svg viewBox="0 0 <%= AhoyDashboard::SeoHelper::PLOT_WIDTH %> <%= AhoyDashboard::SeoHelper::PLOT_HEIGHT %>"
-           preserveAspectRatio="none" role="img" aria-label="<%= presenter.distribution_label %>">
-        <% stacks.each do |stack| %>
-          <g>
-            <title><%= presenter.day_title(stack[:day]) %></title>
-            <% stack[:segments].each do |segment| %>
-              <rect class="seo-dist__seg seo-band--<%= segment[:key] %>" x="<%= stack[:x] %>" y="<%= segment[:y] %>"
-                    width="<%= stack[:width] %>" height="<%= segment[:height] %>"></rect>
-            <% end %>
-          </g>
-        <% end %>
-      </svg>
-      <div class="seo-plot__dates">
-        <% presenter.distribution_dates.each do |label| %><span><%= label %></span><% end %>
-      </div>
-    </div>
+    <%= render "ahoy_dashboard/seo/shared/stacks", stacks: stacks, source: presenter, band: "seo-band",
+          label: presenter.distribution_label, dates: presenter.distribution_dates %>
   <% end %>
 
   <ul class="seo-moves__legend seo-dist__legend" aria-label="Filter tracked searches by band">

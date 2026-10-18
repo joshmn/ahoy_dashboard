@@ -21,7 +21,7 @@ module AhoyDashboard
           end
 
           def label
-            "fake"
+            "Sample data"
           end
 
           def cost_units(pages: 1)
@@ -35,22 +35,14 @@ module AhoyDashboard
           def backlink_cost_units
             0
           end
-        end
 
-        def initialize(**_options)
-          super()
-        end
+          def keywords?
+            true
+          end
 
-        # So both of the bought screens can be worked on without an account. The
-        # figures are derived from the phrase rather than drawn at random, so the
-        # same seed answers the same way twice and a layout can be judged without
-        # the numbers moving underneath it.
-        def keywords?(*forwarded_arguments, **forwarded_keywords, &forwarded_block)
-          true
-        end
-
-        def backlinks?(*forwarded_arguments, **forwarded_keywords, &forwarded_block)
-          true
+          def backlinks?
+            true
+          end
         end
 
         MODIFIERS = [
@@ -106,32 +98,15 @@ module AhoyDashboard
           { domains: domains, anchors: anchors, total: domains.size }
         end
 
-        def search(query:, location: nil, request: nil, device: Serp::DEFAULT_DEVICE,
-                   language: Serp::DEFAULT_LANGUAGE, engine: Serp::DEFAULT_ENGINE)
-          request ||= first_request
-          place = Location.parse(location)
-          payload = payload_for(query, place, request, device, language)
-
-          parse_payload(payload, query: query, location: place, request: request, device: device,
-                                 language: language, engine: engine)
-        end
-
-        def parse_payload(payload, query:, location: nil, request: nil, device: Serp::DEFAULT_DEVICE,
-                          language: Serp::DEFAULT_LANGUAGE, engine: Serp::DEFAULT_ENGINE)
-          request ||= first_request
-
-          Result.new(
-            provider: provider_name, engine: engine, query: query, location: Location.parse(location),
-            device: device, language: language, page: request.page, start: request.start,
-            organic: organic_from(entries(payload), request: request),
-            ai_overview: ai_overview(payload),
-            provider_search_id: payload["search_id"],
-            cost_units: 0,
-            raw: payload
-          )
-        end
-
         private
+
+        def fetch_payload(query:, place:, request:, device:, language:, engine:)
+          payload_for(query, place, request, device, language)
+        end
+
+        def search_id(payload)
+          payload["search_id"]
+        end
 
         def payload_for(query, place, request, device, language)
           seed = seed_for(query, place, request, device, language)

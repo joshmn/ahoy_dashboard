@@ -1,0 +1,9 @@
+<div>
+  <% @presenter.grid_reports.each do |report| %>
+    <%= dash_details_dialog key: report.key, title: report.title,
+          frame: AhoyDashboard::ReportPresenter.details_frame_id(report) %>
+  <% end %>
+  <%= dash_details_dialog key: "search_console", title: AhoyDashboard::SearchConsolePresenter::TITLE,
+        frame: AhoyDashboard::SearchConsolePresenter::DETAILS_FRAME %>
+  <%= render partial: "ahoy_dashboard/funnels/modal", collection: @presenter.funnels, as: :funnel %>
+</div>

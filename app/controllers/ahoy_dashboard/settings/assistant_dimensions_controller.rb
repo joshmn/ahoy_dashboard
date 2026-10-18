@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class AssistantDimensionsController < AhoyDashboard::BaseController
+    class AssistantDimensionsController < AhoyDashboard::Settings::BaseController
       requires_installed :assistant
 
       def edit
@@ -12,10 +12,7 @@ module AhoyDashboard
 
         AhoyDashboard::Assistant::WithheldDimensions::SaveCommand.call(form: @form) do
           on(:ok) { redirect_to settings_assistant_providers_path, notice: "Saved." }
-          on(:invalid) do |form|
-            @form = form
-            render :edit, status: :unprocessable_entity
-          end
+          on(:invalid) { |form| rejected(form) }
         end
       end
 

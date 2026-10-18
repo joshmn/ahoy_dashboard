@@ -1,7 +1,4 @@
 module AhoyDashboard
-  # Bought data, cached. Every row costs money to fetch, so a seed is fetched
-  # once and read as often as anybody likes, and re-fetching is a deliberate act
-  # rather than a page load.
   class KeywordIdea < AhoyDashboard::Record
     self.table_name = "ahoy_dashboard_keyword_ideas"
 
@@ -53,8 +50,6 @@ module AhoyDashboard
       "Easy"
     end
 
-    # Volume against how hard it looks. Crude on purpose: it is a sort order, and
-    # dressing it up as a score invites somebody to read it as a forecast.
     def worth
       return 0.0 if volume.nil?
 

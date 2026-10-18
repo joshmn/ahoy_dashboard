@@ -122,6 +122,16 @@ RSpec.describe AhoyDashboard::AiVisibility::ReportQuery do
     expect(point.rate).to eq(0.5)
   end
 
+  it "puts an answer on the day it was asked in the site's zone, not in UTC" do
+    AhoyDashboard::Preferences.write(:site, time_zone: "America/Chicago")
+    asked = Time.utc(2026, 8, 20, 3, 30)
+    answer(assistant: "openai", mentioned: true, asked_at: asked)
+
+    point = described_class.call(range: (asked - 1.day)..(asked + 1.day)).series.first
+
+    expect(point.on).to eq(Date.new(2026, 8, 19))
+  end
+
   it "finds the latest run the cap skipped" do
     create(:dash_ai_run, status: "skipped", skip_reason: "A run needs 8 requests and 2 are left this month.", started_at: 1.day.ago)
 

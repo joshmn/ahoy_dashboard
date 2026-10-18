@@ -1,23 +1,25 @@
 <% display = AhoyDashboard::Settings::Display %>
+<% missing = @connection.missing %>
+<% fill = @connection.fill %>
 
 <%= dash_card do %>
   <%= dash_card_header "Missing days" do %>
     <span class="g-hint">Days inside the record Google has never been asked about</span>
-    <% if @missing.any? %>
+    <% if missing.any? %>
       <%= dash_button_to "Fill these days", settings_search_console_fill_path, method: :post,
-            tone: :primary, reason: @fill_reason,
+            tone: :primary, reason: @connection.fill_reason,
             title: "Pull each missing day, oldest first" %>
     <% end %>
   <% end %>
 
-  <% if @fill.running? %>
+  <% if fill.running? %>
     <%= dash_notice "Filling now.",
-          detail: "#{@fill.note} One day at a time, oldest first.",
+          detail: "#{fill.note} One day at a time, oldest first.",
           action: dash_button("Watch it run", settings_job_run_path("search_console_fill", anchor: "runs"),
                     data: { tm_frame: "_top" }) %>
   <% end %>
 
-  <% if @missing.any? %>
+  <% if missing.any? %>
     <%= dash_table label: "Missing days", cols: "minmax(0, 1fr) 110px 110px" do %>
       <thead>
         <tr>
@@ -27,7 +29,7 @@
         </tr>
       </thead>
       <tbody>
-        <% @missing.gaps.each do |gap| %>
+        <% missing.gaps.each do |gap| %>
           <tr>
             <td><span class="t-main"><%= display.date_span(gap.first, gap.last) %></span></td>
             <td class="t-when"><%= pluralize(gap.days, "day") %></td>
@@ -44,18 +46,18 @@
     <% end %>
   <% else %>
     <%= dash_empty title: "Nothing is missing", compact: true,
-          hint: "Every day from #{display.short_date(@missing.first_date)} to #{display.short_date(@missing.last_date)} has been asked about." %>
+          hint: "Every day from #{display.short_date(missing.first_date)} to #{display.short_date(missing.last_date)} has been asked about." %>
   <% end %>
 
   <%= dash_card_footer do %>
-    <% if @missing.empty? %>
-      <%= pluralize(@missing.empty_days, "day") %> of the
-      <%= number_with_delimiter(@missing.scanned_days) %> asked about came back with nothing on them.
+    <% if missing.empty? %>
+      <%= pluralize(missing.empty_days, "day") %> of the
+      <%= number_with_delimiter(missing.scanned_days) %> asked about came back with nothing on them.
       Google had no traffic to report, so they are not holes and they are not listed.
     <% end %>
-    <% if @missing.gone.any? %>
+    <% if missing.gone.any? %>
       Google stops serving a day sixteen months after it, so anything before
-      <%= display.short_date(@missing.floor) %> is gone for good and nothing can bring it back.
+      <%= display.short_date(missing.floor) %> is gone for good and nothing can bring it back.
     <% end %>
     The last three days are not counted, because Google is still changing them.
   <% end %>

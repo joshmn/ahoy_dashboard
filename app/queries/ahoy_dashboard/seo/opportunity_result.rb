@@ -17,20 +17,8 @@ module AhoyDashboard
         @rows ||= query.rows(limit: limit)
       end
 
-      def all
-        @all ||= query.rows
-      end
-
-      def days
-        @days ||= query.days
-      end
-
       def any?
         rows.any?
-      end
-
-      def top(count = 25)
-        rows.first(count)
       end
 
       def striking(limit: nil)
@@ -44,31 +32,31 @@ module AhoyDashboard
       end
 
       def clicks
-        summary[0].to_i
+        candidates.sum(&:clicks)
       end
 
       def impressions
-        summary[1].to_i
+        candidates.sum(&:impressions)
       end
 
       def upside
-        summary[2].to_i
+        candidates.sum(&:upside)
       end
 
       def striking_count
-        summary[3].to_i
+        candidates.count(&:striking?)
       end
 
       def under_performing_count
-        summary[4].to_i
+        candidates.count(&:under_performing?)
       end
 
       private
 
       attr_reader :query
 
-      def summary
-        @summary ||= query.summary
+      def candidates
+        query.candidates
       end
     end
   end

@@ -1,9 +1,2 @@
-<%# The details dialog for one funnel. A sibling of the cards rather than a child
-    of one, so position: fixed works and a card frame swap cannot destroy an open
-    dialog. Rendered from the dashboard beside the report modals. %>
-<% key = AhoyDashboard::FunnelPresenter.modal_key(funnel) %>
-<%= dash_dialog key: key, title: funnel.name, close_label: "Close the #{funnel.name.downcase} details" do %>
-  <%= dash_frame_tag AhoyDashboard::FunnelPresenter.details_frame_id(funnel) do %>
-    <%= dash_empty "Loading the whole funnel", compact: true, role: "status" %>
-  <% end %>
-<% end %>
+<%= dash_details_dialog key: AhoyDashboard::FunnelPresenter.modal_key(funnel), title: funnel.name,
+      frame: AhoyDashboard::FunnelPresenter.details_frame_id(funnel), loading: "Loading the whole funnel" %>

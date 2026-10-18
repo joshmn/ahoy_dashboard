@@ -18,9 +18,9 @@ module AhoyDashboard
           calls = output.select { |item| item["type"] == "function_call" }.map { |item| call_from(item) }
 
           Round.new(
-            text: parts(output, "output_text").map { |part| part["text"].to_s }.join,
+            text: Output.parts(response, "output_text").map { |part| part["text"].to_s }.join,
             calls: calls,
-            stop: stop_for(response, output, calls),
+            stop: Output.stop(response) || (calls.any? ? :tool_use : :end),
             wire: output.map(&:compact),
             input_tokens: usage["input_tokens"],
             output_tokens: usage["output_tokens"],
@@ -77,22 +77,6 @@ module AhoyDashboard
           ToolCall.new(id: item["call_id"], name: item["name"], arguments: parsed ? arguments : {}, parsed: parsed)
         rescue JSON::ParserError
           ToolCall.new(id: item["call_id"], name: item["name"], arguments: {}, parsed: false)
-        end
-
-        def parts(output, type)
-          output.select { |item| item["type"] == "message" }
-            .flat_map { |item| Array(item["content"]) }
-            .select { |part| part["type"] == type }
-        end
-
-        def stop_for(response, output, calls)
-          return :refusal if parts(output, "refusal").any?
-
-          case response.dig("incomplete_details", "reason")
-          when "max_output_tokens" then :max_tokens
-          when "content_filter" then :refusal
-          else calls.any? ? :tool_use : :end
-          end
         end
       end
     end

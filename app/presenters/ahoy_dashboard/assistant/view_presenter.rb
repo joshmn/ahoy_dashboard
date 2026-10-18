@@ -51,10 +51,11 @@ module AhoyDashboard
         widths.join(" ")
       end
 
-      def delta(change)
-        AhoyDashboard::Delta.percent(change)
-      end
+      def delta(figure)
+        metric = AhoyDashboard::Metric.find_by_key(figure[:metric_key].to_s)
 
+        AhoyDashboard::Delta.percent(figure[:change], inverted: metric&.inverted?)
+      end
     end
   end
 end

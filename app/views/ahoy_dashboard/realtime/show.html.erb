@@ -1,8 +1,6 @@
-<%# The panel on its own, which is what the frame's src points at. It carries no
-    src of its own, so nothing in the response can send the frame back round to
-    where it came from. %>
+<% frame = AhoyDashboard::RealtimeController::FRAME %>
 <% if params[:view] == "panel" %>
-  <%= dash_frame_tag "dash_realtime_panel" do %>
+  <%= dash_frame_tag frame do %>
     <%= render "ahoy_dashboard/realtime/panel", snapshot: @snapshot %>
   <% end %>
 <% else %>
@@ -11,23 +9,15 @@
 
 <section class="rt-page"
          data-controller="dash--realtime"
-         data-dash--realtime-frame-value="dash_realtime_panel"
+         data-dash--realtime-frame-value="<%= frame %>"
          data-dash--realtime-pause-text-value="<%= pause %>"
          data-dash--realtime-resume-text-value="Resume refreshing">
-<%# Outside the frame on purpose: the frame's contents are replaced on every
-    refresh, and a control inside it would lose focus mid-click. Hidden until the
-    controller connects, because with no JavaScript there is nothing to pause. %>
   <%= dash_page_head title: "Realtime",
         lede: "Who is on your site right now.",
         actions: dash_button(pause, hidden: true,
                              data: { "dash--realtime-target": "toggle", action: "dash--realtime#toggle" }) %>
 
-<%# Already rendered, so it says so: without that the frame fetches its own src
-    the moment it connects and every load costs two requests. Refreshing is the
-    controller calling reload() on it, which fetches the src regardless.
-    The src is the panel-only branch above, not this page, so the response carries
-    the panel and not another copy of this whole screen. %>
-  <%= dash_frame_tag "dash_realtime_panel",
+  <%= dash_frame_tag frame,
         src: realtime_path(view: "panel"), rendered: true do %>
     <%= render "ahoy_dashboard/realtime/panel", snapshot: @snapshot %>
   <% end %>

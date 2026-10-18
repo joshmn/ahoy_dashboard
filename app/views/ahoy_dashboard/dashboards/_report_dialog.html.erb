@@ -1,5 +1,0 @@
-<%= dash_dialog key: report.key, title: report.title, close_label: "Close the #{report.title.downcase} details" do %>
-  <%= dash_frame_tag "report_details_#{report.key}" do %>
-    <%= dash_empty "Loading the full list", compact: true, role: "status" %>
-  <% end %>
-<% end %>

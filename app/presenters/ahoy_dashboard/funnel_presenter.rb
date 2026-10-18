@@ -1,16 +1,9 @@
 module AhoyDashboard
-  # One funnel card, or the same funnel blown up into the details modal.
-  #
-  # Its rows are in step order rather than ranked, and every bar is scaled against
-  # step one rather than against the biggest row, because the shape of the drop is
-  # the whole answer. The top bar is therefore always full.
   class FunnelPresenter
     FRAME_PREFIX = "report_funnel_".freeze
     DETAILS_FRAME_PREFIX = "report_details_funnel_".freeze
     MODAL_PREFIX = "funnel_".freeze
     DETAILS_VIEW = "details".freeze
-
-    LABEL_COLUMN = "Step".freeze
 
     COLUMNS = [
       { key: "visitors", label: "Visitors", short: "People" },
@@ -22,16 +15,22 @@ module AhoyDashboard
       { key: "dropoff_rate", label: "Share lost since the step before", short: "Lost rate" }
     ]).freeze
 
-    def self.frame_id(funnel)
-      "#{FRAME_PREFIX}#{funnel.id}"
-    end
+    class << self
+      def frame_id(funnel)
+        "#{FRAME_PREFIX}#{funnel.id}"
+      end
 
-    def self.details_frame_id(funnel)
-      "#{DETAILS_FRAME_PREFIX}#{funnel.id}"
-    end
+      def details_frame_id(funnel)
+        "#{DETAILS_FRAME_PREFIX}#{funnel.id}"
+      end
 
-    def self.modal_key(funnel)
-      "#{MODAL_PREFIX}#{funnel.id}"
+      def modal_key(funnel)
+        "#{MODAL_PREFIX}#{funnel.id}"
+      end
+
+      def wrap(readings, query:)
+        readings.map { |reading| new(query: query, funnel: reading.funnel, result: reading) }
+      end
     end
 
     class Row
@@ -42,15 +41,12 @@ module AhoyDashboard
 
       attr_reader :step
 
-      delegate :position, :name, :visitors, :first?, :dropoff_rate, to: :step
+      delegate :position, :name, :dropoff_rate, to: :step
 
       def share
         presenter.share(step)
       end
 
-      # The other side of the drop off, which is the number somebody actually
-      # reads off the line between two steps. dropoff_rate is measured against
-      # the step above rather than against the top, so this is too.
       def continue_rate
         return if dropoff_rate.nil?
 
@@ -60,7 +56,7 @@ module AhoyDashboard
       def dropoff_label
         return if step.dropoff.nil?
 
-        "drop off (#{presenter.number(step.dropoff)} #{"visitor".pluralize(step.dropoff.to_i)})"
+        "drop off (#{AhoyDashboard::Counted.call(step.dropoff.to_i, noun: "visitor")})"
       end
 
       def values
@@ -94,10 +90,6 @@ module AhoyDashboard
       funnel.name
     end
 
-    def label_column
-      LABEL_COLUMN
-    end
-
     def columns
       details? ? DETAIL_COLUMNS : COLUMNS
     end
@@ -114,15 +106,8 @@ module AhoyDashboard
       @rows ||= result.steps.map { |step| Row.new(step: step, presenter: self) }
     end
 
-    # Nobody reached the first step, so there is no shape to draw. The steps are
-    # still real and still named, which is why this is about the traffic rather
-    # than about the funnel.
     def empty?
       !result.any?
-    end
-
-    def header_row
-      [ label_column, *columns.map { |column| column[:label] } ]
     end
 
     def summary_line
@@ -132,18 +117,8 @@ module AhoyDashboard
         "#{rate(result.conversion_rate)}."
     end
 
-    # The one thing about a funnel that is not visible in it. Somebody reading a
-    # drop between two steps will otherwise assume a visitor who came back the
-    # next day and finished is in the bottom number.
-    def counting_note
-      "Counted per visit: the steps have to happen in order, in one sitting. Coming back later " \
-        "and finishing is a different visit and does not carry through."
-    end
-
     def share(step)
-      return 0.0 unless result.entered.positive?
-
-      (step.visitors.to_f / result.entered).clamp(0.0, 1.0)
+      AhoyDashboard::Share.fraction(step.visitors, of: result.entered)
     end
 
     def card_path
@@ -160,8 +135,6 @@ module AhoyDashboard
       ActiveSupport::NumberHelper.number_to_delimited(value.to_i)
     end
 
-    # Already a percentage on the way in, unlike Search Console's ctr. Blank for
-    # a step with nothing to compare against rather than a flat zero.
     def rate(value)
       return "" if value.nil?
 

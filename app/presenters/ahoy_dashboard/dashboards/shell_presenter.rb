@@ -4,14 +4,9 @@ module AhoyDashboard
 
   module Dashboards
 
-    class ShellPresenter
-      attr_reader :grid_reports, :funnels, :funnel_count
-
-      def initialize(reports:, funnels:, funnel_count:, pinned:)
-        @grid_reports = reports
-        @funnels = funnels
-        @funnel_count = funnel_count
-        @pinned = pinned
+    ShellPresenter = Data.define(:reports, :funnels, :funnel_count, :pinned) do
+      def grid_reports
+        reports
       end
 
       def pinned?
@@ -25,10 +20,6 @@ module AhoyDashboard
       def computed_at
         nil
       end
-
-      private
-
-      attr_reader :pinned
     end
   end
 end

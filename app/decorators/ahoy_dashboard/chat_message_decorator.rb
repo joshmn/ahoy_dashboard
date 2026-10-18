@@ -17,5 +17,12 @@ module AhoyDashboard
 
       input_tokens.to_i + output_tokens.to_i
     end
+
+    def work_label
+      return "Read #{looked_at.to_sentence}" if looked_at.any?
+      return "Writing" if content.present?
+
+      "Reading the data"
+    end
   end
 end

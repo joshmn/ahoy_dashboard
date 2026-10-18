@@ -3,18 +3,9 @@
 
   <%= render "ahoy_dashboard/funnels/rows", presenter: presenter %>
 
-  <%= dash_card_footer action: true do %>
-    <%= dash_button presenter.details_path,
-          tone: :link,
-          class: "more",
-          "aria-haspopup": "dialog",
-          data: {
-            tm_frame: AhoyDashboard::FunnelPresenter.details_frame_id(presenter.funnel),
-            action: "dash--modal#open",
-            "dash--modal-key-param": presenter.modal_key
-          } do %>
-      <span>Details</span>
-      <%= dash_icon(:chevron_right) %>
-    <% end %>
+  <%= dash_details_opener presenter.details_path,
+        frame: AhoyDashboard::FunnelPresenter.details_frame_id(presenter.funnel), key: presenter.modal_key do %>
+    <span>Details</span>
+    <%= dash_icon(:chevron_right) %>
   <% end %>
 <% end %>

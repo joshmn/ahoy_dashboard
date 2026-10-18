@@ -1,7 +1,4 @@
 FactoryBot.define do
-  # A funnel is invalid with fewer than two steps, so the factory builds them.
-  # Pass goals: [goal, goal, ...] to say which, or steps: 3 for that many
-  # throwaway ones.
   factory :dash_funnel, class: "AhoyDashboard::Funnel" do
     sequence(:name) { |n| "Funnel #{n}" }
     sequence(:position) { |n| n }

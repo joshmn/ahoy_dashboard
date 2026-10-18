@@ -1,5 +1,4 @@
 require "rails_helper"
-require "rake"
 
 RSpec.describe AhoyDashboard::EventStatistics do
   let(:connection) { ActiveRecord::Base.connection }
@@ -9,8 +8,7 @@ RSpec.describe AhoyDashboard::EventStatistics do
   end
 
   def migrate!
-    migration = AhoyDashboard::Engine.root.join("db/migrate/core/add_ahoy_dashboard_event_statistics.rb")
-    load migration.to_s unless defined?(AddAhoyDashboardEventStatistics)
+    engine_migration("core/add_ahoy_dashboard_event_statistics.rb")
     ActiveRecord::Migration.suppress_messages { AddAhoyDashboardEventStatistics.new.up }
   end
 
@@ -71,18 +69,13 @@ RSpec.describe AhoyDashboard::EventStatistics do
 
   describe "bin/rails ahoy_dashboard:statistics" do
     before do
-      unless Rake::Task.task_defined?("ahoy_dashboard:statistics")
-        Rake::Task.define_task(:environment)
-        load AhoyDashboard::Engine.root.join("lib/tasks/ahoy_dashboard_statistics.rake").to_s
-      end
-      Rake::Task["ahoy_dashboard:statistics"].reenable
       allow(described_class).to receive(:apply!).and_wrap_original { |original, **| original.call(analyze: false) }
     end
 
     it "reports nothing missing after a normal migrate" do
       migrate!
 
-      expect { Rake::Task["ahoy_dashboard:statistics"].invoke }.to output(/all present/).to_stdout
+      expect(run_dashboard_task("ahoy_dashboard:statistics")).to match(/all present/)
       expect(statistics).to match_array(described_class::ALL.keys)
     end
   end

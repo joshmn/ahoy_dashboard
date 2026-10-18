@@ -30,10 +30,7 @@ RSpec.describe AhoyDashboard::SearchConsoleSlicePresenter do
   it "renders the prepared menu without reading the database" do
     total(country: "usa", clicks: 9)
     menus
-    statements = []
-    subscriber = ->(*args) { statements << args.last[:sql] if args.last[:sql].match?(/\ASELECT/) }
-
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+    statements = captured_sql(/\ASELECT/, cached: true) do
       menus.country_items
       menus.device_items
     end
@@ -71,6 +68,12 @@ RSpec.describe AhoyDashboard::SearchConsoleSlicePresenter do
 
     it "names the picked country when no data is stored for it" do
       expect(menus.country_label).to eq("France")
+    end
+
+    it "clears the device and the country in one step" do
+      expect(menus.clear_action(data: { tm_frame: "_top" })).to eq(
+        label: "Show all devices and countries", url: "/report?", data: { tm_frame: "_top" }, primary: true
+      )
     end
   end
 end

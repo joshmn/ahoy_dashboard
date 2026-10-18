@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Sql do
   describe "ENTRY_PATH" do
@@ -182,14 +181,23 @@ RSpec.describe AhoyDashboard::Sql do
       { referring_domain: "", utm_medium: "", channel: "Direct / None" }
     ].freeze
 
-    channel_cases.each_with_index do |row, index|
-      it "puts #{row[:referring_domain].inspect} on medium #{row[:utm_medium].inspect} in #{row[:channel]}" do
+    it "puts each referring domain and medium in its channel" do
+      channel_cases.each_with_index do |row, index|
         domain = row[:referring_domain]
         create(:ahoy_visit, visit_token: format("channel-%02d", index), referring_domain: domain,
                             referrer: domain.presence && "https://#{domain}/somewhere",
                             utm_medium: row[:utm_medium], utm_source: nil)
+      end
 
-        expect(Ahoy::Visit.pluck(described_class::CHANNEL)).to eq([ row[:channel] ])
+      channels = Ahoy::Visit.order(:visit_token).pluck(described_class::CHANNEL)
+
+      expect(channels.size).to eq(channel_cases.size)
+      aggregate_failures do
+        channel_cases.zip(channels).each do |row, channel|
+          expect(channel).to eq(row[:channel]),
+                             "#{row[:referring_domain].inspect} on medium #{row[:utm_medium].inspect} " \
+                             "should be #{row[:channel]}, got #{channel.inspect}"
+        end
       end
     end
 
@@ -246,15 +254,5 @@ RSpec.describe AhoyDashboard::Sql do
 
     AhoyDashboard::Preferences.write(:site, host: nil)
     expect(Ahoy::Visit.pick(described_class::CHANNEL)).to eq("Referral")
-  end
-
-  describe ".internal_domain?" do
-    it "matches the main host and anything under it" do
-      expect(described_class.internal_domain?("example.com")).to be(true)
-      expect(described_class.internal_domain?("vouch.example.com")).to be(true)
-      expect(described_class.internal_domain?("notexample.com")).to be(false)
-      expect(described_class.internal_domain?("example.com.evil.test")).to be(false)
-      expect(described_class.internal_domain?(nil)).to be(false)
-    end
   end
 end

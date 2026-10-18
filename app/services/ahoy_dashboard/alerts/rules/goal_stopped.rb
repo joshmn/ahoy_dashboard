@@ -10,7 +10,7 @@ module AhoyDashboard
 
         def findings
           readings.goal_days.select { |series| stopped?(series) }.map do |series|
-            finding(subject: series.name, reading: now.beginning_of_hour.utc.iso8601,
+            finding(subject: series.name, reading: this_hour,
                     headline: "#{series.name} stopped converting",
                     detail: "No conversions in the last 24 hours, after " \
                             "#{counted(series.week_before_last_day.sum, "conversion")} in the 7 days before.")

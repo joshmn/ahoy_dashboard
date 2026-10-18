@@ -12,10 +12,7 @@ RSpec.describe AhoyDashboard::Seo::HubPresenter do
     context = AhoyDashboard::SearchConsole::PageContextQuery.call(range: query.range)
     shown = described_class.new(query: query, surface: nil, site: check.site, sites: [check.site], reading: reading,
                                 search_console_context: context)
-    statements = []
-    subscriber = ->(*args) { statements << args.last[:sql] if args.last[:sql].match?(/\ASELECT/) }
-
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+    statements = captured_sql(/\ASELECT/, cached: true) do
       shown.top_queries
       shown.opportunities
       shown.rank_tiles

@@ -21,13 +21,7 @@ RSpec.describe AhoyDashboard::GoalConversionsPresenter do
 
   it "presents prepared goal rows without database reads" do
     presenter
-    statements = []
-    recorder = ->(*args) do
-      payload = args.last
-      statements << payload[:sql] if payload[:name] != "SCHEMA" && payload[:sql].match?(/\ASELECT/i)
-    end
-
-    ActiveSupport::Notifications.subscribed(recorder, "sql.active_record") do
+    statements = captured_sql(/\ASELECT/i, cached: true) do
       presenter.any_goals?
       presenter.rows.each do |row|
         row.goal

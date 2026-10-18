@@ -1,14 +1,10 @@
 <% content_for :title, "New exclusion" %>
 <% content_for :dash_settings_section, "exclusions" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "New exclusion",
-          lede: "Pick the traffic to leave out and give it a name." %>
+<%= dash_page_head title: "New exclusion",
+      lede: "Pick the traffic to leave out and give it a name." %>
 
-    <%= dash_card do %>
-      <%= render "ahoy_dashboard/settings/exclusions/form",
-            url: settings_exclusions_path, method: :post, submit_label: "Save exclusion" %>
-    <% end %>
-  </section>
-</div>
+<%= dash_card do %>
+  <%= render "ahoy_dashboard/settings/exclusions/form",
+        url: settings_exclusions_path, method: :post, submit_label: "Save exclusion" %>
+<% end %>

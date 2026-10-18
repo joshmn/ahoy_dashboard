@@ -1,9 +1,5 @@
 module AhoyDashboard
   class AssetsController < AhoyDashboard::BaseController
-    # Rails refuses to serve a text/javascript body to a plain GET, on the
-    # grounds that a dynamic script could be read cross origin by a script tag.
-    # These are static files with nothing in them to leak, and a script tag is
-    # exactly how they are asked for.
     skip_after_action :verify_same_origin_request, raise: false
 
     def show

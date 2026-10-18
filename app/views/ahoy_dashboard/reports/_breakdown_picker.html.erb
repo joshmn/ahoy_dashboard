@@ -1,27 +1,16 @@
-<% options = tab.breakdown_options %>
+<% options = presenter.breakdown_options %>
 
 <% if options.many? %>
   <% scope = local_assigns.fetch(:scope, "card") %>
-  <% extra = local_assigns.fetch(:extra, {}) %>
   <% picker_id = "tm-#{scope}-#{report.key}-breakdown" %>
-  <% showing = tab.active_breakdown %>
+  <% showing = options.find(&:active?) %>
 
-<%# The chevron is what tells this apart from the tabs it sits beside. Without
-    one it reads as a fourth view that will not take, rather than as the menu it
-    is. %>
   <%= dash_menu id: picker_id, label: showing.label, toggle: :tab, chevron: true, align: :end,
         aria_label: "Break down by: #{showing.label}", panel_class: "tm-scroll", data: { tm_picker: "breakdown" } do %>
     <%= dash_menu_header "Break down by" %>
 
-<%# Plain links inside the card's own frame, the same as the property
-    picker: the frame navigates and the card comes back grouped the new
-    way. The class is what menu_controller reads for arrows, Home, End and
-    Escape. The breakdown is merged in here and nowhere near to_query, so it
-    stays on this card and leaves every other card's links alone. %>
     <% options.each do |option| %>
-      <%= dash_menu_item option.label,
-            report_path(report.key, query.to_query.merge(tab: tab.key, breakdown: option.key).merge(extra)),
-            current: option == showing %>
+      <%= dash_menu_item option.label, option.path, current: option.active? %>
     <% end %>
   <% end %>
 <% end %>

@@ -1,16 +1,13 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Complete dashboard rendering", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
-  let(:document) { Nokogiri::HTML5(response.body) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
   before do
     sign_in create(:user, :admin)
-    visit = dash_visit(started_at: now - 1.hour, visitor: "reader", country: "US", browser: "Firefox")
-    dash_page_view(visit, path: "/rendered-initially", at: now - 1.hour)
+    dash_landing("/rendered-initially", at: now - 1.hour, visitor: "reader", country: "US", browser: "Firefox")
   end
 
   it "completes every source frame in the initial response" do

@@ -1,29 +1,13 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard filter options", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
   def traffic!
-    visit = dash_visit(started_at: now - 1.day, visitor: "a", country: "US")
-    dash_page_view(visit, path: "/going-in/faq", at: now - 1.day)
+    visit = dash_landing("/going-in/faq", at: now - 1.day, visitor: "a", country: "US")
     dash_page_view(visit, path: "/resources", at: now - 1.day + 1.minute)
-  end
-
-  it "sends a signed out visitor to sign in" do
-    get "/telemetry/filter_options.json", params: { dimension: "page" }
-
-    expect(response).to redirect_to("/users/sign_in")
-  end
-
-  it "is a 404 for a signed in visitor who is not an admin" do
-    sign_in create(:user)
-
-    get "/telemetry/filter_options.json", params: { dimension: "page" }
-
-    expect(response).to have_http_status(:not_found)
   end
 
   describe "as an admin" do
@@ -54,8 +38,7 @@ RSpec.describe "Dashboard filter options", type: :request do
     end
 
     it "answers a property dimension" do
-      visit = dash_visit(started_at: now - 1.day, visitor: "a")
-      dash_page_view(visit, path: "/facility", at: now - 1.day)
+      visit = dash_landing("/facility", at: now - 1.day, visitor: "a")
       dash_goal(visit, "site_searched", at: now - 1.day + 1.minute, facility_id: "12")
 
       get "/telemetry/filter_options.json", params: { dimension: "prop:facility_id" }
@@ -67,13 +50,15 @@ RSpec.describe "Dashboard filter options", type: :request do
     it "does not error on a dimension nobody registered" do
       get "/telemetry/filter_options.json", params: { dimension: "hairstyle" }
 
-      expect(response.status).to be < 500
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)["options"]).to eq([])
     end
 
     it "does not let a property name reach the statement" do
       get "/telemetry/filter_options.json", params: { dimension: "prop:x'); drop table ahoy_events; --" }
 
-      expect(response.status).to be < 500
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)["options"]).to eq([])
       expect(ActiveRecord::Base.connection.table_exists?("ahoy_events")).to be(true)
     end
   end
@@ -83,8 +68,7 @@ RSpec.describe "Dashboard filter options", type: :request do
       sign_in create(:user, :admin)
 
       %w[US CA].each_with_index do |country, index|
-        visit = dash_visit(started_at: now - 1.day + index.minutes, visitor: country, country: country)
-        dash_page_view(visit, path: "/alpha", at: now - 1.day + index.minutes)
+        dash_landing("/alpha", at: now - 1.day + index.minutes, visitor: country, country: country)
       end
     end
 

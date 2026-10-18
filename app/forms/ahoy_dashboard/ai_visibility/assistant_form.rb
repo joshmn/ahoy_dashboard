@@ -1,11 +1,12 @@
 module AhoyDashboard
   module AiVisibility
     class AssistantForm < AhoyDashboard::Form
+      include SecretFields
+
       attribute :name, :string
       attribute :enabled, :boolean, default: true
       attribute :models, default: -> { [] }
       attribute :other_models, :string
-      attribute :credentials
 
       validates :name, inclusion: { in: AiVisibility::NAMES, message: "is not an assistant this asks" }
       validate :a_model_when_asked
@@ -38,10 +39,6 @@ module AhoyDashboard
         typed = other_models.to_s.split(/[\s,]+/)
 
         (Array(models) + typed).map { |model| model.to_s.strip }.reject(&:blank?).uniq
-      end
-
-      def submitted_credentials
-        (credentials || {}).to_h.symbolize_keys.slice(:api_key)
       end
 
       private

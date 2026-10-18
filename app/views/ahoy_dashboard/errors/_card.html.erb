@@ -1,7 +1,7 @@
+<% back = public_send(error.back_route) %>
 <%= dash_card do %>
   <%= dash_empty title: error.heading, hint: error.hint,
-        action: (error.retry? ? { label: "Try again", url: error.retry_path, data: { tm_frame: "_top" } } : { label: error.back_label, url: public_send(error.back_route), data: { tm_frame: "_top" } }),
-        secondary: ({ label: error.back_label, url: public_send(error.back_route), data: { tm_frame: "_top" } } if error.retry?) %>
+        action: error.primary_action(back), secondary: error.secondary_action(back) %>
   <%= dash_card_footer do %>
     <% error.details.each_with_index do |detail, index| %><% if index.positive? %> &middot; <% end %><span class="mono"><%= detail %></span><% end %>
   <% end %>

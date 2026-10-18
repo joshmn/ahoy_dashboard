@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class EmailsController < AhoyDashboard::BaseController
+    class EmailsController < AhoyDashboard::Settings::BaseController
       def edit
         @form = AhoyDashboard::EmailSettingsForm.current
       end
@@ -8,12 +8,9 @@ module AhoyDashboard
       def update
         @form = AhoyDashboard::EmailSettingsForm.new(email_params)
 
-        AhoyDashboard::EmailSettings::UpdateCommand.call(form: @form) do
+        AhoyDashboard::Preferences::UpdateCommand.call(form: @form) do
           on(:ok) { redirect_to edit_settings_emails_path, notice: "Saved." }
-          on(:invalid) do |form|
-            @form = form
-            render :edit, status: :unprocessable_entity
-          end
+          on(:invalid) { |form| rejected(form) }
         end
       end
 

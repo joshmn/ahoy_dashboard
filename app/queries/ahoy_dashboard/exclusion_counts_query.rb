@@ -1,10 +1,6 @@
 module AhoyDashboard
-  class ExclusionCountsQuery
+  class ExclusionCountsQuery < AhoyDashboard::Query
     WINDOW = 30.days
-
-    def self.call(**options)
-      new(**options).call
-    end
 
     def initialize(filters:, floor: nil)
       @filters = Array(filters)

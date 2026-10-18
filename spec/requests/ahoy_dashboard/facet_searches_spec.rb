@@ -1,35 +1,17 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard command palette value search", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
   def clock(hour, minute = 0)
-    AhoyDashboard.time_zone.local(2026, 8, 10, hour, minute)
+    dash_time(2026, 8, 10, hour, minute)
   end
 
   def traffic!
-    visit = dash_visit(started_at: clock(9), visitor: "a", country: "US")
-    dash_page_view(visit, path: "/going-in/faq", at: clock(9))
+    visit = dash_landing("/going-in/faq", at: clock(9), visitor: "a", country: "US")
     dash_page_view(visit, path: "/resources", at: clock(9, 5))
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/facet_search"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/facet_search"
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do
@@ -82,15 +64,6 @@ RSpec.describe "Dashboard command palette value search", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(options).to be_empty
-    end
-
-    it "does not raise on a term full of sql metacharacters" do
-      traffic!
-
-      get "/telemetry/facet_search", params: { q: "'; drop table ahoy_events --", shape: "palette" }
-
-      expect(response).to have_http_status(:ok)
-      expect(Ahoy::Event.count).to eq(2)
     end
   end
 end

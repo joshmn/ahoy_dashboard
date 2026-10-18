@@ -25,7 +25,6 @@ RSpec.describe AhoyDashboard::SearchConsolePresenter do
         clicks: 1_234, impressions: 20_000, ctr: 0.0617, position: 9.15
       ),
       coverage: coverage,
-      live_dates: [],
       connected: connected
     )
   end

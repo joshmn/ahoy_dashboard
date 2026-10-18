@@ -1,8 +1,5 @@
 module AhoyDashboard
   module Serp
-    # The spend card. Every sentence on it comes from here, the same way the
-    # rank tracking copy does, so the wording is changed in one place and the
-    # template only decides where it sits.
     class SpendPresenter
       BAND_KEYS = SpendQuery::KINDS
 
@@ -18,12 +15,10 @@ module AhoyDashboard
 
       attr_reader :spend
 
+      delegate :name, :capped?, :saved?, :used, :cap, :percent, :forecast, :days, to: :spend
+
       def initialize(spend: nil, now: Time.current)
         @spend = spend || SpendQuery.call(now: now)
-      end
-
-      def name
-        spend.name
       end
 
       def label
@@ -34,40 +29,10 @@ module AhoyDashboard
         name.to_s == Adapters::FakeAdapter.adapter_name
       end
 
-      def capped?
-        spend.capped?
-      end
-
-      def saved?
-        spend.saved?
-      end
-
-      def used
-        spend.used
-      end
-
-      def cap
-        spend.cap
-      end
-
-      def percent
-        spend.percent
-      end
-
       def share
         [ spend.share, 1.0 ].min
       end
 
-      def forecast
-        spend.forecast
-      end
-
-      def days
-        spend.days
-      end
-
-      # The page warns on the same number the alert rule fires on. A rule row
-      # somebody has retuned wins, so the two never say different things.
       def threshold
         @threshold ||= tuned_threshold || NEAR_CAP_PERCENT
       end

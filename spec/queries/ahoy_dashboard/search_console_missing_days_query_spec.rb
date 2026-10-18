@@ -1,13 +1,10 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsoleMissingDaysQuery do
-  # 2026-08-12 minus the three day lag puts the last finished day at the 9th.
   let(:now) { Time.utc(2026, 8, 12, 18, 0) }
   let(:last_final) { Date.new(2026, 8, 9) }
   let(:floor) { AhoyDashboard::SearchConsole.earliest_available_date(now: now) }
 
-  # A day that was asked about and had traffic on it.
   def store(*dates)
     dates.flatten.each do |date|
       create(:dash_search_console_day, date: date)
@@ -15,7 +12,6 @@ RSpec.describe AhoyDashboard::SearchConsoleMissingDaysQuery do
     end
   end
 
-  # A day that was asked about and came back with nothing.
   def scan(*dates)
     dates.flatten.each { |date| create(:dash_search_console_day, date: date) }
   end
@@ -81,7 +77,7 @@ RSpec.describe AhoyDashboard::SearchConsoleMissingDaysQuery do
     expect(fillable.gone?).to be(false)
     expect(fillable).to have_attributes(first: floor, last: floor + 4)
     expect(missing.fillable_days).to eq(5)
-    expect(missing.gone_days).to eq(4)
+    expect(gone.days).to eq(4)
   end
 
   it "hands the fill its days oldest first" do

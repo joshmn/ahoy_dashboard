@@ -4,13 +4,9 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter %>
 
   <% if !@presenter.any? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.rank_empty(hint: "Features are read from each rank check. Try a longer date range, or run a check from Rankings.") %>
-    <% end %>
+    <%= dash_empty_card **@presenter.rank_empty(hint: "Features are read from each rank check. Try a longer date range, or run a check from Rankings.") %>
   <% elsif @presenter.unreadable? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.unreadable_empty %>
-    <% end %>
+    <%= dash_empty_card **@presenter.unreadable_empty %>
   <% else %>
     <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
 
@@ -39,10 +35,7 @@
                 <td><div class="t-main"><%= seo_label(feature.label) %></div></td>
                 <% if @presenter.shares? %>
                   <td>
-                    <div class="seo-figure seo-figure--start">
-                      <%= tag.span(class: "seo-meter seo-meter--wide", **seo_bar(feature.share)) %>
-                      <span class="seo-figure__pct"><%= @presenter.percent(feature.share) %></span>
-                    </div>
+                    <%= seo_figure(feature.share, @presenter.percent(feature.share), wide: true) %>
                   </td>
                 <% end %>
                 <td class="num"><%= @presenter.number(feature.seen) %></td>
@@ -58,8 +51,7 @@
                 <td class="ps-3">
                   <div class="seo-cell">
                     <% if feature.ownable %>
-                      <%= seo_label(feature.leader, path: true) %>
-                      <% if @presenter.ours?(feature.leader) %><%= dash_badge "You", tone: :kind %><% end %>
+                      <%= seo_domain(feature.leader, mine: @presenter.mine?(feature.leader)) %>
                     <% else %>
                       <span class="small text-body-secondary">Nobody holds it</span>
                     <% end %>
@@ -113,8 +105,7 @@
                 <% owner = row.owner_of("featured_snippet") %>
                 <td>
                   <div class="seo-cell">
-                    <%= seo_label(owner, path: true) %>
-                    <% if @presenter.ours?(owner) %><%= dash_badge "You", tone: :kind %><% end %>
+                    <%= seo_domain(owner, mine: @presenter.mine?(owner)) %>
                   </div>
                 </td>
               <% end %>

@@ -7,21 +7,16 @@ main {
   padding-bottom: 72px;
 }
 
-main .foot {
-  padding-bottom: 0;
-}
-
 code {
   font-family: var(--mono);
   font-size: 0.875em;
   color: var(--t1);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--hover);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0 4px;
 }
 
-// ---------- header ----------
 .hd-in {
   gap: 6px;
 }
@@ -42,7 +37,7 @@ code {
 }
 
 .hd-tabs .btn.hd-nav:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--hover);
 }
 
 .hd-tabs .btn.hd-nav[aria-current] {

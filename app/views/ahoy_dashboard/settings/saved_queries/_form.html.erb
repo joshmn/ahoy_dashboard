@@ -19,9 +19,7 @@
   <%= form.check :pinned, label: "Pin it to the dashboard",
         hint: "Up to #{AhoyDashboard::SavedQuery::MAX_PINNED} pinned questions show on the dashboard, in list order." %>
 
-  <% @form.question_fields.each do |name, value| %>
-    <%= hidden_field_tag name, value, id: nil %>
-  <% end %>
+  <%= dash_hidden_fields @form.question_fields %>
 
   <%= form.actions submit_label, cancel: settings_saved_queries_path %>
 <% end %>

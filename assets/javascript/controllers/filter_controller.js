@@ -1,4 +1,5 @@
 import { Controller } from "../runtime/controllers.js"
+import { getJSON } from "../runtime/fetch.js"
 
 const ROW = ".tm-filter-row"
 
@@ -24,9 +25,6 @@ export default class extends Controller {
     this.requests.clear()
   }
 
-  // One controller for the whole form rather than one per row, because the submit
-  // reads every row. Which row was typed in comes off the event, and the timers
-  // and requests are keyed by it so two rows can be refined at once.
   search(event) {
     this.toggleApply()
 
@@ -56,9 +54,6 @@ export default class extends Controller {
     const request = new AbortController()
     this.requests.set(row, request)
 
-    // The url already carries the range, the crawler toggle and the filters
-    // already applied, so the values offered are the ones in front of the reader
-    // rather than the ones in the default range.
     const url = new URL(this.optionsUrlValue, window.location.origin)
     url.searchParams.set("dimension", dimension)
     url.searchParams.set("q", input.value)
@@ -69,17 +64,12 @@ export default class extends Controller {
 
     if (this.requests.get(row) === request) row.removeAttribute("aria-busy")
 
-    // A null is a failure, and the values the server rendered are better than
-    // none, so the list is left alone.
     if (options) this.render(list, options)
   }
 
   async fetchOptions(url, signal) {
     try {
-      const response = await fetch(url, { headers: { Accept: "application/json" }, signal })
-      if (!response.ok) return null
-
-      const payload = await response.json()
+      const payload = await getJSON(url, { signal })
 
       return Array.isArray(payload.options) ? payload.options : []
     } catch {
@@ -97,8 +87,6 @@ export default class extends Controller {
     )
   }
 
-  // Every box empty means every row is dropped server side, so the button says so
-  // rather than submitting a round trip that changes nothing.
   toggleApply() {
     if (!this.hasSubmitTarget) return
 

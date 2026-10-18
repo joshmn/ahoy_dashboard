@@ -1,8 +1,3 @@
-<%# The design has no visible heading on this screen: the site control in the
-    header is a button and every card names itself. One hidden heading, so the
-    page still has exactly one h1 and nothing is added to the drawing. %>
-<h1 class="visually-hidden">Analytics for <%= AhoyDashboard.host || request.host %></h1>
-
 <%= render "ahoy_dashboard/dashboards/bar" %>
 
 <%= render "ahoy_dashboard/dashboards/chart" %>
@@ -12,10 +7,8 @@
   <%= render "ahoy_dashboard/pinned_questions/cards", cards: @presenter.pinned_cards %>
 <% end %>
 
-<%# The first response contains every card. Frames keep their own URLs so tab
-    changes still replace only the selected card after the page is ready. %>
 <section class="grid row" id="panels" aria-label="Reports">
-  <% cache_if @presenter.fragment_cache_key, dash_dashboard_cache_key(:reports), expires_in: AhoyDashboard::Dashboards::Snapshot::MAX_AGE do %>
+  <% dash_snapshot_cache(:reports) do %>
     <%= render partial: "ahoy_dashboard/dashboards/report", collection: @presenter.report_presenters, as: :presenter %>
   <% end %>
 
@@ -25,26 +18,19 @@
       <% if @presenter.search_console %>
         <%= render "ahoy_dashboard/search_console/card", presenter: @presenter.search_console %>
       <% else %>
-        <%= dash_card element: :section, class: "panel h-100 p-3", "aria-label": "How to install #{@presenter.search_console_state.label}" do %>
-          <%= render "ahoy_dashboard/shared/feature_state", state: @presenter.search_console_state %>
-        <% end %>
+        <%= render "ahoy_dashboard/shared/install_card", state: @presenter.search_console_state, panel: true %>
       <% end %>
     <% end %>
   </div>
 
-  <% cache_if @presenter.fragment_cache_key, dash_dashboard_cache_key(:funnels), expires_in: AhoyDashboard::Dashboards::Snapshot::MAX_AGE do %>
+  <% dash_snapshot_cache(:funnels) do %>
     <%= render partial: "ahoy_dashboard/dashboards/funnel", collection: @presenter.funnel_presenters, as: :presenter %>
   <% end %>
 </section>
 
-<% if @presenter.more_funnels? %>
-  <div class="d-flex align-items-center justify-content-between mb-3" aria-label="More funnels">
-    <span class="text-body-secondary">Showing <%= @presenter.funnel_presenters.length %> of <%= @presenter.funnel_count %> funnels</span>
-    <%= dash_button "View all funnels", funnels_path(query.to_query), tone: :link %>
-  </div>
-<% end %>
+<%= render "ahoy_dashboard/dashboards/more_funnels" %>
 
-<%= dash_frame_tag "dash_journey", src: journey_path(query.to_query), rendered: true do %>
+<%= dash_frame_tag AhoyDashboard::JourneyPresenter::FRAME, src: journey_path(query.to_query), rendered: true do %>
   <%= render "ahoy_dashboard/journeys/card", presenter: @presenter.journey %>
 <% end %>
 
@@ -53,20 +39,4 @@
   <%= render "ahoy_dashboard/goal_conversions/card", presenter: @presenter.goal_conversions %>
 <% end %>
 
-<%# Every dialog is a sibling of the grid rather than a child of a card. Two
-    reasons, both of which have bitten: position: fixed resolves against the
-    nearest positioned ancestor, and a card frame swapping its contents would
-    otherwise destroy a dialog that is open over it. %>
-<div>
-  <%= render partial: "ahoy_dashboard/dashboards/report_dialog", collection: @presenter.grid_reports, as: :report %>
-
-  <% search_title = AhoyDashboard::SearchConsolePresenter::TITLE %>
-  <%= dash_dialog key: "search_console", title: search_title, close_label: "Close the #{search_title.downcase} details" do %>
-    <%= dash_frame_tag AhoyDashboard::SearchConsolePresenter::DETAILS_FRAME do %>
-      <%= dash_empty "Loading the full list", compact: true, role: "status" %>
-    <% end %>
-  <% end %>
-
-  <%= render partial: "ahoy_dashboard/funnels/modal", collection: @presenter.funnels, as: :funnel,
-        locals: { range_label: @presenter.range_label } %>
-</div>
+<%= render "ahoy_dashboard/dashboards/dialogs" %>

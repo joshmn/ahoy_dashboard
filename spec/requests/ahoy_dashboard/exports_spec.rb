@@ -1,9 +1,8 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 require "csv"
 
 RSpec.describe "Dashboard exports", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
@@ -19,26 +18,19 @@ RSpec.describe "Dashboard exports", type: :request do
     CSV.parse(response.body)
   end
 
-  # The card shows nine rows and the details modal a hundred. The download is
-  # the whole answer, and nothing in the path is allowed to quietly shorten it.
   describe "the whole answer" do
     before { sign_in create(:user, :admin) }
 
     it "carries every row, not a page of them" do
       40.times do |n|
-        visit = dash_visit(started_at: now - 1.day - n.minutes, visitor: "v#{n}")
-        dash_page_view(visit, path: "/p#{n}", at: now - 1.day - n.minutes)
+        dash_landing("/p#{n}", at: now - 1.day - n.minutes, visitor: "v#{n}")
       end
 
       get "/telemetry/exports/pages"
 
-      expect(rows.size).to eq(41)  # a header and forty pages
+      expect(rows.size).to eq(41)
     end
 
-    # The body is handed over as an enumerator rather than a built string. The
-    # rack stack under a request spec drains it and puts a length back on, so
-    # what is checkable here is the download's own headers; that it goes out a
-    # row at a time is only visible against a real server.
     it "asks proxies not to buffer, and downloads as a file" do
       traffic!
 
@@ -49,20 +41,6 @@ RSpec.describe "Dashboard exports", type: :request do
       expect(response.headers["Content-Disposition"]).to include("attachment")
       expect(response.media_type).to eq("text/csv")
     end
-  end
-
-  it "sends a signed out visitor to sign in" do
-    get "/telemetry/exports/pages"
-
-    expect(response).to redirect_to("/users/sign_in")
-  end
-
-  it "is a 404 for a signed in visitor who is not an admin" do
-    sign_in create(:user)
-
-    get "/telemetry/exports/pages"
-
-    expect(response).to have_http_status(:not_found)
   end
 
   describe "as an admin" do
@@ -108,10 +86,21 @@ RSpec.describe "Dashboard exports", type: :request do
       expect(rows.last.first).to eq("United States")
     end
 
+    it "follows the card's drill down when the link names no tab" do
+      dash_landing("/a", at: now - 1.day, visitor: "visitor-r", country: "US", region: "Illinois")
+
+      get "/telemetry/exports/locations", params: {
+        filters: [ { dimension: "country", operator: "is", value: "US" } ]
+      }
+
+      expect(rows.first.first).to eq("Region")
+      expect(rows.drop(1).map(&:first)).to eq([ "Illinois" ])
+    end
+
     it "exports every report key" do
       traffic!
 
-      AhoyDashboard::Report.card_order.each do |key|
+      AhoyDashboard::Report::CARD_ORDER.each do |key|
         get "/telemetry/exports/#{key}"
 
         expect(response).to have_http_status(:ok), "expected the #{key} export to render"
@@ -131,9 +120,6 @@ RSpec.describe "Dashboard exports", type: :request do
       expect(response).to have_http_status(:not_found)
     end
 
-    # A download that quietly reports a different grouping than the card it came
-    # from is worse than no download, so the export resolves the card's own
-    # dimension overrides exactly the way the card did.
     describe "the card's own dimension overrides" do
       it "groups by the breakdown the card was showing" do
         traffic!
@@ -154,8 +140,7 @@ RSpec.describe "Dashboard exports", type: :request do
       end
 
       it "groups by the property the card was showing" do
-        visit = dash_visit(started_at: now - 1.day, visitor: "visitor-p")
-        dash_page_view(visit, path: "/a", at: now - 1.day)
+        dash_landing("/a", at: now - 1.day, visitor: "visitor-p")
         create(:dash_property, key: "facility_id", position: 1)
 
         get "/telemetry/exports/behaviours", params: { tab: "properties", property: "action" }

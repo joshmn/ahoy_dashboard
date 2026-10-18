@@ -1,9 +1,6 @@
 module AhoyDashboard
   module Settings
-    # Step one of the OAuth dance. Nothing is written here; the only side effect
-    # is the state in the session, which is what the callback checks itself
-    # against.
-    class GoogleAuthorizationsController < AhoyDashboard::BaseController
+    class GoogleAuthorizationsController < AhoyDashboard::Settings::BaseController
       requires_installed :search_console
 
       STATE_KEY = :dash_google_state

@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Exclusion do
   let(:entry) { { "dimension" => "asn", "operator" => "contains", "value" => "AMAZON" } }
@@ -35,33 +34,17 @@ RSpec.describe AhoyDashboard::Exclusion do
     expect(exclusion).not_to be_valid
   end
 
-  it "keeps a group when it reads its filters back" do
-    exclusion = described_class.create!(name: "Two", filters: [ entry.merge("group" => 0), entry.merge("value" => "GOOGLE", "group" => 0) ])
-
-    expect(sole_item(exclusion.to_blocks).groups.map(&:size)).to eq([ 2 ])
-  end
-
-  it "reads filters with no block as one set, the way they were saved before sets" do
-    exclusion = described_class.create!(name: "Old", filters: [ entry, entry.merge("dimension" => "country", "operator" => "is", "value" => "US") ])
-
-    expect(exclusion.to_blocks.size).to eq(1)
-  end
-
-  it "reads sets as alternatives" do
-    exclusion = described_class.create!(name: "Sets", filters: [
-      entry.merge("block" => 0),
-      entry.merge("dimension" => "country", "operator" => "is", "value" => "US", "block" => 0),
-      entry.merge("dimension" => "ip", "operator" => "is", "value" => "1.2.3.4", "block" => 1)
-    ])
-
-    expect(exclusion.to_blocks.size).to eq(2)
+  it "judges the entries a form holds by the same rule it saves by" do
+    expect(described_class.usable_entries?([ entry ])).to be(true)
+    expect(described_class.usable_entries?([ entry, entry.merge("dimension" => "page_group") ])).to be(false)
+    expect(described_class.usable_entries?([ { dimension: "exit_page", value: "/a" } ])).to be(false)
+    expect(described_class.usable_entries?([ "not an entry" ])).to be(true)
   end
 
   it "only lists the switched on and readable ones as active" do
     on = described_class.create!(name: "On", filters: [ entry ])
     described_class.create!(name: "Off", filters: [ entry ], enabled: false)
-    broken = described_class.create!(name: "Broken", filters: [ entry ])
-    broken.update_column(:filters, [ entry.merge("dimension" => "nope") ])
+    create(:dash_exclusion, :unreadable, name: "Broken")
     AhoyDashboard::Current.exclusions = nil
 
     expect(described_class.active).to eq([ on ])

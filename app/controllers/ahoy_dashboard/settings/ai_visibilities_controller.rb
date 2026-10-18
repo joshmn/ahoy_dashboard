@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class AiVisibilitiesController < AhoyDashboard::BaseController
+    class AiVisibilitiesController < AhoyDashboard::Settings::BaseController
       requires_installed :ai_visibility
 
       def edit
@@ -14,9 +14,8 @@ module AhoyDashboard
         AhoyDashboard::AiVisibility::Settings::SaveCommand.call(form: @form) do
           on(:ok) { redirect_to edit_settings_ai_visibility_path, notice: "AI visibility saved." }
           on(:invalid) do |form|
-            @form = form
             set_overview
-            render :edit, status: :unprocessable_entity
+            rejected(form)
           end
           on(:confirm_deletions) do |form, stake|
             @form = form

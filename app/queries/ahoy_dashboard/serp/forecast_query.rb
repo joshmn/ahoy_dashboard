@@ -1,14 +1,7 @@
 module AhoyDashboard
   module Serp
-    # What the rest of the month is already committed to.
-    #
-    # Walked one scheduled run at a time rather than divided out of a monthly
-    # average, because the answer people want on the 27th is what is left to pay
-    # for, and a keyword checked weekly has either one check left or none. The
-    # walk is bounded by the cadences themselves: the shortest is daily, so no
-    # keyword takes more than 31 steps.
     class ForecastQuery
-      Result = Data.define(:checks, :backlinks, :searches, :through, :days_left) do
+      Result = Data.define(:checks, :backlinks, :searches, :through) do
         def total
           checks + backlinks
         end
@@ -28,8 +21,7 @@ module AhoyDashboard
       end
 
       def call
-        Result.new(checks: check_units, backlinks: backlink_units, searches: searches,
-                   through: finish, days_left: days_left)
+        Result.new(checks: check_units, backlinks: backlink_units, searches: searches, through: finish)
       end
 
       private
@@ -42,10 +34,6 @@ module AhoyDashboard
 
       def finish
         @finish ||= now.in_time_zone(zone).end_of_month
-      end
-
-      def days_left
-        (finish.to_date - now.in_time_zone(zone).to_date).to_i + 1
       end
 
       def adapter_class
@@ -69,8 +57,6 @@ module AhoyDashboard
         @runs_left[keyword.id] ||= steps(starts_at(keyword), SerpKeyword::DURATIONS.fetch(keyword.frequency))
       end
 
-      # A keyword already due is checked on the next hourly dispatch, so it
-      # counts from now rather than from a last check that has gone stale.
       def starts_at(keyword)
         at = keyword.next_check_at
         at.nil? || at < now ? now : at
@@ -88,9 +74,6 @@ module AhoyDashboard
         count
       end
 
-      # Backlinks spend from the same ceiling when they run through the same
-      # provider, and a daily sync every day to the 31st is the difference
-      # between clearing the ceiling and not.
       def backlink_units
         return 0 unless Backlinks.enabled? && Backlinks.provider == name
 

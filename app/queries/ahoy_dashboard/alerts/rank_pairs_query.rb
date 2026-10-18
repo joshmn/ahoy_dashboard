@@ -31,14 +31,9 @@ module AhoyDashboard
       def call
         return [] if site.nil?
 
-        keywords = AhoyDashboard::SerpKeyword.where(id: checks.keys.map(&:first)).index_by(&:id)
-
-        checks.map do |(keyword_id, location), group|
-          keyword = keywords[keyword_id]
-          next if keyword.nil?
-
-          Pair.new(keyword: keyword, location: location, now: group.first, before: group.second)
-        end.select { |value| value }
+        checks.group_by { |check| [ check.keyword_id, check.location ] }.map do |(_keyword_id, location), (now, before)|
+          Pair.new(keyword: now.keyword, location: location, now: now, before: before)
+        end
       end
 
       private
@@ -46,23 +41,11 @@ module AhoyDashboard
       attr_reader :site, :since
 
       def checks
-        @checks ||= begin
-          successful = AhoyDashboard::SerpCheck
-            .where(site_id: site.id, status: AhoyDashboard::SerpCheck.statuses[:success])
-          active_pairs = successful.where(SerpCheck.arel_table[:checked_at].gteq(since)).select(:keyword_id, :location)
+        active = AhoyDashboard::SerpCheck.success.where(site_id: site.id)
+          .where(SerpCheck.arel_table[:checked_at].gteq(since)).at_current_places
+          .distinct.select(:target_id, :location)
 
-          ranked = successful
-            .where("(keyword_id, location) in (#{active_pairs.to_sql})")
-            .select("ahoy_dashboard_serp_checks.*, row_number() over " \
-                    "(partition by keyword_id, location order by checked_at desc, id desc) as recency")
-
-          AhoyDashboard::SerpCheck.from(ranked, :ahoy_dashboard_serp_checks)
-            .where("recency <= 2")
-            .order(:keyword_id, :location, checked_at: :desc, id: :desc)
-            .to_a
-            .group_by { |check| [ check.keyword_id, check.location ] }
-            .select { |_key, group| group.first.checked_at >= since }
-        end
+        Serp::RecentChecksQuery.call(searches: active, count: 2).includes(:keyword).to_a
       end
     end
   end

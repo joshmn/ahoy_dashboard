@@ -1,52 +1,23 @@
-// The dashboard's palette, written down once. Both mocks declare this block and
-// they declare it identically, so it lives here and nothing else restates a
-// colour.
-//
-// Dark only. There is no light palette and no prefers-color-scheme branch: the
-// layout stamps data-bs-theme="dark" and the tool has one look.
-//
-// Measured contrast. Text needs 4.5:1, UI boundaries 3:1. One of these does not
-// clear it and it is marked. See the note in TELEMETRY.md before changing one.
-//   --t1 #f7f8f8  on --bg 18.6:1   on --surface 17.0:1   on --raised 15.3:1
-//   --t2 #9099a3  on --bg  6.9:1   on --surface  6.6:1   on --raised  6.0:1
-//   --t3 #7b8391  on --bg  5.2:1   on --surface  5.0:1   on --raised  4.6:1
-// kbd was --t3 on its own lighter ground, which measured 4.46:1 and is the only
-// text in the dashboard that missed 4.5:1. It is --t2 now.
-//   --accent #5e6ad2 on --bg 4.2:1 (UI only: focus ring, share bar, flags)
-//   --green-t #63c78f on --surface 9.4:1
-//   --red-t   #e8837d on --surface 7.9:1
-//   --border-strong on --surface 1.4:1*  (decorative edges only now)
-//   --control-edge #60646c on --surface 3.23:1, on --bg 3.36:1, on --surface-2 3.07:1  (control edges)
-//   --accent solid focus ring on --surface 4.08:1, on --bg 4.24:1
-//   white on --accent 4.70:1, white on --accent-hover #5764cc 5.12:1
-// * below the threshold for its job.
-//
-// --t3 was the mock's #5f6672, which read 3.0:1 against the ground it sits on
-// most and carried real text: every percentage in a card, every hint, the count
-// and the pager in the details dialog. It is raised to the darkest value that
-// clears 4.5:1 on --raised, which is the lightest thing under it. It is still a
-// step below --t2, so the three-level hierarchy the design is built on holds.
-
 :root {
-  --bg: #08090a;
-  --surface: #0e0f11;
-  --surface-2: #141518;
-  --raised: #17181c;
-  --border: rgba(255, 255, 255, 0.075);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --t1: #f7f8f8;
-  --t2: #9099a3;
-  --t3: #7b8391;
-  --accent: #5e6ad2;
-  --accent-soft: rgba(94, 106, 210, 0.14);
-  --green: #4cb782;
-  --green-t: #63c78f;
-  --red-t: #e8837d;
-  --warn-t: #dcc08a;
-  --accent-hover: #5764cc;
+  --bg: #{$tm-bg};
+  --surface: #{$tm-surface};
+  --surface-2: #{$tm-surface-2};
+  --raised: #{$tm-raised};
+  --border: #{$tm-border};
+  --border-strong: #{$tm-border-strong};
+  --t1: #{$tm-t1};
+  --t2: #{$tm-t2};
+  --t3: #{$tm-t3};
+  --accent: #{$tm-accent};
+  --accent-soft: #{$tm-accent-soft};
+  --green: #{$tm-green};
+  --green-t: #{$tm-green-t};
+  --red-t: #{$tm-red-t};
+  --warn-t: #{$tm-warn-t};
+  --accent-hover: #{$tm-accent-hover};
   --on-accent: #fff;
-  --selected: rgba(255, 255, 255, 0.08);
-  --hover: rgba(255, 255, 255, 0.05);
+  --selected: #{$tm-selected};
+  --hover: #{$tm-hover};
   --secondary-fill: rgba(255, 255, 255, 0.02);
   --control-edge: #60646c;
   --control-edge-hover: #73777f;
@@ -56,29 +27,10 @@
   --danger-fill-active: rgba(232, 110, 100, 0.12);
   --accent-fill: rgba(94, 106, 210, 0.1);
   --warning-fill: rgba(210, 166, 94, 0.08);
+  --focus-ring: 2px solid rgba(94, 106, 210, 0.65);
   --font: #{$font-family-sans-serif};
   --mono: #{$font-family-monospace};
 
-  --bs-body-bg: var(--bg);
-  --bs-body-color: var(--t1);
-  --bs-emphasis-color: var(--t1);
-  --bs-secondary-color: var(--t2);
-  --bs-tertiary-color: var(--t3);
-  --bs-border-color: var(--border);
-  --bs-border-color-translucent: var(--border);
-  --bs-primary: #5e6ad2;
-  --bs-primary-rgb: 94, 106, 210;
-  --bs-success: #4cb782;
-  --bs-success-rgb: 76, 183, 130;
-  --bs-danger: #e8837d;
-  --bs-danger-rgb: 232, 131, 125;
-  --bs-body-font-family: var(--font);
-  --bs-body-font-size: #{$font-size-base};
-  --bs-body-line-height: 1.45;
-
-  // Three jobs the mock names inline and the component layer needs a handle
-  // for: the edge of a control, the ground under a 16px square chip, and the
-  // colour of the live dot.
   --tm-line-strong: var(--control-edge);
   --tm-chip-bg: var(--surface-2);
   --tm-live: var(--green);

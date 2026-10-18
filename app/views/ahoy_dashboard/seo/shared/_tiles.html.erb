@@ -2,13 +2,10 @@
 <% stats = capture do %>
   <%= dash_tiles label: "Summary figures" do %>
     <% tiles.each do |tile| %>
-      <% tone = tile.respond_to?(:tone) ? tile.tone : nil %>
-      <% kind = tile.respond_to?(:kind) ? tile.kind : :number %>
-      <% url = tile.respond_to?(:url) ? tile.url : nil %>
       <%= dash_tile tile.label, tile.value,
-            url: url, status: kind == :status,
-            delta: ({ text: tile.note, tone: tone } if tone.present? && tile.note.present?),
-            note: (tile.note if tone.blank?) %>
+            url: tile.url, status: tile.kind == :status,
+            delta: ({ text: tile.note, tone: tile.tone } if tile.tone.present? && tile.note.present?),
+            note: (tile.note if tile.tone.blank?) %>
     <% end %>
   <% end %>
 <% end %>

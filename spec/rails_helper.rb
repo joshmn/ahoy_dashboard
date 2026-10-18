@@ -21,6 +21,7 @@ RSpec.configure do |config|
 
   config.include(FactoryBot::Syntax::Methods)
   config.include(Devise::Test::IntegrationHelpers, type: :request)
+  config.include(ActiveSupport::Testing::TimeHelpers)
 
   config.before(:each, type: :view) do |example|
     next unless example.metadata[:file_path].to_s.include?("/ahoy_dashboard/")
@@ -37,3 +38,5 @@ RSpec.configure do |config|
 
   config.filter_rails_from_backtrace!
 end
+
+Dir[File.expand_path("support/ahoy_dashboard/**/*.rb", __dir__)].sort.each { |file| require file }

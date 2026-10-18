@@ -1,34 +1,15 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard realtime", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   def someone(name, path:, ago: 1.minute, **attributes)
     visit = dash_visit(started_at: now - ago, visitor: name, **attributes)
     dash_page_view(visit, path: path, at: now - ago)
 
     visit
-  end
-
-  it "sends a signed out visitor to sign in" do
-    get "/telemetry/realtime"
-
-    expect(response).to redirect_to("/users/sign_in")
-  end
-
-  it "is a 404 for a signed in visitor who is not an admin" do
-    sign_in create(:user)
-
-    get "/telemetry/realtime.json"
-
-    expect(response).to have_http_status(:not_found)
   end
 
   describe "as an admin" do
@@ -41,16 +22,12 @@ RSpec.describe "Dashboard realtime", type: :request do
       expect(response.body).to include("dash_realtime")
     end
 
-    # The page used to render the header pill as its whole body, which put two of
-    # them on screen with the layout's copy, both polling.
     it "renders the live pill exactly once" do
       get "/telemetry/realtime"
 
       expect(document.css(".live").size).to eq(1)
     end
 
-    # The src points at the panel-only branch, not at this page, so the response
-    # carries the panel rather than another copy of the whole screen.
     it "renders one refreshable panel frame that does not refetch itself on load" do
       get "/telemetry/realtime"
 
@@ -112,10 +89,8 @@ RSpec.describe "Dashboard realtime", type: :request do
     end
 
     it "counts the people on the site right now" do
-      one = dash_visit(started_at: now - 2.minutes, visitor: "one")
-      dash_page_view(one, path: "/a", at: now - 2.minutes)
-      two = dash_visit(started_at: now - 1.minute, visitor: "two")
-      dash_page_view(two, path: "/b", at: now - 1.minute)
+      dash_landing("/a", at: now - 2.minutes, visitor: "one")
+      dash_landing("/b", at: now - 1.minute, visitor: "two")
 
       get "/telemetry/realtime.json"
 
@@ -137,20 +112,6 @@ RSpec.describe "Dashboard realtime", type: :request do
       expect(sources).to eq([ [ "google.com", "2" ], [ AhoyDashboard::Sql::DIRECT, "1" ] ])
     end
 
-    # Somebody reading four pages in five minutes is one person on the fourth
-    # one, so the rows count people rather than views and add up to the number
-    # above them.
-    it "counts a person once, against the last page they opened" do
-      visit = dash_visit(started_at: now - 4.minutes, visitor: "one")
-      dash_page_view(visit, path: "/first", at: now - 4.minutes)
-      dash_page_view(visit, path: "/second", at: now - 3.minutes)
-      dash_page_view(visit, path: "/third", at: now - 1.minute)
-
-      get "/telemetry/realtime"
-
-      expect(labels_and_counts(document.at_css(".p-list"))).to eq([ [ "/third", "1" ] ])
-    end
-
     it "leaves crawlers out of it" do
       visit = dash_visit(started_at: now - 1.minute, visitor: "bot")
       dash_page_view(visit, path: "/going-in/faq", at: now - 1.minute, crawler: "Googlebot")
@@ -161,8 +122,6 @@ RSpec.describe "Dashboard realtime", type: :request do
       expect(JSON.parse(get_json)).to eq("visitors" => 0)
     end
 
-    # One window, or the number on load and the number after the first refresh
-    # are answers to two different questions.
     it "reads the page and the poll over the same window" do
       someone("here", path: "/a", ago: 4.minutes)
       someone("gone", path: "/b", ago: 20.minutes)

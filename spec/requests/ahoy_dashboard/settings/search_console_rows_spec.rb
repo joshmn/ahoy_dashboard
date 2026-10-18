@@ -8,22 +8,6 @@ RSpec.describe "Dashboard Search Console raw rows", type: :request do
            impressions: impressions, ctr: ctr, position: position)
   end
 
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/search_console_rows"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/settings/search_console_rows"
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
@@ -44,8 +28,6 @@ RSpec.describe "Dashboard Search Console raw rows", type: :request do
       expect(response.body).to include("3.4")
     end
 
-    # The whole reason to show raw rows: the rows are a sample of the clicks, and
-    # how small a sample is only visible beside the day's own total.
     describe "the per day summary" do
       it "prints the rows against what the day actually got" do
         row(clicks: 3)

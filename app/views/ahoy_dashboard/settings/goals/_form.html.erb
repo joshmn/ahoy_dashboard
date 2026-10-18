@@ -1,9 +1,7 @@
 <%= dash_form_with model: @form, scope: :goal, url: url, method: method, card: true, class: "goal-form" do |form| %>
   <%= form.error_summary unlinked: [ :kind ] %>
 
-  <%= form.segmented :kind,
-        [ [ AhoyDashboard::GoalForm::CUSTOM_EVENT, "Custom event" ], [ AhoyDashboard::GoalForm::PAGEVIEW, "Pageview" ] ],
-        label: "What counts" %>
+  <%= form.segmented :kind, @form.kind_options, label: "What counts" %>
 
   <%= form.grid do %>
     <%= form.text_field :event_name, label: "Event name", mono: true,

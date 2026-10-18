@@ -9,6 +9,5 @@ module AhoyDashboard
 
     scope :ranked, -> { order(:position) }
     scope :top, ->(depth) { where(arel_table[:position].lteq(depth)) }
-    scope :in_range, ->(range) { where(checked_at: range) }
   end
 end

@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Filter do
   let(:dimension) { AhoyDashboard::Dimension.find("country") }
@@ -10,7 +9,11 @@ RSpec.describe AhoyDashboard::Filter do
     end
     channel = AhoyDashboard::Dimension.find("channel")
 
-    AhoyDashboard::Sql::CHANNELS.each do |value|
+    sql = AhoyDashboard::Sql
+    channels = [ sql::PAID_SEARCH, sql::EMAIL, sql::ORGANIC_SOCIAL, sql::ORGANIC_SEARCH, sql::AI_ASSISTANTS,
+                 sql::REFERRAL, sql::INTERNAL, sql::DIRECT ]
+
+    channels.each do |value|
       [ [ "is", "=" ], [ "is_not", "is distinct from" ] ].each do |operator, sql_operator|
         filter = described_class.new(dimension: channel, operator: operator, value: value)
         expected = Ahoy::Visit.where("#{channel.sql} #{sql_operator} ?", value).order(:id).ids
@@ -69,8 +72,6 @@ RSpec.describe AhoyDashboard::Filter do
       expect(matches("is", "US")).to eq([ "us" ])
     end
 
-    # A NULL is genuinely not the value, so it belongs in an is-not set.
-    # Written as `!=` postgres drops every one of those rows on the floor.
     it "keeps unset rows in an is not" do
       expect(matches("is_not", "US")).to eq(%w[ca empty null])
     end
@@ -87,8 +88,6 @@ RSpec.describe AhoyDashboard::Filter do
       expect(matches("is", dimension.unknown_label)).to eq(%w[empty null])
     end
 
-    # The value is a raw query string parameter and has to arrive as a bound
-    # parameter, never as text pasted into the statement.
     it "binds the value instead of interpolating it" do
       page = AhoyDashboard::Dimension.find("page")
       filter = described_class.new(
@@ -107,10 +106,6 @@ RSpec.describe AhoyDashboard::Filter do
     end
   end
 
-  # A filter value is somebody's own text, so % and _ in it are characters rather
-  # than LIKE wildcards. FilterOptionsQuery escapes them for the typeahead, and
-  # the two disagreeing meant picking a value out of the dropdown matched rows
-  # the dropdown had never offered.
   describe "a value that reads as a wildcard" do
     before do
       create(:ahoy_visit, visit_token: "under", country: "a_b")

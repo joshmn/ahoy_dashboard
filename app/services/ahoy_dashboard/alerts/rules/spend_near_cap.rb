@@ -7,10 +7,6 @@ module AhoyDashboard
                 default_threshold: Serp::NEAR_CAP_PERCENT, unit: "percent", threshold_range: 1..99,
                 phrase: "the month's search units reach %{threshold}%% of the provider's monthly cap"
 
-        # Once a month, and again if the cap is raised and the new one is passed
-        # too. The cap is in the reading for that second case: raising it is a
-        # decision to spend more, and going through 80% of the bigger number is
-        # news again.
         def findings
           spend = readings.serp_spend
           return [] if spend.nil? || !spend.near?(threshold)

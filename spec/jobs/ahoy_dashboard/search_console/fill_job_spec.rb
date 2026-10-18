@@ -1,14 +1,9 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsole::FillJob do
   let(:queue) { AhoyDashboard::SearchConsole::FillQueue }
   let(:url) { analytics_url }
   let(:days) { [ Date.new(2026, 7, 3), Date.new(2026, 7, 4), Date.new(2026, 7, 5) ] }
-
-  def stub_days
-    stub_request(:post, url).to_return(status: 200, body: analytics_body([]).to_json, headers: json_headers)
-  end
 
   it "runs on the low queue, out of the way of anything somebody is waiting on" do
     expect(described_class.new.queue_name).to eq("low")
@@ -20,29 +15,35 @@ RSpec.describe AhoyDashboard::SearchConsole::FillJob do
   end
 
   it "does nothing with nothing connected" do
-    expect(AhoyDashboard::SearchConsole::FillCommand).not_to receive(:call)
+    allow(Rails.logger).to receive(:info)
 
     described_class.perform_now
+
+    expect(Rails.logger).to have_received(:info).with("search console fill skipped: search console is not configured")
+    expect(AhoyDashboard::JobRun.for("search_console_fill").status).to eq("ok")
   end
 
   it "does nothing while the integration is off" do
+    allow(Rails.logger).to receive(:info)
     search_console_disabled!
     create(:dash_google_account, :with_property)
-
-    expect(AhoyDashboard::SearchConsole::FillCommand).not_to receive(:call)
+    queue.start!(days)
 
     described_class.perform_now
+
+    expect(Rails.logger).to have_received(:info).with("search console fill skipped: search console is not configured")
+    expect(queue.load.remaining).to eq(3)
   end
 
   describe "with a ready account" do
     before do
       search_console_enabled!
-      create(:dash_google_account, :with_property, access_token: "good", expires_at: 30.minutes.from_now)
+      create(:dash_google_account, :with_property)
     end
 
     it "works through the whole queue rather than one day a run" do
       queue.start!(days)
-      stub_days
+      stub_analytics
 
       described_class.perform_now
 
@@ -51,7 +52,7 @@ RSpec.describe AhoyDashboard::SearchConsole::FillJob do
 
     it "stops and leaves the rest queued when Google stops answering" do
       queue.start!(days)
-      stub_request(:post, url).to_return(status: 429, body: "quota", headers: json_headers)
+      stub_analytics_refusal(429, body: "quota")
 
       described_class.perform_now
 
@@ -60,11 +61,21 @@ RSpec.describe AhoyDashboard::SearchConsole::FillJob do
 
     it "records the run so the jobs screen can say how it went" do
       queue.start!([ Date.new(2026, 7, 3) ])
-      stub_days
+      stub_analytics
 
       described_class.perform_now
 
       expect(AhoyDashboard::JobRun.for("search_console_fill")).to have_attributes(status: "ok")
+    end
+
+    it "fails the run and keeps the day queued when Google does not answer" do
+      queue.start!(days)
+      stub_analytics_refusal(500)
+
+      expect { described_class.perform_now }.to raise_error(AhoyDashboard::Job::Failed)
+
+      expect(queue.load.remaining).to eq(3)
+      expect(AhoyDashboard::JobRun.for("search_console_fill").status).to eq("failed")
     end
 
     it "stops on an empty queue instead of looping" do

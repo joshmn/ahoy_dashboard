@@ -1,16 +1,15 @@
 module AhoyDashboard
   module Settings
-    class SerpProvidersController < AhoyDashboard::BaseController
+    class SerpProvidersController < AhoyDashboard::Settings::BaseController
       requires_installed :serp, :keywords, :backlinks
+
+      include AhoyDashboard::SerpProvidersScreen
 
       before_action :set_name, only: [ :edit, :update ]
       before_action :set_secrets, only: [ :edit, :update ]
 
       def index
-        @records = AhoyDashboard::SerpProvider.ordered.index_by(&:name)
-        @names = AhoyDashboard::SerpProvider::NAMES
-        @active = AhoyDashboard::Serp.provider.to_s
-        @options = AhoyDashboard::SearchOptionsForm.current
+        load_serp_providers_screen
       end
 
       def edit
@@ -22,10 +21,7 @@ module AhoyDashboard
 
         AhoyDashboard::Serp::Providers::SaveCommand.call(form: @form) do
           on(:ok) { redirect_to settings_serp_providers_path, notice: "Provider saved." }
-          on(:invalid) do |form|
-            @form = form
-            render :edit, status: :unprocessable_entity
-          end
+          on(:invalid) { |form| rejected(form) }
         end
       end
 
@@ -39,7 +35,7 @@ module AhoyDashboard
       def set_secrets
         @secrets = AhoyDashboard::Serp.adapter_class(@name).credential_keys
           .map { |key| [ key.to_sym, AhoyDashboard::Settings::StoredSecretPresenter.serp(@name, key, record: record) ] }.to_h
-        @removing = @secrets.values.find { |secret| secret.stored? && params[:remove] == secret.key.to_s }
+        @removing = @secrets.values.find { |secret| secret.removing?(params[:remove]) }
       end
 
       def record

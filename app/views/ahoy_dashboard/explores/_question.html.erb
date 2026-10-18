@@ -1,16 +1,4 @@
-<%# The question as a sentence. Every control is a menu of links carrying the
-    rest of the question along, so this works with the JavaScript off and the
-    result is a URL somebody can keep.
-
-    Two rows, not one. The sentence is what is being asked; the row under it is
-    how the answer is drawn, and the two were one wrapping line with the columns
-    menu pushed right by ms-auto, so at four filters it landed mid sentence and
-    the line read "compared to Previous period 3 columns Show crawlers".
-
-    Each connector keeps its own control inside one part, because the sentence
-    wraps between parts and "over" was ending a line with its date range
-    starting the next one. %>
-<% carried = explore.to_query.slice(*AhoyDashboard::DashboardHelper::DESTINATION_KEYS) %>
+<% carried = explore.to_query.slice(*AhoyDashboard::FilterDestination::KEYS) %>
 
 <div class="ex-ask">
   <div class="ex-ask__sentence">
@@ -30,9 +18,6 @@
             groups: presenter.dimension_groups) %>
     </span>
 
-<%# The one part that is allowed to wrap inside itself: a filter list has no
-    length limit and the chips have to be able to run onto a second line without
-    taking the rest of the sentence with them. %>
     <span class="ex-ask__part ex-ask__part--filters">
       <span class="ex-ask__word">where</span>
 
@@ -43,12 +28,8 @@
       <% end %>
 
       <% if query.defaulted? %>
-        <span class="ex-ask__note">
-          <span>Default filters</span>
-          <span class="vr"></span>
-          <%= link_to "Show everything", explore_path(query.default_clear_params.merge(carried)),
-                class: "link-secondary text-decoration-underline" %>
-        </span>
+        <%= render "ahoy_dashboard/shared/defaulted_note", url: explore_path(query.default_clear_params.merge(carried)),
+              class_name: "ex-ask__note" %>
       <% end %>
 
       <%= render "ahoy_dashboard/dashboards/filter_menu",
@@ -85,11 +66,6 @@
     </span>
   </div>
 
-<%# How the answer is drawn, which is not part of the question and no longer
-    reads as if it were. Only what this dimension can actually answer is offered:
-    scroll depth on a dimension the engagement event cannot be grouped by would
-    print 0, which reads as nobody scrolled rather than as a question this cannot
-    answer. %>
   <div class="ex-ask__views">
     <% if query.period.custom? %>
       <%= render "ahoy_dashboard/shared/range_fields",

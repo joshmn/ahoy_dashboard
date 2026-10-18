@@ -1,14 +1,7 @@
 module AhoyDashboard
-  # Which custom property keys the dashboard offers. Events carry whatever they
-  # carry and nothing here gates what gets recorded, unlike Plausible, where the
-  # allowlist decides what is stored at all. This is a display list: it puts the
-  # keys worth reading in a chosen order and gives them a human label, so the
-  # properties card is not a frequency-ordered dump of every key in the range.
-  #
-  # PropertyKeysQuery still discovers keys from the data. Property.discoverable
-  # is the difference between the two, which is what the settings screen offers
-  # to add.
   class Property < AhoyDashboard::Record
+    include Positioned
+
     NAME = AhoyDashboard::Dimension::PROPERTY_NAME
 
     validates :key, presence: true, uniqueness: true, format: { with: NAME }
@@ -19,6 +12,9 @@ module AhoyDashboard
 
     scope :ordered, -> { order(:position, :key) }
     scope :surfaced, -> { where(enabled: true).ordered }
+
+    after_save :forget
+    after_destroy :forget
 
     UNSET_KEY = "property".freeze
 
@@ -47,6 +43,10 @@ module AhoyDashboard
     end
 
     private
+
+    def forget
+      AhoyDashboard::Current.forget_dimensions
+    end
 
     def key_is_not_a_built_in_dimension
       taken = AhoyDashboard::Dimension.collision(key)

@@ -1,12 +1,6 @@
 module AhoyDashboard
   module Settings
-    # The place picker's list, one step at a time.
-    #
-    # Read only and a frame rather than a page: it fills in a field on whatever
-    # form opened it and never navigates. No parent and no term is the list of
-    # countries, a parent is what is inside it, and a term searches from
-    # wherever the picker is standing.
-    class PlacesController < AhoyDashboard::BaseController
+    class PlacesController < AhoyDashboard::Settings::BaseController
       requires_installed :places
 
       FRAME = "dash_places".freeze
@@ -24,10 +18,6 @@ module AhoyDashboard
 
       private
 
-      # A country the search provider in use cannot search from is not on offer,
-      # because picking one would save a keyword the provider refuses. The
-      # narrowing is only at the top: every place under a country it does search
-      # is fine.
       def searchable
         AhoyDashboard::Serp.adapter_class.countries&.keys
       rescue AhoyDashboard::Serp::Error

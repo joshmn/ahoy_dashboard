@@ -13,8 +13,6 @@ Gem::Specification.new do |spec|
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = spec.homepage
 
-  # chdir, because Dir globs the working directory and this gemspec gets loaded
-  # from the host application's root as often as from its own.
   spec.files = Dir.chdir(__dir__) do
     Dir["{app,assets,config,db,docs,lib}/**/*"].select { |path| File.file?(path) } +
       [ "MIT-LICENSE", "README.md" ]
@@ -23,8 +21,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency "rails", ">= 6.0"
   spec.add_dependency "csv", ">= 3.0"
 
-  # Only the build_css task needs these, and only when working on the gem: the
-  # compiled stylesheet is committed.
   spec.add_development_dependency "bootstrap", "~> 5.3"
   spec.add_development_dependency "sass-embedded"
 end

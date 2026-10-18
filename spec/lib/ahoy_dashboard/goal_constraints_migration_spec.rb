@@ -4,15 +4,14 @@ RSpec.describe "Upgrading dashboard goal constraints" do
   let(:connection) { ActiveRecord::Base.connection }
 
   def migrate
-    path = AhoyDashboard::Engine.root.join("db/migrate/core/enforce_ahoy_dashboard_goal_and_funnel_constraints.rb")
-    load(path.to_s) unless defined?(EnforceAhoyDashboardGoalAndFunnelConstraints)
+    engine_migration("core/enforce_ahoy_dashboard_goal_and_funnel_constraints.rb")
     ActiveRecord::Migration.suppress_messages { EnforceAhoyDashboardGoalAndFunnelConstraints.new.up }
   end
 
   def legacy_goals
     connection.remove_index(:ahoy_dashboard_goals, name: "index_ahoy_dashboard_goals_on_null_safe_definition")
     connection.remove_index(:ahoy_dashboard_goals, name: "index_ahoy_dashboard_goals_on_effective_name")
-    connection.add_index(:ahoy_dashboard_goals, [:kind, :event_name, :path_pattern, :property_key, :property_value],
+    connection.add_index(:ahoy_dashboard_goals, [ :kind, :event_name, :path_pattern, :property_key, :property_value ],
                          unique: true, name: "index_ahoy_dashboard_goals_on_definition")
   end
 

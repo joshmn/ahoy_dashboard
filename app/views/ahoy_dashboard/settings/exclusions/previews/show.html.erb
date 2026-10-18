@@ -1,15 +1,11 @@
 <% content_for :title, "What this would hide" %>
 <% content_for :dash_settings_section, "exclusions" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "What this would hide",
-          lede: "A count of the visits these filters match, over the last 30 days." %>
+<%= dash_page_head title: "What this would hide",
+      lede: "A count of the visits these filters match, over the last 30 days." %>
 
-    <%= dash_card padded: true do %>
-      <%= render "ahoy_dashboard/settings/exclusions/preview", form: @form, count: @preview %>
-      <%= dash_button "Start a new exclusion with these filters", new_settings_exclusion_path(filters: @form.to_blocks.to_param),
-            data: { tm_frame: "_top" } %>
-    <% end %>
-  </section>
-</div>
+<%= dash_card padded: true do %>
+  <%= render "ahoy_dashboard/settings/exclusions/preview", form: @form, count: @preview %>
+  <%= dash_button "Start a new exclusion with these filters", new_settings_exclusion_path(filters: @form.to_blocks.to_param),
+        data: { tm_frame: "_top" } %>
+<% end %>

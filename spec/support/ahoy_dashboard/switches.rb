@@ -30,16 +30,25 @@ module AhoyDashboardSwitches
     end
   end
 
-  def ahoy_dashboard_preferences(scope, **values)
-    AhoyDashboard::Preferences.write(scope, **values)
+  def alert_settings(**values, &block)
+    with_ahoy_dashboard_settings(:alerts, **values, &block)
   end
 
-  def ahoy_dashboard_switches
-    (@ahoy_dashboard_switches ||= [])
+  def report_settings(**values, &block)
+    with_ahoy_dashboard_settings(:reports, **values, &block)
+  end
+
+  def ai_visibility_settings(**values, &block)
+    with_ahoy_dashboard_settings(:ai_visibility, **values, &block)
+  end
+
+  def search_console_settings(**values, &block)
+    with_ahoy_dashboard_settings(:search_console, **values, &block)
+  end
+
+  def serp_settings(**values, &block)
+    with_ahoy_dashboard_settings(:serp, **values, &block)
   end
 end
 
-RSpec.configure do |config|
-  config.include AhoyDashboardSwitches
-  config.after { ahoy_dashboard_switches.reverse_each { |settings, key, was| settings[key] = was } }
-end
+RSpec.configure { |config| config.include AhoyDashboardSwitches }

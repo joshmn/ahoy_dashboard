@@ -14,7 +14,10 @@ module AhoyDashboard
           on(:refused) { |message| Rails.logger.warn "backlinks skipped: #{message.to_s.downcase}" }
           on(:unsupported) { |provider| Rails.logger.warn "#{provider} does not sell backlink data" }
           on(:rate_limited) { |message| Rails.logger.warn "backlinks hit a quota: #{message}" }
-          on(:failed) { |message| Rails.logger.warn "backlinks failed: #{message}" }
+          on(:failed) do |message|
+            Rails.logger.warn "backlinks failed: #{message}"
+            raise Failed, message
+          end
         end
       end
     end

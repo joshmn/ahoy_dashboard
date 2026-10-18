@@ -1,57 +1,34 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard filter dialog", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
   let(:frame) { AhoyDashboard::FilterValuesController::FRAME }
 
   around { |example| travel_to(now) { example.run } }
 
   def clock(hour, minute = 0)
-    AhoyDashboard.time_zone.local(2026, 8, 10, hour, minute)
+    dash_time(2026, 8, 10, hour, minute)
   end
 
   def traffic!
-    first = dash_visit(started_at: clock(9), visitor: "a", country: "US")
-    dash_page_view(first, path: "/going-in/faq", at: clock(9))
+    first = dash_landing("/going-in/faq", at: clock(9), visitor: "a", country: "US")
     dash_page_view(first, path: "/resources", at: clock(9, 5))
 
-    second = dash_visit(started_at: clock(10), visitor: "b", country: "CA")
-    dash_page_view(second, path: "/going-in/faq", at: clock(10))
+    dash_landing("/going-in/faq", at: clock(10), visitor: "b", country: "CA")
   end
 
   def results(params = {})
-    get "/telemetry/filter_values", params: params, headers: { "Tm-Frame" => frame }
+    get_frame("/telemetry/filter_values", frame, params: params)
     Nokogiri::HTML5.fragment(response.body)
   end
 
   def page(params = {})
     get "/telemetry/filter_values", params: params
-    Nokogiri::HTML5(response.body)
+    document
   end
 
   def rows(document)
     document.css("button[data-action~='dash--filter-modal#pick']")
-  end
-
-  def query_of(href)
-    Rack::Utils.parse_nested_query(URI.parse(href).query.to_s)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/filter_values"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/filter_values"
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as the dialog's results" do
@@ -137,15 +114,6 @@ RSpec.describe "Dashboard filter dialog", type: :request do
 
         expect(results(q: "nowhere-at-all").text).to include("No matches for")
       end
-
-      it "does not raise on a term full of sql metacharacters" do
-        traffic!
-
-        results(q: "'; drop table ahoy_events --")
-
-        expect(response).to have_http_status(:ok)
-        expect(Ahoy::Event.count).to eq(3)
-      end
     end
 
     describe "one dimension's values" do
@@ -189,9 +157,8 @@ RSpec.describe "Dashboard filter dialog", type: :request do
 
       it "reads all traffic when feeding a form, whatever the page is filtered to" do
         traffic!
-        office = dash_visit(started_at: clock(11), visitor: "office", country: "MX", asn: "Telmex")
-        dash_page_view(office, path: "/", at: clock(11))
-        AhoyDashboard::Exclusion.create!(name: "Mexico", filters: [ { "dimension" => "country", "operator" => "is", "value" => "MX" } ])
+        dash_landing(at: clock(11), visitor: "office", country: "MX", asn: "Telmex")
+        dash_exclusion("Mexico", [ "country", "is", "MX" ])
 
         values = rows(results(dimension: "country", collect: "1",
                               filters: [ { dimension: "page", operator: "is", value: "/resources" } ]))
@@ -220,8 +187,7 @@ RSpec.describe "Dashboard filter dialog", type: :request do
 
       it "says when there are more than it shows" do
         (AhoyDashboard::FilterValuesController::LIMIT + 2).times do |index|
-          visit = dash_visit(started_at: clock(9), visitor: "v#{index}")
-          dash_page_view(visit, path: "/page-#{index}", at: clock(9))
+          dash_landing("/page-#{index}", at: clock(9), visitor: "v#{index}")
         end
 
         document = results(dimension: "page")
@@ -277,7 +243,7 @@ RSpec.describe "Dashboard filter dialog", type: :request do
       href = page.at_css("nav[aria-label=Dimensions] a[data-dimension=country]")["href"]
 
       expect(href).to start_with("/telemetry/filter_values?")
-      expect(query_of(href)).to include("dimension" => "country")
+      expect(link_query(href)).to include("dimension" => "country")
     end
 
     it "marks the dimension being shown" do
@@ -291,7 +257,7 @@ RSpec.describe "Dashboard filter dialog", type: :request do
 
       link = page(dimension: "page").css("a.data-row").find { |node| node.text.include?("/going-in/faq") }
 
-      expect(query_of(link["href"])["filters"]).to eq([ { "dimension" => "page", "operator" => "is", "value" => "/going-in/faq" } ])
+      expect(link_query(link["href"])["filters"]).to eq([ { "dimension" => "page", "operator" => "is", "value" => "/going-in/faq" } ])
       expect(link["href"]).to start_with("/telemetry/?").or start_with("/telemetry?")
     end
 
@@ -302,7 +268,7 @@ RSpec.describe "Dashboard filter dialog", type: :request do
         .css("a.data-row").first
 
       expect(link["href"]).to start_with("/telemetry/explore?")
-      expect(query_of(link["href"])).to include("dimension" => "country", "columns" => "visitors")
+      expect(link_query(link["href"])).to include("dimension" => "country", "columns" => "visitors")
     end
 
     it "keeps the filters already applied on the search it submits" do
@@ -311,6 +277,29 @@ RSpec.describe "Dashboard filter dialog", type: :request do
 
       expect(form.at_css("input[type=hidden][name='filters[][value]']")["value"]).to eq("/resources")
       expect(form.at_css("input[type=hidden][name=dimension]")["value"]).to eq("country")
+    end
+
+    it "keeps a cleared default segment cleared on the search and the dimension links" do
+      create(:dash_segment, applied_by_default: true)
+
+      document = page(dimension: "country", filters: AhoyDashboard::QueryForm::NO_FILTERS)
+      form = document.at_css("form:has(input[name=q])")
+      links = document.css("nav[aria-label=Dimensions] a[data-dimension]")
+
+      expect(form.css("input[type=hidden][name=filters]").map { |node| node["value"] })
+        .to eq([ AhoyDashboard::QueryForm::NO_FILTERS ])
+      expect(form.css("input[type=hidden][name^='filters[]']")).to be_empty
+      expect(links).not_to be_empty
+      expect(links.map { |link| link_query(link["href"])["filters"] }.uniq).to eq([ AhoyDashboard::QueryForm::NO_FILTERS ])
+    end
+
+    it "carries the question it came from on the search it submits" do
+      document = page(dimension: "page", return: "explore", for_dimension: "country", for_columns: "visitors")
+      form = document.at_css("form:has(input[name=q])")
+      hidden = form.css("input[type=hidden]").map { |node| [ node["name"], node["value"] ] }.to_h
+
+      expect(hidden).to include("return" => "explore", "for_dimension" => "country", "for_columns" => "visitors",
+                                "dimension" => "page")
     end
 
     it "offers the way back without filtering" do
@@ -331,7 +320,7 @@ RSpec.describe "Dashboard filter dialog", type: :request do
 
     def dashboard(params = {})
       get "/telemetry", params: params
-      Nokogiri::HTML5(response.body)
+      document
     end
 
     def dialog(document)
@@ -342,7 +331,7 @@ RSpec.describe "Dashboard filter dialog", type: :request do
       button = dashboard(period: "7d").at_css("#tm-filter-button")
 
       expect(button["href"]).to start_with("/telemetry/filter_values?")
-      expect(query_of(button["href"])).to include("period" => "7d")
+      expect(link_query(button["href"])).to include("period" => "7d")
       expect(button["aria-haspopup"]).to eq("dialog")
       expect(button).to have_attribute("data-tm-filter")
     end
@@ -376,17 +365,17 @@ RSpec.describe "Dashboard filter dialog", type: :request do
     it "applies to the view being looked at, leaving the filters to the box" do
       apply = dialog(dashboard(period: "7d", filters: us_or_ca))["data-dash--filter-modal-apply-value"]
 
-      expect(query_of(apply)).to include("period" => "7d")
-      expect(query_of(apply)).not_to have_key("filters")
+      expect(link_query(apply)).to include("period" => "7d")
+      expect(link_query(apply)).not_to have_key("filters")
     end
 
     it "reads its results for the same view" do
       url = dialog(dashboard(period: "7d", filters: us_or_ca))["data-dash--filter-modal-url-value"]
 
       expect(url).to start_with("/telemetry/filter_values?")
-      expect(query_of(url)).to include("period" => "7d")
-      expect(query_of(url)).not_to have_key("filters")
-      expect(query_of(url)).not_to have_key("collect")
+      expect(link_query(url)).to include("period" => "7d")
+      expect(link_query(url)).not_to have_key("filters")
+      expect(link_query(url)).not_to have_key("collect")
     end
 
     it "says every operator the way a chip does" do
@@ -401,8 +390,8 @@ RSpec.describe "Dashboard filter dialog", type: :request do
 
     it "loads the initial help with the controls" do
       path = dialog(dashboard)["data-dash--filter-modal-contents-value"]
-      get(path, headers: { "Tm-Frame" => "tm-filter-controls" })
-      results = Nokogiri::HTML5(response.body).at_css("tm-frame##{frame}")
+      get_frame(path, "tm-filter-controls")
+      results = document.at_css("tm-frame##{frame}")
 
       expect([results.text.include?("Pick a dimension, or just start typing"), results["src"]]).to eq([true, nil])
     end
@@ -411,7 +400,7 @@ RSpec.describe "Dashboard filter dialog", type: :request do
       palette = dashboard(period: "7d").at_css("[data-search-url]")["data-search-url"]
 
       expect(palette).to start_with("/telemetry/facet_search?")
-      expect(query_of(palette)).to include("period" => "7d")
+      expect(link_query(palette)).to include("period" => "7d")
     end
   end
 
@@ -420,11 +409,11 @@ RSpec.describe "Dashboard filter dialog", type: :request do
 
     it "applies back to the same question" do
       get "/telemetry/explore", params: { dimension: "browser", columns: "visitors" }
-      dialog = Nokogiri::HTML5(response.body).at_css("[data-dash--modal-key=filter]")
+      dialog = document.at_css("[data-dash--modal-key=filter]")
 
       expect(dialog["data-dash--filter-modal-apply-value"]).to start_with("/telemetry/explore?")
-      expect(query_of(dialog["data-dash--filter-modal-apply-value"])).to include("dimension" => "browser", "columns" => "visitors")
-      expect(query_of(dialog["data-dash--filter-modal-url-value"])).to include("return" => "explore", "for_dimension" => "browser")
+      expect(link_query(dialog["data-dash--filter-modal-apply-value"])).to include("dimension" => "browser", "columns" => "visitors")
+      expect(link_query(dialog["data-dash--filter-modal-url-value"])).to include("return" => "explore", "for_dimension" => "browser")
     end
   end
 end

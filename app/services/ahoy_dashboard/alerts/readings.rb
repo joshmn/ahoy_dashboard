@@ -92,18 +92,19 @@ module AhoyDashboard
         end
 
         def cadence
-          entry.daily? ? 1.day : entry.every
+          entry.interval
         end
 
         def cadence_label
           return "hourly" if cadence == 1.hour
           return "daily" if cadence == 1.day
+          return "monthly" if entry.monthly?
 
           "every #{ActiveSupport::Duration.build(cadence.to_i).inspect}"
         end
 
         def overdue?
-          last_started_at.present? && last_started_at < now - (cadence * 2)
+          cadence.present? && last_started_at.present? && last_started_at < now - (cadence * 2)
         end
       end
 
@@ -118,8 +119,8 @@ module AhoyDashboard
       end
 
       def rival_checks(run_ids)
-        AhoyDashboard::SerpCheck.includes(:site)
-          .where(run_id: run_ids, status: AhoyDashboard::SerpCheck.statuses[:success])
+        AhoyDashboard::SerpCheck.success.includes(:site)
+          .where(run_id: run_ids)
           .where.not(site_id: our_site&.id)
           .group_by { |check| [ check.run_id, check.location ] }
       end

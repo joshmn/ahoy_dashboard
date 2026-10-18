@@ -4,7 +4,7 @@
   <% end %>
 <% else %>
   <%= dash_frame_tag @presenter.frame_id do %>
-    <% cache_if @snapshot, dash_dashboard_cache_key([:funnel, @funnel.id], snapshot: @snapshot), expires_in: AhoyDashboard::Dashboards::Snapshot::MAX_AGE do %>
+    <% dash_snapshot_cache([:funnel, @funnel.id], snapshot: @snapshot) do %>
       <%= render "ahoy_dashboard/funnels/card", presenter: @presenter %>
     <% end %>
   <% end %>

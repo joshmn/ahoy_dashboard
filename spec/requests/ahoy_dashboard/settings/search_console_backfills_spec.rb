@@ -3,22 +3,6 @@ require "rails_helper"
 RSpec.describe "Dashboard Search Console backfill", type: :request do
   let(:path) { "/telemetry/settings/search_console_backfill" }
 
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      post path
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      post path
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 

@@ -1,17 +1,10 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard keyword tags", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
 
   around { |example| travel_to(now) { example.run } }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   def reading(keyword, position: 3)
     run = create(:dash_serp_run, keyword: keyword, checked_at: now - 1.day)
@@ -20,24 +13,6 @@ RSpec.describe "Dashboard keyword tags", type: :request do
 
   def listed
     document.css("#tracked-searches tbody tr a[href*='/rank_keyword']").map { |link| link.text.strip }
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in before tagging anything" do
-      post "/telemetry/rankings/tags", params: { keyword_tag: { tag: "x", keyword_ids: [ "1" ] } }
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      keyword = create(:dash_serp_keyword)
-      sign_in create(:user)
-
-      post "/telemetry/rankings/tags", params: { keyword_tag: { tag: "x", keyword_ids: [ keyword.id.to_s ] } }
-
-      expect(response).to have_http_status(:not_found)
-      expect(keyword.reload.tags).to eq([])
-    end
   end
 
   describe "as an admin" do
@@ -244,6 +219,14 @@ RSpec.describe "Dashboard keyword tags", type: :request do
         post "/telemetry/rankings/tags", params: tag_params("x", two).merge(return_to: "//evil.example/rankings")
 
         expect(response).to redirect_to("/telemetry/rankings")
+      end
+
+      it "goes back to Rankings for any return address a browser would read as another host" do
+        [ "/\t/evil.example", "/\n/evil.example", "/\r/evil.example", "//evil.example", "/\\evil.example" ].each do |value|
+          post "/telemetry/rankings/tags", params: tag_params("x", two).merge(return_to: value)
+
+          expect(response).to redirect_to("/telemetry/rankings"), value.inspect
+        end
       end
     end
 

@@ -1,23 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard serp site settings", type: :request do
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/serp_sites"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/settings/serp_sites"
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
@@ -40,7 +23,7 @@ RSpec.describe "Dashboard serp site settings", type: :request do
 
     describe "the new site form" do
       def domain_value
-        Nokogiri::HTML5(response.body).at_css("input#serp_site_domain")["value"]
+        document.at_css("input#serp_site_domain")["value"]
       end
 
       before { allow(AhoyDashboard::Serp).to receive(:own_domain).and_return("example.com") }

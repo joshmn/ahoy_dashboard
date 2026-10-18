@@ -1,40 +1,23 @@
 module AhoyDashboard
-  # The Search Console page: the whole of what has been pulled from Google, at
-  # every grain it was pulled at.
-  #
-  # Its own resource rather than a view of the dashboard card. The card answers
-  # what search did for the range in nine rows; this answers what is actually
-  # stored, says which of the three tables each block came from, and lets one
-  # keyword be opened on its own.
-  #
-  # Singular, because the report is the query string.
-  class SearchConsoleReportsController < AhoyDashboard::BaseController
-    include AhoyDashboard::SeoRange
-    include AhoyDashboard::CsvRenderable
-    include AhoyDashboard::SeoInstallGate
-
+  class SearchConsoleReportsController < AhoyDashboard::Seo::BaseController
     ROWS = 25
 
-    requires_installed :search_console
+    skip_before_action :set_sites, :set_tag
 
     def show
-      context = if request_format == :html
-        SearchConsole::PageContextQuery.call(range: query.range, countries: true, history: !result.any?)
-      end
       @presenter = AhoyDashboard::SearchConsoleReportPresenter.new(
         query: query,
         result: result,
         measure: params[:measure],
-        context: context || SearchConsole::PageContext.new
+        context: search_console_context(countries: true, history: request_format == :html && !result.any?)
       )
-      @tracked_keywords = TrackedKeywordsPresenter.new(phrases: @presenter.tracking_phrases) if request_format == :html
-
+      track_phrases
     end
 
     private
 
-    def slice
-      @slice ||= AhoyDashboard::SearchConsole::Slice.from_params(params)
+    def surface_key
+      "search_console"
     end
 
     def result

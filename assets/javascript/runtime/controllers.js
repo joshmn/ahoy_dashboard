@@ -47,9 +47,6 @@ const declaration = (spec) => {
   return { type: spec, fallback: EMPTY[spec.name] }
 }
 
-// A target may sit on the controller element itself, which is how a dialog that
-// is its own panel is written, so the element is matched before its descendants
-// are searched. Stimulus does the same and controllers here are written expecting it.
 const defineTargets = (klass, identifier) => {
   const names = klass.targets || []
 
@@ -188,12 +185,12 @@ const listenFor = (root) => {
   })
 }
 
-export const connectTree = (root) => {
+const connectTree = (root) => {
   listenFor(root)
   eachIn(root, "[data-controller]", connectElement)
 }
 
-export const disconnectTree = (root) => {
+const disconnectTree = (root) => {
   eachIn(root, "[data-controller]", (element) => disconnectElement(element))
 }
 

@@ -1,0 +1,4 @@
+<%= dash_card element: :section, class: class_names({ "panel h-100" => local_assigns[:panel] }, "p-3"),
+      "aria-label": "How to install #{state.label}" do %>
+  <%= render "ahoy_dashboard/shared/feature_state", state: state %>
+<% end %>

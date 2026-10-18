@@ -23,7 +23,6 @@ module AhoyDashboard
             SnapshotStore.write_value(key: lease_key(expected_key), value: token, expires_in: LEASE)
             begin
               job = SnapshotRefreshJob.perform_later(expected_key, token)
-              raise job.enqueue_error if job && job.respond_to?(:enqueue_error) && job.enqueue_error
               SnapshotStore.delete(key: lease_key(expected_key)) unless job
               job
             rescue StandardError => error
@@ -45,7 +44,7 @@ module AhoyDashboard
         private
 
         def default_key
-          query = QueryForm.from_params({period: "30d", filters: "none"})
+          query = SnapshotRefreshService.default_query
           return unless SnapshotQuery.eligible?(query: query, cards: true)
 
           SnapshotKeyQuery.call(query: query)

@@ -1,6 +1,8 @@
 module AhoyDashboard
   module Seo
     class LandingPagesPresenter < BasePresenter
+      delegate :pages, :lost, to: :result
+
       def tiles
         [
           Tile.new(label: "Pages ranking", value: number(result.pages.size), note: "on the latest reading"),
@@ -9,14 +11,6 @@ module AhoyDashboard
           Tile.new(label: "Lost every search", value: number(result.lost.size),
                    note: "pages that held one earlier", tone: (:bad if result.lost.any?))
         ]
-      end
-
-      def pages
-        result.pages
-      end
-
-      def lost
-        result.lost
       end
 
       def places?
@@ -91,7 +85,7 @@ module AhoyDashboard
       def lost_row(page, row)
         values = [ path_of(page.url), row.query ]
         values << row.place.label if places?
-        values.push(row.was, row.now_position, (path_of(row.now_url) if row.now_url.present?))
+        values.push(row.was, row.now_position, Formatting.url_path(row.now_url))
       end
 
       def top_share

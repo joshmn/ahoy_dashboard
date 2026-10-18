@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/alerts"
 
 RSpec.describe AhoyDashboard::Alerts::Digests::SendCommand do
   let(:now) { AhoyDashboard.time_zone.parse("2026-09-19 08:00") }
@@ -28,12 +27,8 @@ RSpec.describe AhoyDashboard::Alerts::Digests::SendCommand do
     expect(digest).to have_attributes(status: "sent", alerts_count: 1, ends_on: Date.new(2026, 9, 18))
   end
 
-  it "sends a period once however often it is asked" do
-    send_digest
-
-    expect(send_digest).to include(:already_done)
-    expect(deliveries.size).to eq(1)
-  end
+  include_examples "a digest send command",
+                   scope: :alerts, mailer: SeoAlertMailer, record: AhoyDashboard::AlertDigest, day: Date.new(2026, 9, 18)
 
   it "sends even when nothing fired" do
     send_digest
@@ -42,30 +37,10 @@ RSpec.describe AhoyDashboard::Alerts::Digests::SendCommand do
   end
 
   it "skips an empty period when told not to send those" do
-    alert_settings(send_empty: false) do
-      expect { send_digest }.not_to change(deliveries, :size)
-    end
+    events = alert_settings(send_empty: false) { send_digest }
 
-    expect(digest).to be_skipped
-  end
-
-  it "records a failed send and tries it again on the next run" do
-    allow(SeoAlertMailer).to receive(:with).and_raise(RuntimeError, "smtp is down")
-
-    expect(send_digest[:failed].last.message).to eq("smtp is down")
-    expect(digest).to have_attributes(status: "failed", error: "RuntimeError: smtp is down")
-
-    allow(SeoAlertMailer).to receive(:with).and_call_original
-
-    expect { send_digest }.to change(deliveries, :size).by(1)
-    expect(digest).to have_attributes(status: "sent", error: nil)
-  end
-
-  it "does nothing when nobody is set to get it" do
-    alert_settings(recipients: []) do
-      expect(send_digest).to include(:disabled)
-    end
-
-    expect(AhoyDashboard::AlertDigest.count).to eq(0)
+    expect(events).to include(:skipped)
+    expect(deliveries).to be_empty
+    expect(digest).to have_attributes(status: "skipped", alerts_count: 0)
   end
 end

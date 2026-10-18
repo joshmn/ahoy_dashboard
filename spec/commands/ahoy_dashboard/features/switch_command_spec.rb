@@ -1,6 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/switches"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe AhoyDashboard::Features::SwitchCommand do
   let(:feature) { AhoyDashboard::Features.fetch(:keywords) }

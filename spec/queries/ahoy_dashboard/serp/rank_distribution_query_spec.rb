@@ -1,21 +1,11 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp::RankDistributionQuery do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:range) { (now - 6.days).beginning_of_day..now.end_of_day }
   let(:site) { create(:dash_serp_site, domain: "example.com") }
 
   around { |example| travel_to(now) { example.run } }
-
-  def reading(keyword:, at:, position:, location: "us", status: :success, on: site)
-    run = create(:dash_serp_run, keyword: keyword, location: location, checked_at: at)
-    target = AhoyDashboard::SerpKeywordTarget.find_or_create_by!(keyword: keyword, site: on)
-    create(:dash_serp_check, run: run, keyword: keyword, site: on, target: target,
-           location: location, checked_at: at, position: position, status: status)
-  end
 
   def call
     described_class.call(site: site, range: range)
@@ -33,20 +23,16 @@ RSpec.describe AhoyDashboard::Serp::RankDistributionQuery do
 
   it "reads the time-zone setting once rather than once per daily cutoff" do
     selected_site, selected_range = site, range
-    reads = []
-    subscriber = ->(_name, _started, _finished, _id, payload) { reads << payload[:sql] if payload[:sql].include?('FROM "ahoy_dashboard_settings"') }
-
-    result = ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
-      described_class.call(site: selected_site, range: selected_range, now: now)
-    end
+    result = nil
+    reads = setting_reads { result = described_class.call(site: selected_site, range: selected_range, now: now) }
 
     expect(result.days.size).to eq(7)
-    expect(reads.size).to eq(1)
+    expect(reads).to eq(1)
   end
 
   it "puts each position in its band" do
     [ 1, 3, 4, 10, 11, 20, 21, 48, nil ].each_with_index do |position, index|
-      reading(keyword: create(:dash_serp_keyword, query: "q#{index}"), at: now - 1.hour, position: position)
+      serp_reading(create(:dash_serp_keyword, query: "q#{index}"), site: site, at: now - 1.hour, position: position)
     end
 
     latest = call.latest
@@ -56,7 +42,7 @@ RSpec.describe AhoyDashboard::Serp::RankDistributionQuery do
 
   it "carries a reading forward to the days after it, so a weekly keyword does not come and go" do
     keyword = create(:dash_serp_keyword, frequency: :weekly)
-    reading(keyword: keyword, at: now - 5.days, position: 2)
+    serp_reading(keyword, site: site, at: now - 5.days, position: 2)
 
     result = call
 
@@ -66,8 +52,8 @@ RSpec.describe AhoyDashboard::Serp::RankDistributionQuery do
 
   it "counts a series on the days before its first check in the range off its last check before the range" do
     keyword = create(:dash_serp_keyword)
-    reading(keyword: keyword, at: now - 20.days, position: 15)
-    reading(keyword: keyword, at: now - 2.days, position: 5)
+    serp_reading(keyword, site: site, at: now - 20.days, position: 15)
+    serp_reading(keyword, site: site, at: now - 2.days, position: 5)
 
     result = call
 
@@ -76,23 +62,23 @@ RSpec.describe AhoyDashboard::Serp::RankDistributionQuery do
   end
 
   it "leaves out a series with nothing in the range, like the keyword list does" do
-    reading(keyword: create(:dash_serp_keyword), at: now - 20.days, position: 1)
+    serp_reading(create(:dash_serp_keyword), site: site, at: now - 20.days, position: 1)
 
     expect(call).not_to be_any
   end
 
   it "uses the latest reading of a day when a search was checked twice that day" do
     keyword = create(:dash_serp_keyword)
-    reading(keyword: keyword, at: now - 3.hours, position: 30)
-    reading(keyword: keyword, at: now - 1.hour, position: 2)
+    serp_reading(keyword, site: site, at: now - 3.hours, position: 30)
+    serp_reading(keyword, site: site, at: now - 1.hour, position: 2)
 
     expect(call.latest.counts.values_at("top-3", "past-20")).to eq([ 1, 0 ])
   end
 
   it "counts each place on its own" do
     keyword = create(:dash_serp_keyword, locations: %w[us gb])
-    reading(keyword: keyword, at: now - 1.hour, position: 2, location: "us")
-    reading(keyword: keyword, at: now - 1.hour, position: nil, location: "gb")
+    serp_reading(keyword, site: site, at: now - 1.hour, position: 2, location: "us")
+    serp_reading(keyword, site: site, at: now - 1.hour, position: nil, location: "gb")
 
     expect(call.latest.counts.values_at("top-3", "not-found")).to eq([ 1, 1 ])
   end
@@ -100,16 +86,16 @@ RSpec.describe AhoyDashboard::Serp::RankDistributionQuery do
   it "ignores failed checks and other sites" do
     keyword = create(:dash_serp_keyword)
     rival = create(:dash_serp_site, domain: "rival.com")
-    reading(keyword: keyword, at: now - 1.hour, position: nil, status: :failed)
-    reading(keyword: keyword, at: now - 1.hour, position: 1, on: rival)
+    serp_reading(keyword, site: site, at: now - 1.hour, position: nil, status: :failed)
+    serp_reading(keyword, site: rival, at: now - 1.hour, position: 1)
 
     expect(call).not_to be_any
   end
 
   it "matches the bands of the keyword list's latest readings on the last day" do
     keyword = create(:dash_serp_keyword)
-    reading(keyword: keyword, at: now - 4.days, position: 3)
-    reading(keyword: keyword, at: now - 1.day, position: 14)
+    serp_reading(keyword, site: site, at: now - 4.days, position: 3)
+    serp_reading(keyword, site: site, at: now - 1.day, position: 14)
 
     row = sole_item(AhoyDashboard::Serp::RankOverviewQuery.call(site: site, range: range).rows)
     band = AhoyDashboard::Serp::RankBand.for(row.position)
@@ -119,8 +105,8 @@ RSpec.describe AhoyDashboard::Serp::RankDistributionQuery do
   end
 
   it "counts only keywords carrying the tag when one is picked" do
-    reading(keyword: create(:dash_serp_keyword, query: "visiting", tags: %w[visits]), at: now - 1.hour, position: 2)
-    reading(keyword: create(:dash_serp_keyword, query: "mail"), at: now - 1.hour, position: 15)
+    serp_reading(create(:dash_serp_keyword, query: "visiting", tags: %w[visits]), site: site, at: now - 1.hour, position: 2)
+    serp_reading(create(:dash_serp_keyword, query: "mail"), site: site, at: now - 1.hour, position: 15)
 
     latest = described_class.call(site: site, range: range, tag: "visits").latest
 
@@ -132,28 +118,32 @@ RSpec.describe AhoyDashboard::Serp::RankDistributionQuery do
   end
 
   it "carries sparse and tied readings forward exactly through a partial final day" do
-    range = (now - 30.days).beginning_of_day..now
-    random = Random.new(42)
-    series = 8.times.map do |key|
-      readings = Array.new(20) do
-        at = range.begin + random.rand(-2..31).days + random.rand(0..23).hours
-        described_class::Reading.new(at: at, position: [ nil, 1, 4, 11, 21 ][random.rand(5)])
-      end.sort_by(&:at)
-      [ key, readings ]
-    end.to_h
-    query = described_class.new(site: site, range: range, now: now)
-    allow(query).to receive(:readings).and_return(series)
+    range = (now - 6.days).beginning_of_day..now
+    seeded = create(:dash_serp_keyword, query: "seeded")
+    tied = create(:dash_serp_keyword, query: "tied")
+    late = create(:dash_serp_keyword, query: "late")
+    serp_reading(seeded, site: site, at: dash_time(2026, 8, 10, 12), position: 15)
+    serp_reading(seeded, site: site, at: dash_time(2026, 8, 16, 8), position: 2)
+    serp_reading(seeded, site: site, at: dash_time(2026, 8, 18, 10), position: nil)
+    serp_reading(tied, site: site, at: dash_time(2026, 8, 15, 6), position: 25)
+    serp_reading(tied, site: site, at: dash_time(2026, 8, 15, 6), position: 5)
+    serp_reading(tied, site: site, at: dash_time(2026, 8, 19, 23), position: 11)
+    serp_reading(late, site: site, at: dash_time(2026, 8, 17, 3), position: 30)
+    serp_reading(late, site: site, at: dash_time(2026, 8, 17, 20), position: 7)
+    serp_reading(late, site: site, at: dash_time(2026, 8, 20, 8), position: 1)
+    serp_reading(late, site: site, at: dash_time(2026, 8, 20, 10), position: 50)
+    serp_reading(create(:dash_serp_keyword, query: "gone"), site: site, at: dash_time(2026, 8, 12, 9), position: 3)
 
-    expected = (range.begin.to_date..now.to_date).map do |date|
-      cutoff = [ date.in_time_zone(AhoyDashboard.time_zone).end_of_day, now ].min
-      counts = AhoyDashboard::Serp::RankBand::KEYS.index_with(0)
-      series.each_value do |readings|
-        latest = readings.select { |reading| reading.at <= cutoff }.last
-        counts[AhoyDashboard::Serp::RankBand.for(latest.position).key] += 1 if latest
-      end
-      [ date, counts ]
-    end
+    days = described_class.call(site: site, range: range).days
 
-    expect(query.call.days.map { |day| [ day.date, day.counts ] }).to eq(expected)
+    expect(days.map { |day| [ day.date, day.counts ] }).to eq([
+      [ Date.new(2026, 8, 14), { "top-3" => 0, "4-10" => 0, "11-20" => 1, "past-20" => 0, "not-found" => 0 } ],
+      [ Date.new(2026, 8, 15), { "top-3" => 0, "4-10" => 1, "11-20" => 1, "past-20" => 0, "not-found" => 0 } ],
+      [ Date.new(2026, 8, 16), { "top-3" => 1, "4-10" => 1, "11-20" => 0, "past-20" => 0, "not-found" => 0 } ],
+      [ Date.new(2026, 8, 17), { "top-3" => 1, "4-10" => 2, "11-20" => 0, "past-20" => 0, "not-found" => 0 } ],
+      [ Date.new(2026, 8, 18), { "top-3" => 0, "4-10" => 2, "11-20" => 0, "past-20" => 0, "not-found" => 1 } ],
+      [ Date.new(2026, 8, 19), { "top-3" => 0, "4-10" => 1, "11-20" => 1, "past-20" => 0, "not-found" => 1 } ],
+      [ Date.new(2026, 8, 20), { "top-3" => 1, "4-10" => 0, "11-20" => 1, "past-20" => 0, "not-found" => 1 } ]
+    ])
   end
 end

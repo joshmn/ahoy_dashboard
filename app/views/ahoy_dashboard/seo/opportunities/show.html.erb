@@ -4,9 +4,7 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false %>
 
   <% if !@presenter.any? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.search_console_empty %>
-    <% end %>
+    <%= dash_empty_card **@presenter.search_console_empty %>
   <% else %>
     <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
 
@@ -43,14 +41,14 @@
               <td class="num t2"><%= @presenter.percent(row.ctr, places: 1) %></td>
               <td class="num"><%= @presenter.number(row.upside) %></td>
               <td><%= dash_badge row.band, tone: @presenter.band_tone(row) %></td>
-              <td><%= seo_page_link(@presenter.path_of(row.page)) %></td>
+              <td><%= seo_page_link(row.page) %></td>
             </tr>
           <% end %>
         </tbody>
       <% end %>
 
       <%= dash_card_footer do %><%= @presenter.upside_note %><% end %>
-      <%= render "ahoy_dashboard/seo/shared/data_note", last_date: @presenter.totals.last_date, slice: @presenter.slice %>
+      <%= dash_card_footer class: "sc-data-note" do %><%= @presenter.data_note %><% end %>
     <% end %>
 
     <div class="row g-3 mt-0">

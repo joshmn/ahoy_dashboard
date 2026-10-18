@@ -1,14 +1,10 @@
 <% content_for :title, "Edit a site" %>
 <% content_for :dash_settings_section, "serp_keywords" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Edit #{@site.name}",
-          lede: "Changing the domain does not recheck searches already stored." %>
+<%= dash_page_head title: "Edit #{@site.name}",
+      lede: "Changing the domain does not recheck searches already stored." %>
 
-    <%= dash_card do %>
-      <%= render "ahoy_dashboard/settings/serp_sites/form",
-            url: settings_serp_site_path(@site), method: :patch, submit_label: "Save changes" %>
-    <% end %>
-  </section>
-</div>
+<%= dash_card do %>
+  <%= render "ahoy_dashboard/settings/serp_sites/form",
+        url: settings_serp_site_path(@site), method: :patch, submit_label: "Save changes" %>
+<% end %>

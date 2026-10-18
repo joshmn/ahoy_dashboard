@@ -8,18 +8,14 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false, controls: controls %>
 
   <% if @presenter.setup_notice %>
-    <%= dash_card class: "seo-notice-card" do %>
-      <%= dash_empty compact: true, **@presenter.setup_notice %>
-    <% end %>
+    <%= dash_empty_card card_class: "seo-notice-card", compact: true, **@presenter.setup_notice %>
   <% else %>
     <%= dash_unavailable_notice "Sync now", @presenter.sync_reason, fix: @presenter.sync_fix %>
   <% end %>
 
   <% if !@presenter.any? %>
     <% unless @presenter.setup_notice %>
-      <%= dash_card do %>
-        <%= dash_empty title: "No backlinks synced yet", hint: @presenter.empty_hint %>
-      <% end %>
+      <%= dash_empty_card title: "No backlinks synced yet", hint: @presenter.empty_hint %>
     <% end %>
   <% else %>
     <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>

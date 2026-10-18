@@ -1,11 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::SegmentDecorator, type: :decorator do
-  def decorate(segment)
-    described_class.new(segment)
-  end
-
   describe "#dates" do
     it "names only the day it was made when nothing has changed since" do
       segment = travel_to(dash_time(2026, 4, 22, 9)) { create(:dash_segment) }
@@ -20,8 +15,6 @@ RSpec.describe AhoyDashboard::SegmentDecorator, type: :decorator do
       expect(decorate(segment).dates).to eq("Created 22 Apr, last updated 3 Aug")
     end
 
-    # A visit at 11pm belongs to the day the operator had, not the day Postgres
-    # had, which is the rule for every other date in this subsystem.
     it "reads the dates in the dashboard's own zone" do
       segment = travel_to(dash_time(2026, 4, 22, 23, 30)) { create(:dash_segment) }
 
@@ -74,11 +67,5 @@ RSpec.describe AhoyDashboard::SegmentDecorator, type: :decorator do
     it "counts the filters" do
       expect(decorate(create(:dash_segment)).count_label).to eq("1 filter")
     end
-  end
-
-  it "keeps building urls off the record rather than off itself" do
-    segment = create(:dash_segment)
-
-    expect(decorate(segment).to_param).to eq(segment.id.to_s)
   end
 end

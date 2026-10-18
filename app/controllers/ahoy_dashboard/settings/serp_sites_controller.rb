@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class SerpSitesController < AhoyDashboard::BaseController
+    class SerpSitesController < AhoyDashboard::Settings::BaseController
       requires_installed :serp
 
       before_action :set_site, only: [ :edit, :update, :destroy ]
@@ -8,7 +8,6 @@ module AhoyDashboard
       def index
         @sites = AhoyDashboard::SerpSite.ordered.to_a
         @keyword_counts = AhoyDashboard::SerpKeywordTarget.where(site_id: @sites.map(&:id)).group(:site_id).count
-        @confirming = params[:confirm].presence
       end
 
       def new
@@ -31,14 +30,14 @@ module AhoyDashboard
       def update
         @form = AhoyDashboard::Serp::SiteForm.new(site_params)
 
-        AhoyDashboard::Serp::Sites::UpdateCommand.call(site: @site, form: @form) do
+        AhoyDashboard::Records::SaveCommand.call(record: @site, form: @form) do
           on(:ok) { redirect_to settings_serp_sites_path, notice: "Site saved." }
-          on(:invalid) { |form| rejected(form, :edit) }
+          on(:invalid) { |form| rejected(form) }
         end
       end
 
       def destroy
-        AhoyDashboard::Serp::Sites::DestroyCommand.call(site: @site) do
+        AhoyDashboard::Records::DestroyCommand.call(record: @site) do
           on(:ok) do |site|
             redirect_to settings_serp_sites_path,
               notice: "#{site.name} is off the list, and so is everything that was recorded about it."
@@ -52,20 +51,13 @@ module AhoyDashboard
         @site = AhoyDashboard::SerpSite.find(params[:id])
       end
 
-      def rejected(form, template)
-        @form = form
-        render template, status: :unprocessable_entity
-      end
-
       def created(outcome)
         return "Site saved." if outcome.attached.zero?
 
-        helpers = ActionController::Base.helpers
         notice = "Site saved and added to #{helpers.pluralize(outcome.attached, 'keyword')}."
         return notice if outcome.backfilled.zero?
 
-        "#{notice} #{helpers.pluralize(outcome.backfilled, 'past search')} " \
-          "#{outcome.backfilled == 1 ? 'was' : 'were'} read again for it."
+        "#{notice} #{read_again(outcome.backfilled)} for it."
       end
 
       def site_params(fields = AhoyDashboard::Serp::SiteForm::FIELDS)

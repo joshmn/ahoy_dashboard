@@ -1,8 +1,5 @@
 class CreateAhoyDashboardKeywordIdeas < ActiveRecord::Migration[6.0]
   def change
-    # Bought data, cached. Every row costs money to fetch, so a seed is fetched
-    # once and read as often as anybody likes, and re-fetching is a deliberate
-    # act rather than a page load.
     create_table :ahoy_dashboard_keyword_ideas do |t|
       t.string :seed, null: false
       t.string :query, null: false

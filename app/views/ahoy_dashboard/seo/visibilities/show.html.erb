@@ -16,9 +16,7 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, controls: controls %>
 
   <% if !@presenter.any? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.rank_empty(hint: "The score starts with the first check in the range. Try a longer date range.") %>
-    <% end %>
+    <%= dash_empty_card **@presenter.rank_empty(hint: "The score starts with the first check in the range. Try a longer date range.") %>
   <% else %>
     <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
 
@@ -61,16 +59,13 @@
             <tr>
               <td><div class="t-main"><%= seo_link(row.query, @presenter.tracked_path(row)) %></div></td>
               <% if @presenter.places? %>
-                <td><%= seo_label(AhoyDashboard::Serp::Location.parse(row.location).label) %></td>
+                <td><%= seo_label(@presenter.place_label(row)) %></td>
               <% end %>
               <td class="num seo-pos"><%= row.position %></td>
               <td class="num t2"><%= @presenter.percent(row.ctr, places: 1) %></td>
               <td class="num"><%= row.points.round(2) %></td>
               <td>
-                <div class="seo-figure">
-                  <%= tag.span(class: "seo-meter", **seo_bar(@presenter.contribution(row))) %>
-                  <span class="seo-figure__pct"><%= @presenter.percent(@presenter.contribution(row)) %></span>
-                </div>
+                <%= seo_figure(@presenter.contribution(row), @presenter.percent(@presenter.contribution(row))) %>
               </td>
             </tr>
           <% end %>
@@ -92,7 +87,7 @@
           <% @presenter.dead.each do |row| %>
             <%= link_to @presenter.tracked_path(row), class: "seo-chip", title: row.query, data: { tm_frame: "_top" } do %>
               <span class="nm"><%= row.query %></span>
-              <% if @presenter.places? %><span class="seo-chip__n"><%= AhoyDashboard::Serp::Location.parse(row.location).label %></span><% end %>
+              <% if @presenter.places? %><span class="seo-chip__n"><%= @presenter.place_label(row) %></span><% end %>
             <% end %>
           <% end %>
         </div>

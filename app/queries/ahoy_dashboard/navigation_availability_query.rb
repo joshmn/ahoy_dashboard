@@ -31,7 +31,7 @@ module AhoyDashboard
       if Installation.installed?(:serp)
         found[:checks] = SerpCheck.all
         found[:results] = SerpResult.all
-        found[:run_pages] = SerpRunPage.where(status: SerpRunPage.statuses.fetch("success")).where.not(response: nil)
+        found[:run_pages] = SerpRunPage.success.where.not(response: nil)
         found[:rivals] = SerpSite.offset(1)
       end
       found[:ideas] = KeywordIdea.all if Installation.installed?(:keywords)

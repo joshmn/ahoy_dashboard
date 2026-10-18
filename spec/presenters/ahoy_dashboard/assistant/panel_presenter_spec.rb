@@ -12,19 +12,19 @@ RSpec.describe AhoyDashboard::Assistant::PanelPresenter do
   end
 
   it "is about the screen a conversation was started from once it holds one" do
-    chat = AhoyDashboard::Chat.create!(context: { "path" => "/telemetry/rankings", "screen" => "rankings" })
+    chat = create(:dash_chat, context: { "path" => "/telemetry/rankings", "screen" => "rankings" })
 
     expect(panel(chat: chat).about).to eq("Rankings")
   end
 
   it "carries the view, the screen and the conversation in its links" do
-    chat = AhoyDashboard::Chat.create!
+    chat = create(:dash_chat)
 
     expect(panel(chat: chat).params).to eq(period: "7d", page: "/telemetry/explore?period=7d", chat_id: chat.id)
   end
 
   it "starts over with everything but the conversation" do
-    chat = AhoyDashboard::Chat.create!
+    chat = create(:dash_chat)
 
     expect(panel(chat: chat).fresh_params).to eq(period: "7d", page: "/telemetry/explore?period=7d")
     expect(panel.params).to eq(panel.fresh_params)

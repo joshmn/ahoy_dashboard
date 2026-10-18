@@ -1,26 +1,8 @@
 import { Controller } from "../runtime/controllers.js"
-
-// The keyword forms: what gets checked, and what it costs, kept in step with
-// what is on the form.
-//
-// One controller for three screens — track one, import a list, track a batch —
-// because they are the same decision at three sizes and the arithmetic behind
-// the number in the corner is the same on all of them.
-//
-// A place row is read by the name of its fields rather than by its tag, because
-// the same row is a country select beside a typed city when there is no place
-// list to pick from, and two hidden fields behind a picker when there is.
+import { counted, plural, sentence } from "../runtime/text.js"
 
 const COUNTRY = '[name$="[place_countries][]"]'
 const CITY = '[name$="[place_cities][]"]'
-
-const sentence = (items) => {
-  if (items.length < 3) return items.join(" and ")
-
-  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`
-}
-
-const counted = (number, one, many) => `${number.toLocaleString("en-US")} ${number === 1 ? one : many}`
 
 const leaf = (name) => name.split(",")[0].trim()
 
@@ -40,10 +22,6 @@ export default class extends Controller {
     this.refresh()
   }
 
-  // Adding a place starts one level up from the last one. Somebody who picked
-  // Chicago almost always wants another city in Illinois next, and somebody who
-  // picked Illinois wants another state. Starting from the top again every time
-  // is four clicks back to where they already were.
   addPlace() {
     const next = this.placeTargets.find((row) => row.hidden)
     if (!next) return
@@ -131,7 +109,7 @@ export default class extends Controller {
     if (this.hasDeviceTarget) this.deviceTarget.textContent = this.labelFor(this.checked("device"))
     if (this.hasOftenTarget) this.oftenTarget.textContent = `${this.labelFor(frequency)}, ${this.labelFor(pages).toLowerCase()}`
     if (this.hasMonthlyTarget) this.monthlyTarget.textContent = monthly.toLocaleString("en-US")
-    if (this.hasMonthlyNounTarget) this.monthlyNounTarget.textContent = `${monthly === 1 ? "search" : "searches"} a month`
+    if (this.hasMonthlyNounTarget) this.monthlyNounTarget.textContent = `${plural(monthly, "search", "searches")} a month`
     if (this.hasPerCheckTarget) this.perCheckTarget.textContent = counted(perCheck, "search", "searches")
     if (this.hasChecksTarget) this.checksTarget.textContent = counted(checks, "check", "checks")
 
@@ -158,9 +136,6 @@ export default class extends Controller {
     if (this.hasOverTarget && this.hasRemainingValue) this.overTarget.hidden = monthly * count <= this.remainingValue
   }
 
-  // Ticked and pasted are one list, not two. The same keyword in both is one
-  // keyword, which is what the server will make of it, so the number in the
-  // corner should not say two.
   get chosen() {
     const seen = new Set()
 

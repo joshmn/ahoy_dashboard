@@ -1,13 +1,10 @@
 module AhoyDashboard
   module Settings
-    class AnnotationsController < AhoyDashboard::BaseController
+    class AnnotationsController < AhoyDashboard::Settings::BaseController
       before_action :set_record, only: [ :edit, :update, :destroy ]
 
       def index
         @records = AhoyDashboard::AnnotationDecorator.wrap(AhoyDashboard::Annotation.listed)
-        # Deleting asks in the row rather than in a dialog, so the thing being
-        # deleted stays on screen while the question is answered.
-        @confirming = params[:confirm].presence
       end
 
       def new
@@ -17,10 +14,9 @@ module AhoyDashboard
       def create
         @form = AhoyDashboard::AnnotationForm.new(record_params)
 
-        AhoyDashboard::Annotations::CreateCommand.call(form: @form) do
+        AhoyDashboard::Records::SaveCommand.call(record: AhoyDashboard::Annotation.new, form: @form) do
           on(:ok) { redirect_to settings_annotations_path, notice: "Annotation added." }
           on(:invalid) { |form| rejected(form, :new) }
-          on(:duplicate) { |form| rejected(form, :new) }
         end
       end
 
@@ -31,15 +27,14 @@ module AhoyDashboard
       def update
         @form = AhoyDashboard::AnnotationForm.new(record_params)
 
-        AhoyDashboard::Annotations::UpdateCommand.call(record: @record, form: @form) do
+        AhoyDashboard::Records::SaveCommand.call(record: @record, form: @form) do
           on(:ok) { redirect_to settings_annotations_path, notice: "Annotation saved." }
-          on(:invalid) { |form| rejected(form, :edit) }
-          on(:duplicate) { |form| rejected(form, :edit) }
+          on(:invalid) { |form| rejected(form) }
         end
       end
 
       def destroy
-        AhoyDashboard::Annotations::DestroyCommand.call(record: @record) do
+        AhoyDashboard::Records::DestroyCommand.call(record: @record) do
           on(:ok) { redirect_to settings_annotations_path, notice: "Annotation deleted." }
         end
       end
@@ -48,11 +43,6 @@ module AhoyDashboard
 
       def set_record
         @record = AhoyDashboard::Annotation.find(params[:id])
-      end
-
-      def rejected(form, template)
-        @form = form
-        render template, status: :unprocessable_entity
       end
 
       def record_params

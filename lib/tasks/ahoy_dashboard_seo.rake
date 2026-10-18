@@ -1,15 +1,8 @@
 namespace :ahoy_dashboard do
-  not_installed = lambda do |name|
-    feature = AhoyDashboard::Installation.fetch(name)
-    next false if feature.installed?
-
-    puts "#{feature.label.downcase} is not installed. #{AhoyDashboard::Schedule.install_steps([ name ])}"
-    true
-  end
-
   desc "fetch keyword ideas for a seed phrase"
   task :keywords, [ :seed, :refresh ] => :environment do |_task, args|
-    next if not_installed.call(:keywords)
+    feature = AhoyDashboard::FeatureState.for(:keywords)
+    next puts(feature.terminal_line) unless feature.installed?
 
     abort "give it a seed: rails ahoy_dashboard:keywords[federal prison]" if args[:seed].blank?
 
@@ -30,7 +23,8 @@ namespace :ahoy_dashboard do
 
   desc "pull the backlink profile and reconcile it"
   task backlinks: :environment do
-    next if not_installed.call(:backlinks)
+    feature = AhoyDashboard::FeatureState.for(:backlinks)
+    next puts(feature.terminal_line) unless feature.installed?
 
     AhoyDashboard::Backlinks::SyncCommand.call do
       on(:ok) { |outcome| puts "#{outcome.domains} domains, #{outcome.gained} new, #{outcome.lost} gone, #{outcome.returned} back" }
@@ -46,7 +40,8 @@ namespace :ahoy_dashboard do
 
   desc "evaluate every alert rule that is switched on"
   task alerts: :environment do
-    next if not_installed.call(:alerts)
+    feature = AhoyDashboard::FeatureState.for(:alerts)
+    next puts(feature.terminal_line) unless feature.installed?
 
     AhoyDashboard::Alerts::Rules::InstallCommand.call
 
@@ -62,7 +57,8 @@ namespace :ahoy_dashboard do
 
   desc "install the alert rules, all switched off"
   task alert_rules: :environment do
-    next if not_installed.call(:alerts)
+    feature = AhoyDashboard::FeatureState.for(:alerts)
+    next puts(feature.terminal_line) unless feature.installed?
 
     AhoyDashboard::Alerts::Rules::InstallCommand.call
 

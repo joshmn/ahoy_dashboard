@@ -2,53 +2,49 @@
 <% content_for :dash_settings_section, "emails" %>
 <% periods = AhoyDashboard::EmailSettingsForm::PERIODS %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Emails",
-          lede: "Who gets the alert and traffic emails, and how often. Each one goes out the morning after its period ends." %>
+<%= dash_page_head title: "Emails",
+      lede: "Who gets the alert and traffic emails, and how often. Each one goes out the morning after its period ends." %>
 
-    <%= dash_form_with model: @form, scope: :emails, url: settings_emails_path, method: :patch do |form| %>
-      <%= form.error_summary %>
+<%= dash_form_with model: @form, scope: :emails, url: settings_emails_path, method: :patch do |form| %>
+  <%= form.error_summary %>
 
-      <%= dash_card element: :section, id: "alert-emails", aria: { labelledby: "alert-emails-title" } do %>
-        <%= dash_card_header "Alert emails", id: "alert-emails-title" do %>
-          <span class="g-hint">Every alert that fired in the period</span>
-        <% end %>
-
-        <div class="p-3 d-flex flex-column gap-3">
-          <%= render "ahoy_dashboard/settings/shared/feature_line", name: :alerts %>
-          <%= form.check_boxes :alerts_digest, periods, :first, :last, label: "How often",
-                hint: "Pick none to send no alert emails. Alerts still show on the dashboard either way." %>
-          <%= form.text_area :alerts_recipients, label: "Send to", rows: 3, mono: true,
-                spellcheck: false, autocapitalize: "none",
-                hint: "One address per line, or separated by commas." %>
-          <%= form.text_field :alerts_from, label: "Send from", optional: true, mono: true,
-                autocomplete: "off", spellcheck: false, autocapitalize: "none",
-                hint: "Like alerts@example.com or Alerts <alerts@example.com>. Leave it blank to use your app's usual sender." %>
-          <%= form.check :alerts_send_empty, label: "Send even when nothing fired",
-                hint: "An email that says nothing fired, so you can tell the emails still work." %>
-        </div>
-      <% end %>
-
-      <%= dash_card element: :section, id: "traffic-emails", aria: { labelledby: "traffic-emails-title" } do %>
-        <%= dash_card_header "Traffic emails", id: "traffic-emails-title" do %>
-          <span class="g-hint">The numbers for the period, whether or not anything changed</span>
-        <% end %>
-
-        <div class="p-3 d-flex flex-column gap-3">
-          <%= render "ahoy_dashboard/settings/shared/feature_line", name: :reports %>
-          <%= form.check_boxes :reports_digest, periods, :first, :last, label: "How often",
-                hint: "Pick none to send no traffic emails." %>
-          <%= form.text_area :reports_recipients, label: "Send to", rows: 3, mono: true,
-                spellcheck: false, autocapitalize: "none",
-                hint: "One address per line, or separated by commas." %>
-          <%= form.text_field :reports_from, label: "Send from", optional: true, mono: true,
-                autocomplete: "off", spellcheck: false, autocapitalize: "none",
-                hint: "Like reports@example.com or Reports <reports@example.com>. Leave it blank to use your app's usual sender." %>
-        </div>
-      <% end %>
-
-      <%= form.actions "Save" %>
+  <%= dash_card element: :section, id: "alert-emails", aria: { labelledby: "alert-emails-title" } do %>
+    <%= dash_card_header "Alert emails", id: "alert-emails-title" do %>
+      <span class="g-hint">Every alert that fired in the period</span>
     <% end %>
-  </section>
-</div>
+
+    <div class="p-3 d-flex flex-column gap-3">
+      <%= render "ahoy_dashboard/settings/shared/feature_line", name: :alerts %>
+      <%= form.check_boxes :alerts_digest, periods, :first, :last, label: "How often",
+            hint: "Pick none to send no alert emails. Alerts still show on the dashboard either way." %>
+      <%= form.text_area :alerts_recipients, label: "Send to", rows: 3, mono: true,
+            spellcheck: false, autocapitalize: "none",
+            hint: "One address per line, or separated by commas." %>
+      <%= form.text_field :alerts_from, label: "Send from", optional: true, mono: true,
+            autocomplete: "off", spellcheck: false, autocapitalize: "none",
+            hint: "Like alerts@example.com or Alerts <alerts@example.com>. Leave it blank to use your app's usual sender." %>
+      <%= form.check :alerts_send_empty, label: "Send even when nothing fired",
+            hint: "An email that says nothing fired, so you can tell the emails still work." %>
+    </div>
+  <% end %>
+
+  <%= dash_card element: :section, id: "traffic-emails", aria: { labelledby: "traffic-emails-title" } do %>
+    <%= dash_card_header "Traffic emails", id: "traffic-emails-title" do %>
+      <span class="g-hint">The numbers for the period, whether or not anything changed</span>
+    <% end %>
+
+    <div class="p-3 d-flex flex-column gap-3">
+      <%= render "ahoy_dashboard/settings/shared/feature_line", name: :reports %>
+      <%= form.check_boxes :reports_digest, periods, :first, :last, label: "How often",
+            hint: "Pick none to send no traffic emails." %>
+      <%= form.text_area :reports_recipients, label: "Send to", rows: 3, mono: true,
+            spellcheck: false, autocapitalize: "none",
+            hint: "One address per line, or separated by commas." %>
+      <%= form.text_field :reports_from, label: "Send from", optional: true, mono: true,
+            autocomplete: "off", spellcheck: false, autocapitalize: "none",
+            hint: "Like reports@example.com or Reports <reports@example.com>. Leave it blank to use your app's usual sender." %>
+    </div>
+  <% end %>
+
+  <%= form.actions "Save" %>
+<% end %>

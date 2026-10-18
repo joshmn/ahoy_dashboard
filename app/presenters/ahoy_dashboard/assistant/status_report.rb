@@ -39,14 +39,12 @@ module AhoyDashboard
         Assistant.tool_classes.map do |tool|
           next "tool #{tool.tool_name}: #{tool.label}" if tool.available?
 
-          feature = Installation.fetch(tool.feature)
-          "tool #{tool.tool_name}: #{tool.label}, not offered because #{feature.label.downcase} is not installed. " \
-            "#{Schedule.install_steps([ feature.name ])}"
+          "tool #{tool.tool_name}: #{tool.label}, not offered because #{FeatureState.for(tool.feature).terminal_line}"
         end
       end
 
       def not_installed
-        "the assistant is not installed. #{Schedule.install_steps([ :assistant ])}"
+        FeatureState.for(:assistant).terminal_line
       end
 
       def stored
@@ -64,7 +62,7 @@ module AhoyDashboard
         return [ "next: switch the assistant on under settings, features" ] unless Assistant.enabled?
         return [ "next: name a model on settings, assistant" ] if Assistant.model_name.blank?
 
-        [ "next: save a key for #{Assistant.settings[:label]} on settings, assistant" ]
+        [ "next: save a key for #{Assistant.settings.label} on settings, assistant" ]
       end
 
       def last_error

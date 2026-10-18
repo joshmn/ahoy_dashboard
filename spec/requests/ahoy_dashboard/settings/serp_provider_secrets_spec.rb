@@ -1,23 +1,20 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard search provider credential removal", type: :request do
-  include SerpFixtures
-
-  describe "gating" do
-    it "is a 404 for a signed in visitor who is not an admin, and keeps the key" do
-      create(:dash_serp_provider, :serpapi)
-      sign_in create(:user)
-
-      delete "/telemetry/settings/serp_providers/serpapi/secrets/api_key"
-
-      expect(response).to have_http_status(:not_found)
-      expect(AhoyDashboard::SerpProvider.for("serpapi").credential(:api_key)).to eq("stored-key")
-    end
+  def store_secret
+    create(:dash_serp_provider, :serpapi, :active)
   end
 
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
+
+    include_examples "a stored secret removal",
+                     secret_path: "/telemetry/settings/serp_providers/serpapi/secrets/api_key",
+                     confirm_path: "/telemetry/settings/serp_providers/serpapi/edit?remove=api_key",
+                     edit_path: "/telemetry/settings/serp_providers/serpapi/edit",
+                     word: "key", nothing: "There was no SerpApi API key stored.", model: AhoyDashboard::SerpProvider,
+                     unknown: { "a provider nobody registered" => "/telemetry/settings/serp_providers/google/secrets/api_key" }
+
 
     it "offers Remove beside each stored credential and only those" do
       create(:dash_serp_provider, name: "dataforseo", credentials: { login: "me@example.com" })
@@ -30,6 +27,21 @@ RSpec.describe "Dashboard search provider credential removal", type: :request do
       expect(document.at_css("a[aria-label='Remove the stored DataForSEO password']")).to be_nil
     end
 
+    it "posts each credential under credentials, as a password box that never shows what is stored" do
+      create(:dash_serp_provider, name: "dataforseo", credentials: { login: "me@example.com" })
+
+      get "/telemetry/settings/serp_providers/dataforseo/edit"
+
+      document = Nokogiri::HTML5(response.body)
+      login = document.at_css("input#serp_provider_credentials_login")
+      expect(login.attributes.slice("type", "name", "autocomplete").transform_values(&:value))
+        .to eq("type" => "password", "name" => "serp_provider[credentials][login]", "autocomplete" => "off")
+      expect(login["value"]).to be_nil
+      expect(document.at_css("label[for='serp_provider_credentials_login']")).to be_present
+      expect(document.at_css("#serp_provider_login_hint").text).to eq(AhoyDashboard::Settings::StoredSecretPresenter::STORED_HINT)
+      expect(document.at_css("#serp_provider_password_hint").text).to eq(AhoyDashboard::Settings::StoredSecretPresenter::MISSING_HINT)
+    end
+
     it "asks first, naming everything that runs through the active provider" do
       create(:dash_serp_provider, :serpapi, :active)
       allow(AhoyDashboard::Keywords).to receive_messages(enabled?: true, provider: :serpapi)
@@ -37,16 +49,8 @@ RSpec.describe "Dashboard search provider credential removal", type: :request do
 
       get "/telemetry/settings/serp_providers/serpapi/edit", params: { remove: "api_key" }
 
-      expect(Nokogiri::HTML5(response.body).at_css("#remove-secret").text)
+      expect(document.at_css("#remove-secret").text)
         .to include("Remove the stored SerpApi API key? Rank checks and keyword research stop until it is saved again.")
-    end
-
-    it "never offers a key from anywhere else to take over" do
-      create(:dash_serp_provider, :serpapi, :active)
-
-      get "/telemetry/settings/serp_providers/serpapi/edit", params: { remove: "api_key" }
-
-      expect(response.body).not_to include("initializer", "used instead")
     end
 
     it "names keyword research on a provider that is not the active one but still runs it" do
@@ -57,7 +61,7 @@ RSpec.describe "Dashboard search provider credential removal", type: :request do
 
       get "/telemetry/settings/serp_providers/dataforseo/edit", params: { remove: "password" }
 
-      expect(Nokogiri::HTML5(response.body).at_css("#remove-secret").text)
+      expect(document.at_css("#remove-secret").text)
         .to include("Remove the stored DataForSEO password? Keyword research stops until it is saved again.")
     end
 
@@ -93,22 +97,10 @@ RSpec.describe "Dashboard search provider credential removal", type: :request do
       expect(response.body).to include("Nothing stored.")
     end
 
-    it "says there was nothing to remove" do
-      delete "/telemetry/settings/serp_providers/serpapi/secrets/api_key"
-
-      expect(flash[:alert]).to eq("There was no SerpApi API key stored.")
-    end
-
     it "is a 404 for a key the adapter does not take" do
       create(:dash_serp_provider, :serpapi)
 
       delete "/telemetry/settings/serp_providers/serpapi/secrets/password"
-
-      expect(response).to have_http_status(:not_found)
-    end
-
-    it "is a 404 for a provider nobody registered" do
-      delete "/telemetry/settings/serp_providers/google/secrets/api_key"
 
       expect(response).to have_http_status(:not_found)
     end

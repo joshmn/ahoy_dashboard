@@ -1,8 +1,13 @@
 module AhoyDashboard
   class AssistantProvider < AhoyDashboard::Record
-    NAMES = Assistant::READERS.keys.freeze
+    include StoredCredentials
+    include LastError
 
-    validates :name, presence: true, inclusion: { in: NAMES }, uniqueness: true
+    CREDENTIALS_SALT = SecretBox::ASSISTANT_SALT
+    NAMES = Assistant::READERS.keys.freeze
+    STORED_NAMES = (NAMES + Assistant::LEGACY_READERS.keys).freeze
+
+    validates :name, presence: true, inclusion: { in: STORED_NAMES }, uniqueness: true
 
     normalizes :model, :api_base, with: ->(value) { value.to_s.strip.presence }
 
@@ -16,31 +21,13 @@ module AhoyDashboard
     end
 
     def self.for(name)
-      find_by(name: name.to_s)
+      names = Assistant.stored_names(name)
+
+      where(name: names).min_by { |provider| names.index(provider.name) }
     end
 
     def reader
-      Assistant::READERS.fetch(name) { {} }
-    end
-
-    def provider
-      reader[:provider]
-    end
-
-    def local?
-      reader[:local].present?
-    end
-
-    def credentials
-      SecretBox.read_values(value: self[:credentials], salt: SecretBox::ASSISTANT_SALT)
-    end
-
-    def credentials=(values)
-      self[:credentials] = SecretBox.write_values(values: values, salt: SecretBox::ASSISTANT_SALT)
-    end
-
-    def credential(key)
-      credentials[key.to_sym]
+      Assistant.reader_for(name)
     end
 
     def api_key
@@ -48,25 +35,11 @@ module AhoyDashboard
     end
 
     def model_name
-      model.presence || reader[:default_model]
+      model.presence || reader.default_model
     end
 
     def endpoint
-      api_base.presence || reader[:api_base]
-    end
-
-    def ready?
-      local? || api_key.present?
-    end
-
-    def record_error!(message)
-      update_columns(last_error: message.to_s.first(255), last_error_at: Time.current)
-    end
-
-    def clear_error!
-      return if last_error.blank?
-
-      update_columns(last_error: nil, last_error_at: nil)
+      api_base.presence || reader.api_base
     end
 
     def activate!

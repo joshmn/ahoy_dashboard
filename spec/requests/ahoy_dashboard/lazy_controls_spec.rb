@@ -1,11 +1,8 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard controls loaded when opened", type: :request do
-  let(:document) { Nokogiri::HTML5(response.body) }
-
   before { sign_in(create(:user, :admin)) }
 
   it "omits the hidden command list and dimension rail from the initial page" do
@@ -24,22 +21,21 @@ RSpec.describe "Dashboard controls loaded when opened", type: :request do
 
   it "offers the commands as a normal page from the header search link" do
     get("/telemetry", params: { period: "7d" })
-    href = Nokogiri::HTML5(response.body).at_css("a.search-btn")["href"]
+    href = document.at_css("a.search-btn")["href"]
     get(href)
 
     expect(document.css("nav[aria-label='Dashboard commands'] a").map { |link| link.text.strip }).to include("Dashboard", "Total pageviews")
   end
 
   it "keeps chart commands within the engine mount when loaded separately" do
-    get("/telemetry/palette", params: { controls: "chart" }, headers: { "Tm-Frame" => "tm-palette-commands" })
+    get_frame("/telemetry/palette", "tm-palette-commands", params: { controls: "chart" })
 
     expect(document.css("a.ck-item").map { |link| link["href"] }).to all(start_with("/telemetry"))
   end
 
   it "keeps chart controls out of unrelated pages" do
     get("/telemetry/settings/goals")
-    href = Nokogiri::HTML5(response.body).at_css("#tm-palette")["data-commands-url"]
-    get(href, headers: { "Tm-Frame" => "tm-palette-commands" })
+    open_palette
 
     expect(document.css(".ck-g").map(&:text)).not_to include("Group by", "Compare to")
   end
@@ -48,10 +44,9 @@ RSpec.describe "Dashboard controls loaded when opened", type: :request do
     get("/telemetry/explore", params: { dimension: "browser", columns: "visitors,pageviews", period: "7d",
       filters: [{ dimension: "country", operator: "is", value: "CA", group: 0 },
         { dimension: "country", operator: "is", value: "US", group: 0 }] })
-    href = Nokogiri::HTML5(response.body).at_css("#tm-filter-modal")["data-dash--filter-modal-contents-value"]
-    get(href, headers: { "Tm-Frame" => "tm-filter-controls" })
+    open_filter_dialog
     dialog = document.at_css("#tm-filter-modal")
-    params = Rack::Utils.parse_nested_query(URI.parse(dialog["data-dash--filter-modal-apply-value"]).query)
+    params = link_query(dialog["data-dash--filter-modal-apply-value"])
     tokens = JSON.parse(dialog["data-dash--filter-modal-tokens-value"])
 
     expect([params.values_at("dimension", "columns", "period"), tokens.first.fetch("filters").map { |filter| filter["value"] }])
@@ -60,7 +55,7 @@ RSpec.describe "Dashboard controls loaded when opened", type: :request do
 
   it "keeps the filter link usable as a page without JavaScript" do
     get("/telemetry", params: { period: "7d" })
-    href = Nokogiri::HTML5(response.body).at_css("#tm-filter-button")["href"]
+    href = document.at_css("#tm-filter-button")["href"]
     get(href)
 
     expect(document.css("nav[aria-label='Dimensions'] [data-dimension]").map { |link| link["data-dimension"] })
@@ -83,28 +78,11 @@ RSpec.describe "Dashboard controls loaded when opened", type: :request do
 
   ["palette", "filter_dialog"].each do |control|
     it "does not aggregate analytics to open #{control}" do
-      queries = []
-      subscriber = ->(*args) { queries << args.last.fetch(:sql) }
-      ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
-        get("/telemetry/#{control}", headers: { "Tm-Frame" => "tm-control" })
+      queries = captured_sql(/(?:FROM|JOIN) [\"]?ahoy_(?:visits|events)/i, cached: true) do
+        get_frame("/telemetry/#{control}", "tm-control")
       end
 
-      expect(queries.grep(/(?:FROM|JOIN) [\"]?ahoy_(?:visits|events)/i)).to be_empty
-    end
-
-    it "requires authorization before returning #{control}" do
-      sign_out(:user)
-      get("/telemetry/#{control}", headers: { "Tm-Frame" => "tm-control" })
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "refuses #{control} to signed-in non-administrators" do
-      sign_out(:user)
-      sign_in(create(:user))
-      get("/telemetry/#{control}", headers: { "Tm-Frame" => "tm-control" })
-
-      expect(response).to have_http_status(:not_found)
+      expect(queries).to be_empty
     end
   end
 end

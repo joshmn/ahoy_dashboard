@@ -4,9 +4,7 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter %>
 
   <% if !@presenter.any? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.rank_empty %>
-    <% end %>
+    <%= dash_empty_card **@presenter.rank_empty %>
   <% else %>
     <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
 
@@ -37,7 +35,7 @@
             <% @presenter.pages.each do |page| %>
               <tr>
                 <td>
-                  <div class="t-main"><%= seo_page_link(@presenter.path_of(page.url)) %></div>
+                  <div class="t-main"><%= seo_page_link(page.url) %></div>
                   <%= dash_disclosure "#{@presenter.searches_label(page)} held", less: "Hide searches" do %>
                     <ul class="list-unstyled mb-0 mt-1 small">
                       <% page.held.each do |held| %>
@@ -54,10 +52,7 @@
                 <td class="num seo-pos"><%= page.best %></td>
                 <td class="num"><%= page.median %></td>
                 <td>
-                  <div class="seo-figure">
-                    <%= tag.span(class: "seo-meter", **seo_bar(page.share)) %>
-                    <span class="seo-figure__pct"><%= @presenter.share_label(page) %></span>
-                  </div>
+                  <%= seo_figure(page.share, @presenter.share_label(page)) %>
                 </td>
               </tr>
             <% end %>
@@ -80,7 +75,7 @@
 
         <% @presenter.lost.each do |page| %>
           <div class="px-3 pt-3">
-            <div class="t-main"><%= seo_page_link(@presenter.path_of(page.url)) %></div>
+            <div class="t-main"><%= seo_page_link(page.url) %></div>
           </div>
 
           <%= dash_table label: "Searches #{@presenter.path_of(page.url)} lost", cols: @presenter.lost_cols do %>

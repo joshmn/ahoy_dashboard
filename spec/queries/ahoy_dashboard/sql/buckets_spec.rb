@@ -1,9 +1,5 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
-# This replaced groupdate, so it is held to the two things that were the reason
-# not to replace it: a day is not always 24 hours, and a dashboard week does not
-# start where Postgres thinks it does.
 RSpec.describe AhoyDashboard::Sql::Buckets do
   before { AhoyDashboard::Preferences.write(:site, time_zone: "America/Chicago") }
 
@@ -26,7 +22,6 @@ RSpec.describe AhoyDashboard::Sql::Buckets do
   end
 
   describe "the series across a clock change" do
-    # 2026-03-08 loses an hour at 2am, 2026-11-01 gains one back.
     it "gives a short day 23 hours and a long day 25" do
       forward = zone.local(2026, 3, 8)
       back = zone.local(2026, 11, 1)
@@ -53,10 +48,7 @@ RSpec.describe AhoyDashboard::Sql::Buckets do
   end
 
   describe "where a week starts" do
-    # Postgres truncates a week to Monday. This one starts Sunday, and getting
-    # it wrong shifts every weekly chart by a day without erroring.
     it "starts the bucket on the Sunday on or before the range" do
-      # 2026-08-12 is a Wednesday.
       first = series(zone.local(2026, 8, 12)..zone.local(2026, 8, 20), :week).first
 
       expect(first).to eq(zone.local(2026, 8, 9))
@@ -83,8 +75,6 @@ RSpec.describe AhoyDashboard::Sql::Buckets do
       expect(counted(range, :day).keys).to eq([ zone.local(2026, 3, 8) ])
     end
 
-    # The hour either side of a spring forward is a different bucket, and the
-    # hour that does not exist locally is not one at all.
     it "separates the hours either side of a clock change" do
       range = zone.local(2026, 3, 8)..zone.local(2026, 3, 8).end_of_day
       dash_visit(started_at: zone.local(2026, 3, 8, 1, 30), visitor: "before")
@@ -97,7 +87,6 @@ RSpec.describe AhoyDashboard::Sql::Buckets do
     end
 
     it "reads the boundary in the dashboard's zone, not in utc" do
-      # 23:30 local on 10 August is 04:30 UTC on the 11th.
       range = zone.local(2026, 8, 10)..zone.local(2026, 8, 10).end_of_day
       dash_visit(started_at: zone.local(2026, 8, 10, 23, 30), visitor: "late")
 

@@ -75,11 +75,8 @@ module AhoyDashboard
           PROMPT
         end
 
-        # page is the screen the question was asked from, when it was asked from the
-        # panel rather than from the Ask screen. Everything else in this prompt is
-        # the same in both places.
         def notes(page: nil)
-          today = Date.current.in_time_zone(AhoyDashboard.time_zone).to_date
+          today = Time.current.in_time_zone(AhoyDashboard.time_zone).to_date
 
           [
             "Today is #{today.strftime("%A, %B %-d, %Y")}. Everything here is cut in " \
@@ -112,10 +109,6 @@ module AhoyDashboard
           []
         end
 
-        # Where they are, when the question came from the panel on a page rather
-        # than from the Ask screen. It fixes what "this" refers to and nothing
-        # else: the window on the screen is where to start, not a rule, because
-        # somebody looking at a week can still ask about the year.
         def looking_at(page)
           return "" if page.blank?
 
@@ -126,10 +119,8 @@ module AhoyDashboard
           PART
         end
 
-        # Monday to Sunday, the week that finished, so "last week" is one thing
-        # rather than whatever seven days the model felt like counting back.
         def week_before(today)
-          monday = today.beginning_of_week - 1.week
+          monday = today.beginning_of_week(:monday) - 1.week
 
           "from #{monday.strftime("%Y-%m-%d")} to #{(monday + 6).strftime("%Y-%m-%d")}"
         end

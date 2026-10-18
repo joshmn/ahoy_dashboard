@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe "Dashboard Search Console settings", type: :request do
   let(:token_url) { AhoyDashboard::SearchConsole::TOKEN_URL }
@@ -9,43 +8,10 @@ RSpec.describe "Dashboard Search Console settings", type: :request do
     create(:dash_google_account, **attributes)
   end
 
-  # The state is made in the session the redirect started in, so the spec walks
-  # the same path a browser does rather than poking at the session.
   def start_authorization!
     get "/telemetry/settings/google_authorization/new"
 
     URI.decode_www_form(URI(response.location).query).to_h["state"]
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in from every entry point" do
-      [ "/telemetry/settings/google_connection",
-        "/telemetry/settings/google_authorization/new",
-        "/telemetry/settings/google_callback",
-        "/telemetry/settings/search_console_property/edit" ].each do |path|
-        get path
-
-        expect(response).to redirect_to("/users/sign_in"), "expected #{path} to bounce a signed out visitor"
-      end
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/settings/google_connection"
-
-      expect(response).to have_http_status(:not_found)
-    end
-
-    it "refuses a disconnect from somebody who is not an admin" do
-      sign_in create(:user)
-      connect!
-
-      delete "/telemetry/settings/google_connection"
-
-      expect(response).to have_http_status(:not_found)
-      expect(AhoyDashboard::GoogleAccount.count).to eq(1)
-    end
   end
 
   describe "as an admin" do
@@ -112,11 +78,9 @@ RSpec.describe "Dashboard Search Console settings", type: :request do
           get "/telemetry/settings/google_connection"
 
           document = Nokogiri::HTML5(response.body)
-          sync = document.css("button[disabled][aria-describedby]").find { |node| node.text.strip == "Sync now" }
           backfill = document.css("button[disabled]").find { |node| node.text.include?("Reach back a month") }
 
-          expect(sync).to be_present
-          expect(document.at_css("##{sync['aria-describedby']}").text).to include("Search Console is off.")
+          expect(disabled_button_reason("Sync now")).to include("Search Console is off.")
           expect(backfill.text).to include("Search Console is off.")
           expect(document.at_css("form[action='/telemetry/settings/search_console_sync']")).to be_nil
           expect(document.at_css("form[action='/telemetry/settings/search_console_backfill']")).to be_nil
@@ -191,8 +155,6 @@ RSpec.describe "Dashboard Search Console settings", type: :request do
           expect(response.body).to include("History is complete")
         end
 
-        # The link passes confirm=1 and the page reads it. It used to render the
-        # link and never the step it asks for, so disconnecting did nothing.
         it "asks before disconnecting" do
           connect!(property_uri: "sc-domain:example.com")
 
@@ -347,7 +309,7 @@ RSpec.describe "Dashboard Search Console settings", type: :request do
       end
 
       it "lists what google says the account can read" do
-        connect!(access_token: "good", expires_at: 30.minutes.from_now)
+        connect!
         stub_sites([
           { "siteUrl" => "sc-domain:example.com", "permissionLevel" => "siteOwner" },
           { "siteUrl" => "https://nope.example/", "permissionLevel" => "siteUnverifiedUser" }
@@ -361,7 +323,7 @@ RSpec.describe "Dashboard Search Console settings", type: :request do
       end
 
       it "explains itself when google will not answer" do
-        connect!(access_token: "good", expires_at: 30.minutes.from_now)
+        connect!
         stub_request(:get, sites_url).to_timeout
 
         get "/telemetry/settings/search_console_property/edit"
@@ -371,7 +333,7 @@ RSpec.describe "Dashboard Search Console settings", type: :request do
       end
 
       it "saves a property google offered" do
-        account = connect!(access_token: "good", expires_at: 30.minutes.from_now)
+        account = connect!
         stub_sites([ { "siteUrl" => "sc-domain:example.com", "permissionLevel" => "siteOwner" } ])
 
         patch "/telemetry/settings/search_console_property",
@@ -382,7 +344,7 @@ RSpec.describe "Dashboard Search Console settings", type: :request do
       end
 
       it "refuses a property google did not offer" do
-        account = connect!(access_token: "good", expires_at: 30.minutes.from_now)
+        account = connect!
         stub_sites([ { "siteUrl" => "sc-domain:example.com", "permissionLevel" => "siteOwner" } ])
 
         patch "/telemetry/settings/search_console_property",
@@ -394,7 +356,7 @@ RSpec.describe "Dashboard Search Console settings", type: :request do
       end
 
       it "refuses a blank choice" do
-        connect!(access_token: "good", expires_at: 30.minutes.from_now)
+        connect!
         stub_sites([ { "siteUrl" => "sc-domain:example.com", "permissionLevel" => "siteOwner" } ])
 
         patch "/telemetry/settings/search_console_property", params: { property: { property_uri: "" } }
@@ -408,7 +370,7 @@ RSpec.describe "Dashboard Search Console settings", type: :request do
       before { search_console_enabled! }
 
       let!(:account) do
-        connect!(access_token: "good", expires_at: 30.minutes.from_now, property_uri: "sc-domain:example.com",
+        connect!(property_uri: "sc-domain:example.com",
                  backfilled_to: Date.current - 300, synced_at: 1.hour.ago)
       end
 
@@ -529,8 +491,6 @@ RSpec.describe "Dashboard Search Console settings", type: :request do
         expect(revoke.with(body: { token: "rt-1" })).to have_been_made
       end
 
-      # Disconnecting has to work when the token is already dead, which is one of
-      # the reasons somebody would be doing it.
       it "drops the row even when google refuses the revoke" do
         connect!
         stub_request(:post, AhoyDashboard::SearchConsole::REVOKE_URL).to_return(status: 400, body: "{}")

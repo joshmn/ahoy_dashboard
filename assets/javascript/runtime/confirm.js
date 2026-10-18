@@ -10,20 +10,6 @@ const onClick = (event) => {
   event.stopImmediatePropagation()
 }
 
-const onSubmit = (event) => {
-  if (event.defaultPrevented) return
-
-  const form = event.target
-  if (!(form instanceof HTMLFormElement)) return
-
-  const asked = form.getAttribute("data-tm-confirm")
-  if (!asked || window.confirm(asked)) return
-
-  event.preventDefault()
-  event.stopImmediatePropagation()
-}
-
 export const start = () => {
   document.addEventListener("click", onClick)
-  document.addEventListener("submit", onSubmit)
 }

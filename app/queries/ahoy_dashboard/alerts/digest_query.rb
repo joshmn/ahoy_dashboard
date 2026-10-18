@@ -60,20 +60,14 @@ module AhoyDashboard
         site = AhoyDashboard::SerpSite.ours
         return 0 if site.nil?
 
-        AhoyDashboard::SerpCheck
-          .where(site_id: site.id, status: AhoyDashboard::SerpCheck.statuses[:success], checked_at: window.range)
+        AhoyDashboard::SerpCheck.success.where(site_id: site.id, checked_at: window.range)
           .distinct.count(Arel.sql("(keyword_id, location)"))
       end
 
       def invented(events)
-        ids = events.flat_map { |event| [ event.check_id, event.previous_check_id ] }.compact.uniq
-        return events.count(&:sample_data) if ids.empty? || !AhoyDashboard::Serp.installed?
+        return 0 if events.empty?
 
-        fake = AhoyDashboard::SerpCheck.joins(:run)
-          .where(id: ids, ahoy_dashboard_serp_runs: { provider: AhoyDashboard::Serp::Adapters::FakeAdapter.adapter_name })
-          .pluck(:id).to_set
-
-        events.count { |event| event.sample_data || fake.include?(event.check_id) || fake.include?(event.previous_check_id) }
+        AhoyDashboard::AlertEvent.from_sample_data.where(id: events.map(&:id)).count
       end
     end
   end

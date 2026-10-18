@@ -1,23 +1,8 @@
 module AhoyDashboard
   module Seo
-    # How much the results themselves are moving, for these searches rather than
-    # for the web. Every reading already stores the whole page it read, so a
-    # reading against the one before it is a free measurement of churn nobody is
-    # currently taking.
-    #
-    # This is worth more than a general volatility index because it is the
-    # neighbourhood the site actually lives in. A quiet week everywhere is no
-    # comfort if the twelve searches that matter here reshuffled.
-    #
-    # Two things are measured and they are not the same thing. Turnover is who is
-    # on the page at all. Shuffle is how far the survivors moved. A page can hold
-    # the same ten links and still be a different page.
     class VolatilityQuery
       DEPTH = 10
 
-      # A link that fell off the read entirely is treated as having moved this
-      # far rather than infinitely. Without a cap one disappearance from a ten
-      # result read pins the day at maximum and nothing else can be seen.
       DROP_DISTANCE = DEPTH
 
       TURNOVER_WEIGHT = 0.6
@@ -27,10 +12,9 @@ module AhoyDashboard
         [ 0, "Still" ], [ 12, "Normal" ], [ 25, "Choppy" ], [ 45, "Rough" ], [ 65, "Storm" ]
       ].freeze
 
-      Comparison = Data.define(:keyword, :query, :location, :on, :turnover, :shuffle, :score,
-                               :arrived, :left) do
-        def any_change?
-          score.positive?
+      Comparison = Data.define(:keyword, :location, :on, :turnover, :shuffle, :score, :arrived, :left) do
+        def query
+          keyword.query
         end
       end
 
@@ -99,16 +83,10 @@ module AhoyDashboard
         end
       end
 
-      # Consecutive readings of the same search in the same place. A search read
-      # once in the range has nothing to compare against and contributes nothing
-      # rather than contributing a zero, which would read as calm.
       def comparisons
         @comparisons ||= pages.flat_map do |(keyword_id, location), reads|
-          keyword = keywords[keyword_id]
-          next [] if keyword.nil?
-
           reads.sort_by(&:first).each_cons(2).map do |(_before_at, before), (after_at, after)|
-            compare(keyword, location, after_at, before, after)
+            compare(keywords[keyword_id], location, after_at, before, after)
           end
         end
       end
@@ -122,7 +100,7 @@ module AhoyDashboard
         displacement = displacement_for(before, after, held)
 
         Comparison.new(
-          keyword: keyword, query: keyword.query, location: location,
+          keyword: keyword, location: location,
           on: on.in_time_zone(time_zone).to_date,
           turnover: turnover, shuffle: shuffle,
           score: ((turnover * TURNOVER_WEIGHT) + (displacement * SHUFFLE_WEIGHT)) * 100,
@@ -140,8 +118,6 @@ module AhoyDashboard
         (moved.to_f / before.size) / DROP_DISTANCE
       end
 
-      # Mean movement of the links that stayed, over the furthest they could have
-      # moved, so a top ten read and a top twenty read are on the same scale.
       def shuffle_for(before, after, held)
         return 0.0 if held.empty?
 
@@ -150,13 +126,11 @@ module AhoyDashboard
         (moved.to_f / held.size) / DROP_DISTANCE
       end
 
-      # One hash of link to position per reading, keyed by search and place.
       def pages
         @pages ||= AhoyDashboard::SerpResult.joins(:run)
           .where("ahoy_dashboard_serp_results.position <= ?", depth)
           .where(ahoy_dashboard_serp_runs: { checked_at: range })
-          .where(ahoy_dashboard_serp_runs: { status: AhoyDashboard::SerpRun.statuses.values_at(:success, :partial) })
-          .merge(AhoyDashboard::SerpRun.for_tag(tag))
+          .merge(AhoyDashboard::SerpRun.usable.for_tag(tag).at_current_places)
           .group("ahoy_dashboard_serp_runs.keyword_id", "ahoy_dashboard_serp_runs.location",
                  "ahoy_dashboard_serp_runs.checked_at")
           .pluck(Arel.sql("ahoy_dashboard_serp_runs.keyword_id"), Arel.sql("ahoy_dashboard_serp_runs.location"),

@@ -10,10 +10,8 @@
   </div>
 
   <% if @presenter.empty? %>
-    <%= dash_card do %>
-      <%= dash_empty title: "No funnels yet", hint: "Create a funnel to see how visitors move through your goals.",
-            action: { label: "Create a funnel", url: new_settings_funnel_path } %>
-    <% end %>
+    <%= dash_empty_card title: "No funnels yet", hint: "Create a funnel to see how visitors move through your goals.",
+          action: { label: "Create a funnel", url: new_settings_funnel_path } %>
   <% else %>
     <div class="grid row" aria-label="Funnels">
       <%= render partial: "ahoy_dashboard/dashboards/funnel", collection: @presenter.funnel_presenters, as: :presenter %>

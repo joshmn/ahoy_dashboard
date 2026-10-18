@@ -3,8 +3,6 @@
 require "rails_helper"
 
 RSpec.describe "Applied filter edit dialogs", type: :request do
-  let(:document) { Nokogiri::HTML5(response.body) }
-
   before { sign_in(create(:user, :admin)) }
 
   def filter(dimension:, value:, group: nil)
@@ -28,8 +26,7 @@ RSpec.describe "Applied filter edit dialogs", type: :request do
   it "still offers new filters from every dimension group" do
     get("/telemetry")
 
-    path = Nokogiri::HTML5(response.body).at_css("#tm-filter-modal")["data-dash--filter-modal-contents-value"]
-    get(path, headers: { "Tm-Frame" => "tm-filter-controls" })
+    open_filter_dialog
 
     expect(document.css("#tm-filter-modal [data-dimension]").map { |link| link["data-dimension"] })
       .to include("page", "source", "country", "browser", "goal")
@@ -65,7 +62,7 @@ RSpec.describe "Applied filter edit dialogs", type: :request do
   it "opens the native edit form when a chip link is followed without JavaScript" do
     get("/telemetry", params: { filters: [filter(dimension: "country", value: "US")] })
     get(chip_links.first["href"])
-    form = Nokogiri::HTML5(response.body).at_css("form[data-controller~='dash--filter']")
+    form = document.at_css("form[data-controller~='dash--filter']")
 
     expect(form["data-dash--filter-editing-value"]).to eq("true")
   end

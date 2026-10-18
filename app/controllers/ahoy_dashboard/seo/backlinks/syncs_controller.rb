@@ -1,8 +1,6 @@
 module AhoyDashboard
   module Seo
     module Backlinks
-      # Pulling the profile now. Its own resource because a sync spends money and
-      # reading what was already pulled does not.
       class SyncsController < BaseController
         def create
           blocker = AhoyDashboard::Backlinks.refusal

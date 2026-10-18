@@ -1,10 +1,6 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard section menus", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
   before { sign_in create(:user, :admin) }
 
   def headings(panel)

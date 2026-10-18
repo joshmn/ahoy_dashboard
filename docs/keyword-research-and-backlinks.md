@@ -137,7 +137,7 @@ A lookup or sync refused before it's even sent (off, no credentials, sample data
 | `backlinks hit a quota: ...` | Out of credits, or the login was refused |
 | `backlinks failed: ...` | Anything else |
 
-Settings, Jobs shows a failed backlinks sync as "Ran". Keyword lookups aren't on it at all.
+Settings, Jobs shows a sync that logged `backlinks failed` as "Failed", and one that hit a quota as "Ran". Keyword lookups aren't on it at all.
 
 ## Known bugs
 

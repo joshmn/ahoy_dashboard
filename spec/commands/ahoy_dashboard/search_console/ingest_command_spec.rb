@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
   let(:account) do
@@ -8,8 +7,6 @@ RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
   let(:url) { analytics_url }
   let(:date) { Date.new(2026, 8, 9) }
 
-  # All three calls go to the same URL and are told apart only by the dimensions
-  # they carry: query and page, query alone, or none at all.
   def stub_day(queries:, total:, keywords: nil)
     slices = AhoyDashboard::SearchConsole::SLICE_DIMENSIONS
 
@@ -32,8 +29,6 @@ RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
       .to_return(status: 200, body: analytics_body(rows).to_json, headers: json_headers)
   end
 
-  # What Google would answer at query grain if it withheld nothing, which it
-  # does, which is why the two are asked for separately in the first place.
   def rolled_up(rows)
     rows.map do |keys, *metrics|
       keys = Array(keys)
@@ -95,9 +90,6 @@ RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
       expect(events[:ok].totals).to eq(1)
     end
 
-    # The third grain, and the one a keyword trend is read from. Asked for on its
-    # own rather than summed out of the breakdown, because Google withholds far
-    # more when the page is part of the question.
     it "writes the keyword grain from its own call" do
       stub_day(
         queries: [ [ [ "thomson", "https://example.com/a" ], 3.0, 40.0, 0.075, 8.4 ] ],
@@ -119,9 +111,6 @@ RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
         .with { |sent| JSON.parse(sent.body)["dimensions"] == %w[query device country] }).to have_been_made.once
     end
 
-    # The keyword grain is not a rollup of the breakdown and must not be stored
-    # as one, or every day the page split was withheld reads as a day the keyword
-    # went quiet.
     it "keeps a keyword google withheld at query x page grain" do
       stub_day(
         queries: [],
@@ -147,8 +136,6 @@ RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
       expect(sole_item(AhoyDashboard::SearchConsoleKeyword).clicks).to eq(9)
     end
 
-    # Google keeps revising recent days, so a second run over the same day has to
-    # rewrite what is there rather than duplicate it or skip it.
     it "rewrites a day it has already stored" do
       stub_day(queries: [ [ %w[thomson /a], 3.0, 40.0, 0.075, 8.4 ] ], total: [ [ [], 12.0, 300.0, 0.04, 9.2 ] ])
       described_class.call(account: account, dates: [ date ])
@@ -210,18 +197,18 @@ RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
 
     it "removes sliced breakdown keys missing from a revised day" do
       create(:dash_search_console_row, date: date, query: "gone", device: "mobile", country: "usa")
-      stub_day(queries: [[%w[replacement /new], 1, 10, 0.1, 2]], total: [])
+      stub_day(queries: [ [ %w[replacement /new], 1, 10, 0.1, 2 ] ], total: [])
 
-      described_class.call(account: account, dates: [date])
+      described_class.call(account: account, dates: [ date ])
 
-      expect(AhoyDashboard::SearchConsoleRow.pluck(:query)).to eq(["replacement"])
+      expect(AhoyDashboard::SearchConsoleRow.pluck(:query)).to eq([ "replacement" ])
     end
 
     it "removes sliced keyword keys missing from a revised day" do
       create(:dash_search_console_keyword, date: date, query: "gone", device: "mobile", country: "usa")
       stub_day(queries: [], keywords: [], total: [])
 
-      described_class.call(account: account, dates: [date])
+      described_class.call(account: account, dates: [ date ])
 
       expect(AhoyDashboard::SearchConsoleKeyword.where(date: date)).to be_empty
     end
@@ -230,7 +217,7 @@ RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
       create(:dash_search_console_total, date: date, device: "mobile", country: "usa")
       stub_day(queries: [], total: [])
 
-      described_class.call(account: account, dates: [date])
+      described_class.call(account: account, dates: [ date ])
 
       expect(AhoyDashboard::SearchConsoleTotal.where(date: date)).to be_empty
     end
@@ -239,33 +226,33 @@ RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
       create(:dash_search_console_row, date: date, clicks: 7)
       create(:dash_search_console_keyword, date: date, clicks: 8)
       create(:dash_search_console_total, date: date, clicks: 9)
-      stub_day(queries: [[%w[new /new], 1, 10, 0.1, 2]], total: [[[], 10**30, 30, 0.1, 2]])
+      stub_day(queries: [ [ %w[new /new], 1, 10, 0.1, 2 ] ], total: [ [ [], 10**30, 30, 0.1, 2 ] ])
 
-      described_class.call(account: account, dates: [date])
+      described_class.call(account: account, dates: [ date ])
 
-      expect([AhoyDashboard::SearchConsoleRow, AhoyDashboard::SearchConsoleKeyword,
-              AhoyDashboard::SearchConsoleTotal].map { |model| model.where(date: date).pluck(:clicks) })
-        .to eq([[7], [8], [9]])
+      expect([ AhoyDashboard::SearchConsoleRow, AhoyDashboard::SearchConsoleKeyword,
+              AhoyDashboard::SearchConsoleTotal ].map { |model| model.where(date: date).pluck(:clicks) })
+        .to eq([ [ 7 ], [ 8 ], [ 9 ] ])
     end
 
     it "does not mark a rejected snapshot scanned" do
-      stub_day(queries: [], total: [[[], 10**30, 30, 0.1, 2]])
+      stub_day(queries: [], total: [ [ [], 10**30, 30, 0.1, 2 ] ])
 
-      described_class.call(account: account, dates: [date])
+      described_class.call(account: account, dates: [ date ])
 
       expect(AhoyDashboard::SearchConsoleDay.where(date: date)).to be_empty
     end
 
     it "retains the previous snapshot if the final API request fails" do
       create(:dash_search_console_row, date: date, clicks: 7)
-      stub_day(queries: [[%w[new /new], 1, 10, 0.1, 2]], total: [])
+      stub_day(queries: [ [ %w[new /new], 1, 10, 0.1, 2 ] ], total: [])
       stub_request(:post, url)
         .with { |sent| JSON.parse(sent.body)["dimensions"] == AhoyDashboard::SearchConsole::SLICE_DIMENSIONS }
         .to_return(status: 429, body: "{}", headers: json_headers)
 
-      described_class.call(account: account, dates: [date])
+      described_class.call(account: account, dates: [ date ])
 
-      expect(AhoyDashboard::SearchConsoleRow.where(date: date).pluck(:clicks)).to eq([7])
+      expect(AhoyDashboard::SearchConsoleRow.where(date: date).pluck(:clicks)).to eq([ 7 ])
     end
 
     it "defaults to the last seven finished days" do
@@ -307,11 +294,6 @@ RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
       expect(events[:ok].rows).to eq(0)
     end
 
-    # One day's batch is one statement, so the database can refuse the whole day
-    # over a single row. That used to end the run: the sum aborted, every later
-    # date was thrown away, and because an ActiveRecord::StatementInvalid is not
-    # a SearchConsole::Error the exception escaped every rescue, so nothing
-    # reached the account and the settings screen said all was well.
     describe "a day the database refuses" do
       let(:bad) { Date.new(2026, 8, 8) }
       let(:good) { Date.new(2026, 8, 9) }
@@ -319,8 +301,6 @@ RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
       before do
         stub_day(queries: [ [ %w[thomson /a], 3.0, 40.0, 0.075, 8.4 ] ], total: [ [ [], 12.0, 300.0, 0.04, 9.2 ] ])
 
-        # A statement Postgres really refuses, rather than a bare raise, so the
-        # run has to cope with the aborted transaction it actually leaves behind.
         allow(AhoyDashboard::SearchConsoleRow).to receive(:absorb).and_wrap_original do |original, rows|
           AhoyDashboard::SearchConsoleRow.connection.execute("select 1 / 0") if rows.any? { |row| row[:date] == bad }
 
@@ -364,7 +344,7 @@ RSpec.describe AhoyDashboard::SearchConsole::IngestCommand do
     end
 
     it "reports a quota refusal as its own outcome and says the next run picks it up" do
-      stub_request(:post, url).to_return(status: 429, body: "{}", headers: json_headers)
+      stub_analytics_refusal(429)
 
       events = described_class.call(account: account, dates: [ date ])
 

@@ -6,10 +6,6 @@ RSpec.describe AhoyDashboard::SearchConsoleKeyword do
     { date: date, query: "federal prison camp rules", clicks: 12, impressions: 400, ctr: 0.03, position: 8.4 }
   end
 
-  it "sits on the prefixed table" do
-    expect(described_class.table_name).to eq("ahoy_dashboard_search_console_keywords")
-  end
-
   describe ".absorb" do
     it "writes nothing for an empty batch" do
       expect(described_class.absorb([])).to eq(0)
@@ -31,13 +27,21 @@ RSpec.describe AhoyDashboard::SearchConsoleKeyword do
       expect(described_class.order(:date).pluck(:position)).to eq([ 11.0, 8.4 ])
     end
 
-    # Same rule as SearchConsoleRow: one over-budget row would take the day's
-    # whole batch down, because an upsert is one statement.
     it "drops a query too long for the index rather than losing the batch" do
       long = keyword.merge(query: "a" * (described_class::KEY_BUDGET + 1))
 
       expect(described_class.absorb([ long, keyword ])).to eq(1)
       expect(described_class.pluck(:query)).to eq([ keyword[:query] ])
+    end
+
+    it "names the query and its size in the log" do
+      allow(Rails.logger).to receive(:warn)
+
+      described_class.absorb([ keyword.merge(query: "a" * (described_class::KEY_BUDGET + 1)) ])
+
+      expect(Rails.logger).to have_received(:warn).with(
+        "search console keyword dropped for #{date}, query is 2501 bytes and the index holds 2500: #{"a" * 57}..."
+      )
     end
 
     it "writes nothing when every row is over budget" do
@@ -52,9 +56,6 @@ RSpec.describe AhoyDashboard::SearchConsoleKeyword do
     expect(described_class.in_range(range).pluck(:date)).to eq([ date ])
   end
 
-  # The reason this table exists beside SearchConsoleRow: Google withholds far
-  # more when the page is part of the question, so summing the query x page rows
-  # into a keyword series understates it and goes missing on days it should not.
   it "is expected to exceed the sum of the query x page rows for the same query" do
     described_class.absorb([ keyword ])
     AhoyDashboard::SearchConsoleRow.absorb([
@@ -63,15 +64,5 @@ RSpec.describe AhoyDashboard::SearchConsoleKeyword do
     ])
 
     expect(sole_item(described_class).clicks).to be > AhoyDashboard::SearchConsoleRow.where(query: keyword[:query]).sum(:clicks)
-  end
-
-  it "reads a query's history oldest first" do
-    described_class.absorb([
-      keyword.merge(date: date, position: 6.0),
-      keyword.merge(date: date - 2, position: 9.0),
-      keyword.merge(date: date - 1, position: 7.0)
-    ])
-
-    expect(described_class.where(query: keyword[:query]).chronological.pluck(:position)).to eq([ 9.0, 7.0, 6.0 ])
   end
 end

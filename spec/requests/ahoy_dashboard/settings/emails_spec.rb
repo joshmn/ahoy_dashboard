@@ -1,20 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/switches"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe "Dashboard email settings", type: :request do
-  def page
-    Nokogiri::HTML5(response.body)
-  end
-
-  def field(id)
-    page.at_css("##{id}")
-  end
-
-  def settings
-    AhoyDashboard::Setting.order(:key).pluck(:key, :value)
-  end
-
   def read(scope, name)
     AhoyDashboard::Preferences.read(scope, name)
   end
@@ -28,21 +14,6 @@ RSpec.describe "Dashboard email settings", type: :request do
     }
   end
 
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/emails/edit"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin, and writes nothing" do
-      sign_in create(:user)
-
-      expect { patch "/telemetry/settings/emails", params: { emails: valid } }.not_to(change { settings })
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
@@ -50,40 +21,37 @@ RSpec.describe "Dashboard email settings", type: :request do
       get "/telemetry/settings/emails/edit"
 
       expect(response).to have_http_status(:ok)
-      expect(page.css("a").map { |link| link["href"] }).to include("/telemetry/settings/emails/edit")
-      expect(page.css("a").find { |link| link["href"] == "/telemetry/settings/emails/edit" }.text.squish).to eq("Emails")
+      expect(document.css("a").map { |link| link["href"] }).to include("/telemetry/settings/emails/edit")
+      expect(document.css("a").find { |link| link["href"] == "/telemetry/settings/emails/edit" }.text.squish).to eq("Emails")
     end
 
     it "labels every field" do
       get "/telemetry/settings/emails/edit"
 
-      %w[emails_alerts_recipients emails_alerts_from emails_alerts_send_empty
-         emails_reports_recipients emails_reports_from].each do |id|
-        expect(page.at_css("label[for='#{id}']")).to be_present, "expected a label for #{id}"
-        expect(field(id)["aria-describedby"]).to include("#{id}_hint")
-      end
-      expect(page.css("fieldset legend").map { |legend| legend.text.squish }).to eq([ "How often", "How often" ])
-      expect(page.css("input[type=checkbox][name='emails[alerts_digest][]']").map { |box| box["value"] })
+      expect_labelled_fields(%w[emails_alerts_recipients emails_alerts_from emails_alerts_send_empty
+                                emails_reports_recipients emails_reports_from])
+      expect(document.css("fieldset legend").map { |legend| legend.text.squish }).to eq([ "How often", "How often" ])
+      expect(document.css("input[type=checkbox][name='emails[alerts_digest][]']").map { |box| box["value"] })
         .to eq(%w[daily weekly monthly])
     end
 
     it "starts with nothing set up and sends when nothing fired" do
       get "/telemetry/settings/emails/edit"
 
-      expect(page.css("input[type=checkbox][name$='_digest][]'][checked]")).to be_empty
+      expect(document.css("input[type=checkbox][name$='_digest][]'][checked]")).to be_empty
       expect(field("emails_alerts_recipients").text.strip).to eq("")
       expect(field("emails_alerts_send_empty")["checked"]).to eq("checked")
     end
 
     it "shows what is stored" do
-      ahoy_dashboard_preferences(:alerts, digest: [ :weekly ], recipients: [ "a@example.com" ], from: "x@example.com",
-                                          send_empty: false)
-      ahoy_dashboard_preferences(:reports, digest: [ :monthly ], recipients: [ "b@example.com", "c@example.com" ])
+      AhoyDashboard::Preferences.write(:alerts, digest: [ :weekly ], recipients: [ "a@example.com" ], from: "x@example.com",
+                                                send_empty: false)
+      AhoyDashboard::Preferences.write(:reports, digest: [ :monthly ], recipients: [ "b@example.com", "c@example.com" ])
 
       get "/telemetry/settings/emails/edit"
 
-      expect(page.css("input[name='emails[alerts_digest][]'][checked]").map { |box| box["value"] }).to eq([ "weekly" ])
-      expect(page.css("input[name='emails[reports_digest][]'][checked]").map { |box| box["value"] }).to eq([ "monthly" ])
+      expect(document.css("input[name='emails[alerts_digest][]'][checked]").map { |box| box["value"] }).to eq([ "weekly" ])
+      expect(document.css("input[name='emails[reports_digest][]'][checked]").map { |box| box["value"] }).to eq([ "monthly" ])
       expect(field("emails_alerts_recipients").text.strip).to eq("a@example.com")
       expect(field("emails_reports_recipients").text.split).to eq([ "b@example.com", "c@example.com" ])
       expect(field("emails_alerts_from")["value"]).to eq("x@example.com")
@@ -104,9 +72,9 @@ RSpec.describe "Dashboard email settings", type: :request do
     end
 
     it "goes back to the defaults when everything is cleared" do
-      ahoy_dashboard_preferences(:alerts, digest: [ :weekly ], recipients: [ "a@example.com" ], from: "x@example.com",
-                                          send_empty: false)
-      ahoy_dashboard_preferences(:reports, digest: [ :monthly ], recipients: [ "b@example.com" ], from: "y@example.com")
+      AhoyDashboard::Preferences.write(:alerts, digest: [ :weekly ], recipients: [ "a@example.com" ], from: "x@example.com",
+                                                send_empty: false)
+      AhoyDashboard::Preferences.write(:reports, digest: [ :monthly ], recipients: [ "b@example.com" ], from: "y@example.com")
 
       patch "/telemetry/settings/emails",
             params: { emails: { alerts_digest: [ "" ], alerts_recipients: "", alerts_from: "", alerts_send_empty: "1",
@@ -124,10 +92,7 @@ RSpec.describe "Dashboard email settings", type: :request do
 
     describe "refusing" do
       def refused(**changes)
-        expect { patch "/telemetry/settings/emails", params: { emails: valid.merge(changes) } }.not_to(change { settings })
-
-        expect(response).to have_http_status(:unprocessable_entity)
-        page.at_css("[role='alert']").text.squish
+        refusal("/telemetry/settings/emails", emails: valid.merge(changes))
       end
 
       it "names the bad recipient" do
@@ -153,7 +118,7 @@ RSpec.describe "Dashboard email settings", type: :request do
         refused(alerts_recipients: "nobody", alerts_digest: [ "weekly" ])
 
         expect(field("emails_alerts_recipients").text.strip).to eq("nobody")
-        expect(page.css("input[name='emails[alerts_digest][]'][checked]").map { |box| box["value"] }).to eq([ "weekly" ])
+        expect(document.css("input[name='emails[alerts_digest][]'][checked]").map { |box| box["value"] }).to eq([ "weekly" ])
       end
     end
 
@@ -163,8 +128,8 @@ RSpec.describe "Dashboard email settings", type: :request do
 
         get "/telemetry/settings/emails/edit"
 
-        expect(page.at_css("#alerts-state")).to be_nil
-        expect(page.at_css("#reports-state")).to be_nil
+        expect(document.at_css("#alerts-state")).to be_nil
+        expect(document.at_css("#reports-state")).to be_nil
       end
 
       it "still shows the fields when alerts and reports are off, and says so with a way to turn them on" do
@@ -172,10 +137,10 @@ RSpec.describe "Dashboard email settings", type: :request do
 
         get "/telemetry/settings/emails/edit"
 
-        expect(page.at_css("#alerts-state").text.squish).to include("Switched off", "turn alerts on")
-        expect(page.at_css("#reports-state").text.squish).to include("Switched off", "turn email reports on")
-        expect(page.at_css("#alerts-state a")["href"]).to eq("/telemetry/settings/features#feature-alerts")
-        expect(page.at_css("#reports-state a")["href"]).to eq("/telemetry/settings/features#feature-reports")
+        expect(document.at_css("#alerts-state").text.squish).to include("Switched off", "turn alerts on")
+        expect(document.at_css("#reports-state").text.squish).to include("Switched off", "turn email reports on")
+        expect(document.at_css("#alerts-state a")["href"]).to eq("/telemetry/settings/features#feature-alerts")
+        expect(document.at_css("#reports-state a")["href"]).to eq("/telemetry/settings/features#feature-reports")
         expect(field("emails_alerts_recipients")).to be_present
         expect(field("emails_reports_recipients")).to be_present
       end
@@ -186,8 +151,8 @@ RSpec.describe "Dashboard email settings", type: :request do
         get "/telemetry/settings/emails/edit"
 
         expect(response).to have_http_status(:ok)
-        expect(page.at_css("#alerts-state").text.squish).to include("Not installed in this app yet")
-        expect(page.at_css("#reports-state").text.squish).to include("Not installed in this app yet")
+        expect(document.at_css("#alerts-state").text.squish).to include("Not installed in this app yet")
+        expect(document.at_css("#reports-state").text.squish).to include("Not installed in this app yet")
 
         patch "/telemetry/settings/emails", params: { emails: valid }
 

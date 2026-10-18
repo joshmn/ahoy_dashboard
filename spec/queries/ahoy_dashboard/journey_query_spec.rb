@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::JourneyQuery do
   let(:range) { dash_day_range(2026, 8, 10) }
@@ -21,18 +20,29 @@ RSpec.describe AhoyDashboard::JourneyQuery do
     column.rows.find(&:exit?)
   end
 
+  let(:separate_counts) do
+    Module.new do
+      private
+
+      def counts(prefix, search)
+        value = offset_value(prefix.size)
+        relation = AhoyDashboard.visit.unscoped.from(Arel.sql("(#{journey_sql(prefix.size)}) tm_journey"))
+
+        count_relation(prefix, search, relation)
+          .pluck(Arel.sql("grouping(#{value})"), Arel.sql(value), Arel.sql(AhoyDashboard::JourneyQuery::VISITORS))
+      end
+    end
+  end
+
   describe "starting points" do
     before do
-      first = dash_visit(started_at: clock(9), visitor: "a")
-      dash_page_view(first, path: "/", at: clock(9))
+      first = dash_landing(at: clock(9), visitor: "a")
       dash_page_view(first, path: "/going-in", at: clock(9, 5))
 
-      second = dash_visit(started_at: clock(10), visitor: "b")
-      dash_page_view(second, path: "/", at: clock(10))
+      second = dash_landing(at: clock(10), visitor: "b")
       dash_page_view(second, path: "/going-in", at: clock(10, 5))
 
-      third = dash_visit(started_at: clock(11), visitor: "c")
-      dash_page_view(third, path: "/faq", at: clock(11))
+      dash_landing("/faq", at: clock(11), visitor: "c")
     end
 
     it "lists every page anybody landed on, in visitors, biggest first" do
@@ -47,8 +57,6 @@ RSpec.describe AhoyDashboard::JourneyQuery do
       expect(journey.columns.size).to eq(1)
     end
 
-    # Nobody has gone anywhere yet, so there is nothing to have left from. The
-    # exit only means something once a step has been picked.
     it "offers no exit row on the first column" do
       expect(exit_row(journey.columns.first)).to be_nil
     end
@@ -67,8 +75,7 @@ RSpec.describe AhoyDashboard::JourneyQuery do
     end
 
     it "counts a visitor once however many times they took the same step" do
-      again = dash_visit(started_at: clock(12), visitor: "a")
-      dash_page_view(again, path: "/", at: clock(12))
+      again = dash_landing(at: clock(12), visitor: "a")
       dash_page_view(again, path: "/", at: clock(12, 1))
       dash_page_view(again, path: "/going-in", at: clock(12, 2))
 
@@ -78,16 +85,13 @@ RSpec.describe AhoyDashboard::JourneyQuery do
 
   describe "one step after" do
     before do
-      first = dash_visit(started_at: clock(9), visitor: "a")
-      dash_page_view(first, path: "/", at: clock(9))
+      first = dash_landing(at: clock(9), visitor: "a")
       dash_page_view(first, path: "/going-in", at: clock(9, 5))
 
-      second = dash_visit(started_at: clock(10), visitor: "b")
-      dash_page_view(second, path: "/", at: clock(10))
+      second = dash_landing(at: clock(10), visitor: "b")
       dash_page_view(second, path: "/faq", at: clock(10, 5))
 
-      third = dash_visit(started_at: clock(11), visitor: "c")
-      dash_page_view(third, path: "/", at: clock(11))
+      dash_landing(at: clock(11), visitor: "c")
     end
 
     let(:result) { journey(chain: [ "/" ]) }
@@ -102,8 +106,6 @@ RSpec.describe AhoyDashboard::JourneyQuery do
       expect(pages).to eq([ [ "/faq", 1 ], [ "/going-in", 1 ] ])
     end
 
-    # Leaving is one of the things that happened next, so it is a row in the
-    # list rather than a number printed beside it.
     it "puts the people who went no further in the list as the exit step" do
       expect(exit_row(result.columns.last)&.visitors).to eq(1)
     end
@@ -123,8 +125,6 @@ RSpec.describe AhoyDashboard::JourneyQuery do
       expect(column.rows.count(&:chosen?)).to eq(1)
     end
 
-    # The count on a picked step is the next column's own total, so a step that
-    # sits below the row cap is still on screen with the right number beside it.
     it "keeps a picked step on screen when the cap would have dropped it" do
       result = journey(chain: [ "/faq" ], limit: 1)
       chosen = result.columns.first.chosen
@@ -134,8 +134,6 @@ RSpec.describe AhoyDashboard::JourneyQuery do
       expect(chosen.visitors).to eq(result.columns.last.reached)
     end
 
-    # The total and the count of people who went no further are pinned above the
-    # candidates, so the row cap cannot cut either of them out of the answer.
     it "still reports the total and the exit when the cap cuts the candidates" do
       column = journey(chain: [ "/" ], limit: 1).columns.last
 
@@ -153,11 +151,9 @@ RSpec.describe AhoyDashboard::JourneyQuery do
 
   describe "leaving" do
     before do
-      first = dash_visit(started_at: clock(9), visitor: "a")
-      dash_page_view(first, path: "/", at: clock(9))
+      dash_landing(at: clock(9), visitor: "a")
 
-      second = dash_visit(started_at: clock(10), visitor: "b")
-      dash_page_view(second, path: "/", at: clock(10))
+      second = dash_landing(at: clock(10), visitor: "b")
       dash_page_view(second, path: "/faq", at: clock(10, 5))
     end
 
@@ -185,20 +181,15 @@ RSpec.describe AhoyDashboard::JourneyQuery do
 
   describe "two steps after" do
     before do
-      first = dash_visit(started_at: clock(9), visitor: "a")
-      dash_page_view(first, path: "/", at: clock(9))
+      first = dash_landing(at: clock(9), visitor: "a")
       dash_page_view(first, path: "/going-in", at: clock(9, 5))
       dash_page_view(first, path: "/going-in/faq", at: clock(9, 9))
 
-      second = dash_visit(started_at: clock(10), visitor: "b")
-      dash_page_view(second, path: "/", at: clock(10))
+      second = dash_landing(at: clock(10), visitor: "b")
       dash_page_view(second, path: "/going-in", at: clock(10, 5))
       dash_page_view(second, path: "/contact", at: clock(10, 9))
 
-      # Same two steps, other order, so an answer that only asked "did both
-      # happen" rather than "in this order, back to back" would show up here.
-      third = dash_visit(started_at: clock(11), visitor: "c")
-      dash_page_view(third, path: "/going-in", at: clock(11))
+      third = dash_landing("/going-in", at: clock(11), visitor: "c")
       dash_page_view(third, path: "/", at: clock(11, 5))
       dash_page_view(third, path: "/consult", at: clock(11, 9))
     end
@@ -220,24 +211,19 @@ RSpec.describe AhoyDashboard::JourneyQuery do
 
   describe "consecutive duplicates" do
     before do
-      visit = dash_visit(started_at: clock(9), visitor: "a")
-      dash_page_view(visit, path: "/", at: clock(9))
+      visit = dash_landing(at: clock(9), visitor: "a")
       dash_page_view(visit, path: "/", at: clock(9, 1))
       dash_page_view(visit, path: "/", at: clock(9, 2))
       dash_page_view(visit, path: "/faq", at: clock(9, 3))
       dash_page_view(visit, path: "/", at: clock(9, 4))
     end
 
-    # A page loaded three times running is a refresh or a back and a forward, not
-    # three steps, so the answer to "what came after /" is /faq rather than /.
     it "collapses a step repeated back to back into one" do
       pages = journey(chain: [ "/" ]).columns.last.rows.reject(&:exit?)
 
       expect(pages.map(&:value)).to eq([ "/faq" ])
     end
 
-    # Coming back to a page later is a step of its own, so the same visit answers
-    # "what came after /faq" with the page it went back to.
     it "keeps a step somebody returned to later" do
       pages = journey(chain: [ "/faq" ]).columns.last.rows.reject(&:exit?)
 
@@ -245,14 +231,11 @@ RSpec.describe AhoyDashboard::JourneyQuery do
     end
   end
 
-  # Pages only. Goals used to be steps in the same list; the journey was rebuilt
-  # around paths and an event that is not a page view is not a step at all.
   describe "events that are not page views" do
     before do
-      AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "site_searched", display_name: "Searched")
+      create(:dash_goal, event_name: "site_searched", display_name: "Searched")
 
-      visit = dash_visit(started_at: clock(9), visitor: "a")
-      dash_page_view(visit, path: "/", at: clock(9))
+      visit = dash_landing(at: clock(9), visitor: "a")
       dash_goal(visit, "site_searched", at: clock(9, 1), query: "thomson")
       dash_page_view(visit, path: "/resources/federal-prisons", at: clock(9, 3))
     end
@@ -261,9 +244,6 @@ RSpec.describe AhoyDashboard::JourneyQuery do
       expect(journey.columns.first.rows.map(&:value)).not_to include("Searched")
     end
 
-    # The goal fired between the two pages. Reading it as a step would have put
-    # it in the middle of the journey; ignoring it has to join the pages up
-    # rather than break the chain at the event.
     it "reads straight through it to the next page" do
       pages = journey(chain: [ "/" ]).columns.last.rows.reject(&:exit?)
 
@@ -275,12 +255,10 @@ RSpec.describe AhoyDashboard::JourneyQuery do
     let(:scope) { dash_scope(range: range, filters: dash_filters([ "page", "is", "/going-in" ])) }
 
     before do
-      inside = dash_visit(started_at: clock(9), visitor: "a")
-      dash_page_view(inside, path: "/", at: clock(9))
+      inside = dash_landing(at: clock(9), visitor: "a")
       dash_page_view(inside, path: "/going-in", at: clock(9, 5))
 
-      outside = dash_visit(started_at: clock(10), visitor: "b")
-      dash_page_view(outside, path: "/", at: clock(10))
+      outside = dash_landing(at: clock(10), visitor: "b")
       dash_page_view(outside, path: "/faq", at: clock(10, 5))
     end
 
@@ -289,8 +267,6 @@ RSpec.describe AhoyDashboard::JourneyQuery do
       expect(journey.columns.first.rows.map(&:value)).not_to include("/faq")
     end
 
-    # The filter picks the sessions and then the whole session is read, so the
-    # journey of somebody who saw the filtered page still carries its other steps.
     it "keeps the rest of the steps of a session it kept" do
       pages = journey(chain: [ "/" ]).columns.last.rows.reject(&:exit?)
 
@@ -300,8 +276,7 @@ RSpec.describe AhoyDashboard::JourneyQuery do
 
   describe "crawlers" do
     before do
-      person = dash_visit(started_at: clock(9), visitor: "a")
-      dash_page_view(person, path: "/", at: clock(9))
+      person = dash_landing(at: clock(9), visitor: "a")
       dash_page_view(person, path: "/faq", at: clock(9, 5))
 
       robot = dash_visit(started_at: clock(10), visitor: "b")
@@ -323,8 +298,7 @@ RSpec.describe AhoyDashboard::JourneyQuery do
 
   describe "searching a column" do
     before do
-      visit = dash_visit(started_at: clock(9), visitor: "a")
-      dash_page_view(visit, path: "/going-in", at: clock(9))
+      visit = dash_landing("/going-in", at: clock(9), visitor: "a")
       dash_page_view(visit, path: "/going-in/faq", at: clock(9, 5))
       dash_page_view(visit, path: "/contact", at: clock(9, 9))
     end
@@ -347,13 +321,10 @@ RSpec.describe AhoyDashboard::JourneyQuery do
 
   describe "a hand edited url" do
     before do
-      visit = dash_visit(started_at: clock(9), visitor: "a")
-      dash_page_view(visit, path: "/", at: clock(9))
+      visit = dash_landing(at: clock(9), visitor: "a")
       dash_page_view(visit, path: "/faq", at: clock(9, 5))
     end
 
-    # Shaped like a path on purpose, so it clears the guard and is actually
-    # bound into the query rather than being dropped before it gets there.
     it "does not raise on a chain full of sql metacharacters" do
       result = journey(chain: [ "/') or 1=1; drop table ahoy_events --" ])
 
@@ -388,10 +359,19 @@ RSpec.describe AhoyDashboard::JourneyQuery do
 
   describe "starting points without a sequence" do
     let(:collapsed_sequence) do
+      counting = separate_counts
+
       Class.new(described_class) do
+        include counting
+
+        def self.depths
+          @depths ||= []
+        end
+
         private
 
         def counts_by_depth(depth_limit)
+          self.class.depths << depth_limit
           return super unless depth_limit.zero?
 
           { 0 => counts([], searches.first.to_s) }
@@ -419,8 +399,7 @@ RSpec.describe AhoyDashboard::JourneyQuery do
 
       empty = dash_visit(started_at: clock(13), visitor: "empty")
       [ nil, "" ].each { |path| dash_page_view(empty, path: path) }
-      whitespace = dash_visit(started_at: clock(14), visitor: "whitespace")
-      dash_page_view(whitespace, path: " ")
+      dash_landing(" ", at: clock(14), visitor: "whitespace")
 
       robot = dash_visit(started_at: clock(15), visitor: "robot")
       dash_page_view(robot, path: "/robot.md", crawler: "GPTBot")
@@ -431,7 +410,7 @@ RSpec.describe AhoyDashboard::JourneyQuery do
       dash_page_view(outside, path: "/outside", at: clock(9))
     end
 
-    it "matches collapsed sequences exactly across filters, searches, caps, and a selected exit" do
+    it "matches collapsed sequences exactly across filters, searches, caps, and a selected exit", :equivalence do
       variants = [
         scope,
         dash_scope(range: range, include_crawlers: true),
@@ -456,6 +435,7 @@ RSpec.describe AhoyDashboard::JourneyQuery do
         expect(actual).to eq(expected), options.inspect
         expect(actual.to_json).to eq(expected.to_json)
       end
+      expect(collapsed_sequence.depths).to include(0)
     end
 
     it "retains zero-count paths, full sessions, and the existing blank-path rules" do
@@ -467,32 +447,28 @@ RSpec.describe AhoyDashboard::JourneyQuery do
     end
 
     it "does not reconstruct an ordered sequence for a single column" do
-      statements = []
-      subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
-        next if payload[:name] == "SCHEMA" || payload[:cached]
-        next unless payload[:sql].include?("grouping sets")
-
-        statements << payload[:sql]
-      end
-
-      ActiveRecord::Base.uncached { journey }
+      statements = captured_sql("grouping sets", uncached: true) { journey }
 
       expect(statements.size).to eq(1)
       expect(statements.first).not_to include("lag(step_value)", "lead(step_value", "partition by visit_id")
-    ensure
-      ActiveSupport::Notifications.unsubscribe(subscriber)
     end
   end
 
   describe "sharing the sequence across columns" do
-    # Keep the previous per-column execution as an oracle for batching. The
-    # comparison covers the whole result, including hidden chosen rows, shares,
-    # totals, exits, cap flags and the exact order of tied values.
     let(:separate_queries) do
+      counting = separate_counts
+
       Class.new(described_class) do
+        include counting
+
+        def self.depths
+          @depths ||= []
+        end
+
         private
 
         def counts_by_depth(depth_limit)
+          self.class.depths << depth_limit
           (0..depth_limit).map do |depth|
             [ depth, counts(chain.first(depth), searches[depth].to_s) ]
           end.to_h
@@ -509,7 +485,6 @@ RSpec.describe AhoyDashboard::JourneyQuery do
       ].each_with_index do |(visitor, paths), index|
         visit = dash_visit(started_at: clock(9 + index), visitor_token: visitor)
         paths.each do |path|
-          # Equal event timestamps exercise the id tie breaker in both windows.
           dash_page_view(visit, path: path)
         end
         dash_page_view(visit, path: nil)
@@ -519,7 +494,7 @@ RSpec.describe AhoyDashboard::JourneyQuery do
       end
     end
 
-    it "matches separate column queries under searches, caps, filters, and crawler inclusion" do
+    it "matches separate column queries under searches, caps, filters, and crawler inclusion", :equivalence do
       variants = [
         scope,
         dash_scope(range: range, include_crawlers: true),
@@ -539,32 +514,21 @@ RSpec.describe AhoyDashboard::JourneyQuery do
 
         expect(described_class.call(scope: current, **options)).to eq(expected), options.inspect
       end
+      expect(separate_queries.depths).to include(0, 5)
     end
 
     it "executes one sequence statement for a six-column chain" do
-      statements = []
-      subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
-        next if payload[:name] == "SCHEMA" || payload[:cached]
-        next unless payload[:sql].include?("lag(step_value)")
-
-        statements << payload[:sql]
-      end
-
-      ActiveRecord::Base.uncached { journey(chain: %w[/ /again /z / /last]) }
+      statements = captured_sql("lag(step_value)", uncached: true) { journey(chain: %w[/ /again /z / /last]) }
 
       expect(statements.size).to eq(1)
       expect(statements.first.scan("lag(step_value)").size).to eq(1)
-    ensure
-      ActiveSupport::Notifications.unsubscribe(subscriber)
     end
   end
 
   it "reads only the visits that started in the range" do
-    earlier = dash_visit(started_at: dash_time(2026, 8, 9, 9), visitor: "a")
-    dash_page_view(earlier, path: "/last-week", at: dash_time(2026, 8, 9, 9))
+    dash_landing("/last-week", at: dash_time(2026, 8, 9, 9), visitor: "a")
 
-    inside = dash_visit(started_at: clock(9), visitor: "b")
-    dash_page_view(inside, path: "/today", at: clock(9))
+    dash_landing("/today", at: clock(9), visitor: "b")
 
     expect(journey.columns.first.rows.map(&:value)).to eq([ "/today" ])
   end

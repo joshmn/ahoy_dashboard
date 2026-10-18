@@ -1,8 +1,4 @@
 module AhoyDashboard
-  # One funnel card. Its own resource rather than a AhoyDashboard::Report tab,
-  # because a funnel is not a breakdown: its rows are steps in an order somebody
-  # chose, there is no dimension behind them and clicking one cannot narrow the
-  # dashboard to it.
   class FunnelsController < AhoyDashboard::BaseController
     def index
       result = Funnels::IndexQuery.call(query: query, page: params[:page])

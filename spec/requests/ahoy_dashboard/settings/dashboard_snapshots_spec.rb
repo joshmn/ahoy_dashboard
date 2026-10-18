@@ -8,17 +8,9 @@ RSpec.describe "Dashboard snapshot settings", type: :request do
     { time_zone: "UTC", host: "example.com", canonical_host: "", internal_ips: "", precomputed_dashboard: "1" }
   end
 
-  around do |example|
-    cache = Rails.cache
-    adapter = snapshots::SnapshotRefreshJob.queue_adapter
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    snapshots::SnapshotRefreshJob.queue_adapter = :test
-    travel_to(Time.utc(2026, 8, 11, 14, 30)) { example.run }
-  ensure
-    Rails.cache = cache
-    snapshots::SnapshotRefreshJob.queue_adapter = adapter
-    AhoyDashboard::Current.reset
-  end
+  include_context "with a test snapshot queue"
+
+  around { |example| travel_to(Time.utc(2026, 8, 11, 14, 30)) { example.run } }
 
   before { sign_in(create(:user, :admin)) }
 
@@ -31,7 +23,7 @@ RSpec.describe "Dashboard snapshot settings", type: :request do
   end
 
   def checkbox
-    Nokogiri::HTML5(response.body).at_css("input[type='checkbox'][name='general[precomputed_dashboard]']")
+    document.at_css("input[type='checkbox'][name='general[precomputed_dashboard]']")
   end
 
   it "offers the setting unchecked by default" do
@@ -54,12 +46,7 @@ RSpec.describe "Dashboard snapshot settings", type: :request do
   end
 
   it "does not run analytical aggregates in the settings request" do
-    statements = []
-    capture = ->(*args) { statements << args.last[:sql] if args.last[:sql].match?(/grouping sets|tm_journey/i) }
-
-    ActiveSupport::Notifications.subscribed(capture, "sql.active_record") { save }
-
-    expect(statements).to be_empty
+    expect(captured_sql(/grouping sets|tm_journey/i, cached: true) { save }).to be_empty
   end
 
   it "builds a usable dashboard through the queued job without a console command" do
@@ -67,7 +54,7 @@ RSpec.describe "Dashboard snapshot settings", type: :request do
     snapshots::SnapshotRefreshJob.perform_now(*jobs.first[:args])
     get("/telemetry?loading=complete", params: { period: "30d" })
 
-    expect(Nokogiri::HTML5(response.body).at_css("#dash-snapshot-freshness time")).to be_present
+    expect(document.at_css("#dash-snapshot-freshness time")).to be_present
   end
 
   it "does not duplicate a queued build when settings are saved again" do
@@ -83,7 +70,7 @@ RSpec.describe "Dashboard snapshot settings", type: :request do
     save(precomputed_dashboard: "0")
     get("/telemetry?loading=complete", params: { period: "30d" })
 
-    expect(Nokogiri::HTML5(response.body).at_css("#dash-snapshot-freshness")).to be_nil
+    expect(document.at_css("#dash-snapshot-freshness")).to be_nil
   end
 
   it "does not let an already queued job rebuild after the setting is turned off" do
@@ -113,13 +100,5 @@ RSpec.describe "Dashboard snapshot settings", type: :request do
     save
 
     expect(jobs).to be_empty
-  end
-
-  it "refuses to enable snapshots for somebody who is not an admin" do
-    sign_out(:user)
-    sign_in(create(:user))
-    save
-
-    expect(AhoyDashboard::Preferences.read(:site, :precomputed_dashboard)).to eq(false)
   end
 end

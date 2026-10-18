@@ -1,39 +1,26 @@
 require "rails_helper"
 require File.expand_path("../../../db/migrate/core/add_ahoy_dashboard_query_indexes", __dir__)
 
-class DashboardQueryIndexTestRecord < ActiveRecord::Base
-  self.abstract_class = true
-end
-
 RSpec.describe AddAhoyDashboardQueryIndexes do
   self.use_transactional_tests = false
 
-  let(:connection) { DashboardQueryIndexTestRecord.connection }
+  let(:connection) { DashboardIsolatedRecord.connection }
   let(:definitions) { described_class::INDEXES }
 
   around do |example|
-    configuration = if ActiveRecord::Base.respond_to?(:connection_db_config)
-      ActiveRecord::Base.connection_db_config.configuration_hash
-    else
-      ActiveRecord::Base.connection_config
+    with_isolated_schema("dashboard_query_indexes_test") do |isolated|
+      isolated.create_table(:ahoy_events) do |table|
+        table.datetime(:time)
+        table.bigint(:visit_id)
+        table.jsonb(:properties, default: {})
+      end
+      isolated.create_table(:ahoy_dashboard_alert_events) do |table|
+        table.bigint(:check_id)
+        table.bigint(:previous_check_id)
+        table.bigint(:CHECK_ID)
+      end
+      example.run
     end
-    DashboardQueryIndexTestRecord.establish_connection(configuration)
-    connection.execute("CREATE SCHEMA dashboard_query_indexes_test")
-    connection.schema_search_path = "dashboard_query_indexes_test"
-    connection.create_table(:ahoy_events) do |table|
-      table.datetime(:time)
-      table.bigint(:visit_id)
-      table.jsonb(:properties, default: {})
-    end
-    connection.create_table(:ahoy_dashboard_alert_events) do |table|
-      table.bigint(:check_id)
-      table.bigint(:previous_check_id)
-      table.bigint(:CHECK_ID)
-    end
-    example.run
-  ensure
-    connection.execute("DROP SCHEMA IF EXISTS dashboard_query_indexes_test CASCADE")
-    DashboardQueryIndexTestRecord.remove_connection
   end
 
   def run_migration(direction)
@@ -53,25 +40,20 @@ RSpec.describe AddAhoyDashboardQueryIndexes do
     end
   end
 
-  def index_valid?(name)
-    connection.select_value("SELECT indisvalid FROM pg_index WHERE indexrelid = #{connection.quote(name)}::regclass")
-  end
-
   def index_oids
     connection.select_values("SELECT indexrelid FROM pg_index WHERE indrelid IN ('ahoy_events'::regclass, 'ahoy_dashboard_alert_events'::regclass) ORDER BY indexrelid")
   end
 
   def leave_interrupted_index(definition, **options)
-    pool = DashboardQueryIndexTestRecord.connection_pool
+    pool = DashboardIsolatedRecord.connection_pool
     writer = pool.checkout
     writer.begin_db_transaction
     writer.execute("INSERT INTO dashboard_query_indexes_test.ahoy_events (time) VALUES ('2026-01-01')")
     connection.execute("SET statement_timeout = '250ms'")
     add_index(definition, **options.merge(algorithm: :concurrently))
   rescue ActiveRecord::QueryCanceled
-    # PostgreSQL retains the invalid index after a concurrent build is canceled.
     name = options.fetch(:name, definition[:name])
-    raise "Expected an interrupted index" unless index_valid?(name) == false
+    raise "Expected an interrupted index" unless index_valid?(connection, name) == false
   ensure
     connection.execute("SET statement_timeout = 0")
     writer.rollback_db_transaction
@@ -108,7 +90,7 @@ RSpec.describe AddAhoyDashboardQueryIndexes do
 
     run_migration(:up)
 
-    expect(index_valid?(definition[:name])).to be(true)
+    expect(index_valid?(connection, definition[:name])).to be(true)
   end
 
   it "removes its interrupted build and reuses an equivalent host index" do
@@ -118,10 +100,10 @@ RSpec.describe AddAhoyDashboardQueryIndexes do
 
     run_migration(:up)
 
-    expect(connection.indexes(:ahoy_events).map(&:name)).to eq(["host_human_index"])
+    expect(connection.indexes(:ahoy_events).map(&:name)).to eq([ "host_human_index" ])
   end
 
-  ["properties ->> 'Crawler' IS NULL", "properties ->> 'crawl(er)' IS NULL", nil].each do |predicate|
+  [ "properties ->> 'Crawler' IS NULL", "properties ->> 'crawl(er)' IS NULL", nil ].each do |predicate|
     it "keeps a host index with the distinct predicate #{predicate.inspect}" do
       add_index(definitions.first, name: "host_other_index", where: predicate)
 
@@ -147,7 +129,7 @@ RSpec.describe AddAhoyDashboardQueryIndexes do
 
     run_migration(:up)
 
-    expect(index_valid?("host_failed_index")).to be(false)
+    expect(index_valid?(connection, "host_failed_index")).to be(false)
   end
 
   it "refuses a conflicting definition under its name, even when interrupted" do
@@ -163,7 +145,7 @@ RSpec.describe AddAhoyDashboardQueryIndexes do
     run_migration(:down)
     run_migration(:down)
 
-    expect(index_names).to eq(["host_human_index"])
+    expect(index_names).to eq([ "host_human_index" ])
   end
 
   it "refuses to remove a unique index encountered under its name" do

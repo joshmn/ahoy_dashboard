@@ -1,7 +1,4 @@
 module AhoyDashboard
-  # Writes. Callers pass a block of on(:event) handlers, evaluated in the
-  # caller's own context, and .call hands back the events hash so a caller with
-  # no block can still read what happened.
   class Command
     class Router
       attr_reader :events
@@ -12,8 +9,8 @@ module AhoyDashboard
         @events = {}
       end
 
-      def on(event, &handler)
-        @handlers[event] = handler
+      def on(*events, &handler)
+        events.each { |event| @handlers[event] = handler }
       end
 
       def fire(event, *args)

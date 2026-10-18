@@ -45,10 +45,7 @@ module AhoyDashboard
       end
 
       def back_path
-        value = params[:return_to].to_s
-        return rankings_path unless value.start_with?("/") && !value.start_with?("//") && !value.include?("\\")
-
-        value
+        local_path(params[:return_to]) || rankings_path
       end
 
       def tag_params

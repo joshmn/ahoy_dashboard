@@ -1,13 +1,7 @@
 # frozen_string_literal: true
 
 module AhoyDashboard
-  class HiddenVisitsQuery
-    class << self
-      def call(**options)
-        new(**options).call
-      end
-    end
-
+  class HiddenVisitsQuery < AhoyDashboard::Query
     def initialize(range:)
       @range = range
     end

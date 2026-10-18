@@ -3,13 +3,6 @@ require "rails_helper"
 RSpec.describe AhoyDashboard::Job do
   include ActiveJob::TestHelper
 
-  before do
-    allow(AhoyDashboard::Serp).to receive(:enabled?).and_return(false)
-    allow(AhoyDashboard::Alerts).to receive(:enabled?).and_return(false)
-    allow(AhoyDashboard::SearchConsole).to receive(:enabled?).and_return(false)
-    allow(AhoyDashboard::Backlinks).to receive(:enabled?).and_return(false)
-  end
-
   def run_of(key)
     AhoyDashboard::JobRun.for(key)
   end

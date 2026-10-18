@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 require "csv"
 
 RSpec.describe "Dashboard report detail metrics", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
@@ -20,23 +19,8 @@ RSpec.describe "Dashboard report detail metrics", type: :request do
     dash_goal(second, AhoyDashboard::ENGAGEMENT, path: "/a", scroll_depth: 80, engagement_time: 90)
   end
 
-  def analytics_sql
-    statements = []
-    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*arguments|
-      payload = arguments.last
-      next if payload[:name].in?(["SCHEMA", "TRANSACTION"]) || payload[:cached]
-      next unless payload[:sql].match?(/\b(?:FROM|JOIN)\s+"?ahoy_(?:visits|events)\b/i)
-
-      statements << payload[:sql]
-    end
-    ActiveRecord::Base.uncached { yield }
-    statements
-  ensure
-    ActiveSupport::Notifications.unsubscribe(subscriber)
-  end
-
   def visible_rows
-    Nokogiri::HTML5(response.body).css(".data-row").map do |row|
+    document.css(".data-row").map do |row|
       [row.at_css(".nm").text, row.css(".cnt").map(&:text)]
     end
   end
@@ -50,6 +34,14 @@ RSpec.describe "Dashboard report detail metrics", type: :request do
   it "does not aggregate engagement for an HTML list that only shows visitors" do
     statements = analytics_sql { get("/telemetry/reports/pages", params: {view: "details"}) }
 
+    expect(statements.join(" ")).not_to match(/scroll_depth|engagement_time/)
+  end
+
+  it "treats a request that accepts anything as the HTML list it gets back" do
+    statements = analytics_sql { get("/telemetry/reports/pages", params: { view: "details" }, headers: { "Accept" => "*/*" }) }
+
+    expect(response.media_type).to eq("text/html")
+    expect(visible_rows).to eq([ [ "/a", [ "2" ] ], [ "/b", [ "1" ] ] ])
     expect(statements.join(" ")).not_to match(/scroll_depth|engagement_time/)
   end
 

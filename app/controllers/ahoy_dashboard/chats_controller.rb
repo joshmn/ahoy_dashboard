@@ -7,19 +7,13 @@ module AhoyDashboard
 
     before_action :set_chat, only: [ :show, :destroy ]
 
-    # The list, not the last one. Landing straight in whichever conversation was
-    # open most recently hid every other one behind a card that only appeared
-    # once there were three of them.
     def index
       @result = AhoyDashboard::ChatsQuery.call(page: params[:page])
       @chats = AhoyDashboard::ChatDecorator.wrap(@result.chats)
-      @realtime = AhoyDashboard::RealtimeQuery.call
     end
 
     def show
-      return render partial: "ahoy_dashboard/chats/thread", locals: { chat: @chat } if thread?
-
-      @realtime = AhoyDashboard::RealtimeQuery.call
+      render partial: "ahoy_dashboard/chats/thread", locals: { chat: @chat } if thread?
     end
 
     def create

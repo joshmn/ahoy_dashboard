@@ -1,7 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
-require "support/ahoy_dashboard/assistant"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard assistant tools" do
   describe AhoyDashboard::Assistant::Tools::TrafficSummary do
@@ -146,7 +143,7 @@ RSpec.describe "Dashboard assistant tools" do
     let(:conversation) { AhoyDashboard::Assistant::Slice.from_context("slice" => { "filters" => [ us ] }) }
 
     before do
-      travel_to(AhoyDashboard.time_zone.local(2026, 8, 21, 14, 30))
+      travel_to(dash_time(2026, 8, 21, 14, 30))
       [ "US", "US", "CA" ].each do |country|
         dash_page_view(dash_visit(started_at: 1.day.ago, visitor: SecureRandom.uuid, country: country))
       end

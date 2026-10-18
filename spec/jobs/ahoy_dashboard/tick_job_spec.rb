@@ -1,8 +1,6 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::TickJob do
-  # Every entry off unless a spec says otherwise, so one feature's guard cannot
-  # quietly enqueue somebody else's job into the expectation.
   before do
     allow(AhoyDashboard::Serp).to receive(:enabled?).and_return(false)
     allow(AhoyDashboard::Alerts).to receive(:enabled?).and_return(false)
@@ -57,8 +55,6 @@ RSpec.describe AhoyDashboard::TickJob do
       expect(run_of("serp_dispatch")).to have_attributes(status: "off", runs_count: 0)
     end
 
-    # Off is a state, not a result. Blanking the last run would lose the only
-    # record of when the feature last did anything.
     it "keeps what the last real run said" do
       allow(AhoyDashboard::Serp).to receive(:enabled?).and_return(true)
       described_class.perform_now

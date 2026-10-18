@@ -23,7 +23,7 @@ module AhoyDashboard
 
         def call
           Answer.transaction do
-            Answer.connection.execute("SELECT pg_advisory_xact_lock(#{Runs::ReservationService::LOCK_NAMESPACE}, #{Runs::ReservationService::LOCK_KEY})")
+            Runs::ReservationService.lock
             answer = reservation
             next if answer.nil? || !answer.pending?
             next if !roll_over(answer: answer)

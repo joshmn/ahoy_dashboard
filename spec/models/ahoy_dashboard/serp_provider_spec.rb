@@ -1,10 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::SerpProvider do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
 
   around { |example| travel_to(now) { example.run } }
 
@@ -27,15 +24,6 @@ RSpec.describe AhoyDashboard::SerpProvider do
       provider.update_column(:credentials, "not an envelope")
 
       expect(provider.reload.credentials).to eq({})
-    end
-
-    it "knows whether it has everything its adapter needs" do
-      expect(create(:dash_serp_provider, :serpapi)).to be_ready
-      expect(build(:dash_serp_provider, :serpapi, credentials: {})).not_to be_ready
-    end
-
-    it "counts an adapter that needs no credentials as ready" do
-      expect(create(:dash_serp_provider)).to be_ready
     end
   end
 

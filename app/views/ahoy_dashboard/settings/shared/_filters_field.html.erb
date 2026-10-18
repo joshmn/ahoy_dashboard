@@ -1,11 +1,3 @@
-<%# A form's filters, built the way the dashboard's are: the same filter dialog
-    over the same values, collected into compact rows, and on an exclusion into
-    sets.
-
-    It was three selects in a row before, which asked somebody to know a
-    dimension's name and spell one of its values from memory. A row's values are
-    one text box, one per line, so a list can be pasted in whole and the form
-    still works from a keyboard and with the JavaScript off. %>
 <% preview_url = local_assigns[:preview_url] %>
 <% blocks = source.blocks? %>
 <% sets = source.filter_blocks %>
@@ -36,9 +28,6 @@
           "aria-haspopup": "dialog", data: { action: "dash--filters#newSet", tm_filter: "" } %>
   <% end %>
 
-<%# The templates the controller stamps out for a row or a set added after the
-    page loaded. Server-rendered so a new row and an old one cannot drift, and
-    inert until they are cloned. %>
   <% AhoyDashboard::Dimension.filterable.each_with_index do |dimension, number| %>
     <template data-dash--filters-target="rowTemplate" data-dimension="<%= dimension.key %>">
       <%= render "ahoy_dashboard/settings/shared/filter_row",

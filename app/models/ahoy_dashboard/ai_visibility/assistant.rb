@@ -1,6 +1,10 @@
 module AhoyDashboard
   module AiVisibility
     class Assistant < AhoyDashboard::Record
+      include StoredCredentials
+      include LastError
+
+      CREDENTIALS_SALT = SecretBox::AI_VISIBILITY_SALT
       MODEL_FORMAT = %r{\A[A-Za-z0-9][A-Za-z0-9._:/@-]*\z}
       MODEL_LENGTH = 100
 
@@ -15,20 +19,8 @@ module AhoyDashboard
         find_by(name: name.to_s)
       end
 
-      def credentials
-        SecretBox.read_values(value: self[:credentials], salt: SecretBox::AI_VISIBILITY_SALT)
-      end
-
-      def credentials=(values)
-        self[:credentials] = SecretBox.write_values(values: values, salt: SecretBox::AI_VISIBILITY_SALT)
-      end
-
       def api_key
-        credentials[:api_key]
-      end
-
-      def record_error!(message)
-        update_columns(last_error: message.to_s.first(255), last_error_at: Time.current)
+        credential(:api_key)
       end
 
       def record_success!(now: Time.current)

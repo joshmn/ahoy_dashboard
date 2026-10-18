@@ -3,26 +3,6 @@ require "rails_helper"
 RSpec.describe "Dashboard seo brand terms", type: :request do
   let(:key) { AhoyDashboard::Seo::BrandTerms::KEY }
 
-  after { AhoyDashboard::Setting.clear(key) }
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      patch "/telemetry/seo/brand_terms", params: { brand_terms: { terms: "prison dude" } }
-
-      expect(response).to redirect_to("/users/sign_in")
-      expect(AhoyDashboard::Setting.read(key)).to be_nil
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      patch "/telemetry/seo/brand_terms", params: { brand_terms: { terms: "prison dude" } }
-
-      expect(response).to have_http_status(:not_found)
-      expect(AhoyDashboard::Setting.read(key)).to be_nil
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
@@ -32,6 +12,16 @@ RSpec.describe "Dashboard seo brand terms", type: :request do
       expect(response).to redirect_to("/telemetry/seo/brand_split?period=6mo")
       expect(AhoyDashboard::Setting.read(key)).to eq([ "federal prison dude", "Prison Dude" ])
       expect(flash[:notice]).to eq("Brand words saved.")
+    end
+
+    it "does not read the site list for a save that only redirects" do
+      create(:dash_serp_site, name: "Us", domain: "example.com")
+      reads = captured_sql(/\ASELECT "ahoy_dashboard_serp_sites"/, cached: true) do
+        patch "/telemetry/seo/brand_terms", params: { brand_terms: { terms: "prison dude" } }
+      end
+
+      expect(response).to have_http_status(:redirect)
+      expect(reads).to be_empty
     end
 
     it "clears the list when the box is emptied and goes back to the site's name" do

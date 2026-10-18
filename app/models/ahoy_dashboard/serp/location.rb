@@ -20,6 +20,14 @@ module AhoyDashboard
           @country_names ||= AhoyDashboard::Countries::NAMES.map { |code, name| [ code.downcase, name ] }.to_h.freeze
         end
 
+        def country_options(names = country_names, keep: [])
+          missing = keep.select(&:present?).reject { |code| names.key?(code) }
+
+          names.merge(missing.index_with { |code| country(code).country_name })
+            .sort_by { |_code, name| name }
+            .map { |code, name| [ name, code ] }
+        end
+
         def city(canonical_name:, country_code: Serp::DEFAULT_COUNTRY)
           new([ CITY_PREFIX, country_code.to_s.downcase, canonical_name ].join(SEPARATOR))
         end
@@ -53,11 +61,6 @@ module AhoyDashboard
         problem.nil?
       end
 
-      # What a line has to be before a provider will take it. A country is the
-      # two letter code and nothing else: that is what gl wants, and it is the
-      # key DataForSEO maps to a country name. Anything else used to pass, so a
-      # line reading chicago was sent as a country code, came back as a search
-      # from nowhere in particular, and looked like a real ranking.
       def problem
         return nil if country? && country_code.match?(COUNTRY_CODE)
         return "#{value.inspect} is not a two letter country code" if country?

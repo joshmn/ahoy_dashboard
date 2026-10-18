@@ -23,11 +23,9 @@ module AhoyDashboard
         "Metrics" => Metric::ALL.map do |metric|
           PaletteItem.new(label: metric.label, icon: :empty, path: routes.root_path(query.with(metric: metric.key).to_query))
         end,
-        "Date range" => Period::ALL.reject(&:custom?).map do |period|
-          PaletteItem.new(label: period.label, icon: :cal, path: routes.root_path(query.to_query.merge(period: period.key).except(:from, :to)))
-        end,
+        "Date range" => periods,
         "SEO" => Seo::Surface::ALL.map do |surface|
-          PaletteItem.new(label: surface.title, icon: surface.sample? ? :empty : :chevron_right,
+          PaletteItem.new(label: surface.title, icon: :chevron_right,
             path: routes.public_send(surface.route), badge: (surface.feature_state.badge unless surface.installed?))
         end,
         "Group by" => options(:interval_options, icon: :cal),
@@ -55,10 +53,18 @@ module AhoyDashboard
       ]
     end
 
+    def periods
+      options = PeriodMenu.items(query: query, custom: false) do |period|
+        routes.root_path(query.to_query.merge(period: period.key).except(:from, :to))
+      end
+
+      options.map { |option| PaletteItem.new(label: option.label, icon: :cal, path: option.path) }
+    end
+
     def options(name, icon:)
       return [] unless screen.respond_to?(name)
 
-      Array(screen.public_send(name)).select { |option| option.respond_to?(:path) }.map do |option|
+      screen.public_send(name).map do |option|
         PaletteItem.new(label: option.label, icon: icon, path: option.path)
       end
     end
@@ -78,7 +84,7 @@ module AhoyDashboard
       end
 
       if query.filters.any?
-        items.unshift(PaletteItem.new(label: "Clear all filters", icon: :close, note: "#{query.filters.count} on",
+        items.unshift(PaletteItem.new(label: "Clear all filters", icon: :close,
           path: routes.root_path(query.with(filters: nil).to_query)))
       end
 

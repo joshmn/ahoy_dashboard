@@ -25,38 +25,19 @@ RSpec.describe "Concurrent dashboard database claims" do
     end
   end
 
-  def concurrently(count: 2)
-    ready = Queue.new
-    start = Queue.new
-    threads = Array.new(count) do |index|
-      Thread.new do
-        ActiveRecord::Base.connection_pool.with_connection do |connection|
-          ready << connection.raw_connection.backend_pid
-          start.pop
-          yield(index)
-        end
-      end
-    end
-    @connection_ids = Array.new(count) { ready.pop }
-    count.times { start << true }
-    threads.map(&:value)
-  ensure
-    threads.each(&:join) if threads
-  end
-
   it "reserves the final available AI request for only one simultaneous run" do
     AhoyDashboard::Setting.write(AhoyDashboard::AiVisibility::CAP_KEY, 1)
     @prompt = create(:dash_ai_prompt)
     target = AhoyDashboard::AiVisibility::Target.new(assistant: "openai", model: "gpt-5")
     now = Time.current
 
-    runs = concurrently do
+    runs = run_concurrently do
       AhoyDashboard::AiVisibility::Runs::ReservationService.call(
-        prompts: [@prompt], targets: [target], trigger: "manual", now: now
+        prompts: [ @prompt ], targets: [ target ], trigger: "manual", now: now
       )
     end
 
-    expect([runs.map(&:status).sort, @connection_ids.uniq.length]).to eq([%w[queued skipped], 2])
+    expect([ runs.map(&:status).sort, concurrent_backends.uniq.length ]).to eq([ %w[queued skipped], 2 ])
   end
 
   it "lets only one connection claim the same external AI request" do
@@ -65,37 +46,37 @@ RSpec.describe "Concurrent dashboard database claims" do
     create(:dash_ai_answer, run: run, prompt: @prompt, status: :pending)
     now = Time.current
 
-    claims = concurrently do
+    claims = run_concurrently do
       AhoyDashboard::AiVisibility::Answers::ClaimService.call(
         run: run, prompt: @prompt, assistant: "openai", model: "gpt-4.1", now: now
       )
     end
 
-    expect([claims.compact.length, @connection_ids.uniq.length]).to eq([1, 2])
+    expect([ claims.compact.length, concurrent_backends.uniq.length ]).to eq([ 1, 2 ])
   end
 
   it "grants only one scheduler lease to simultaneous first-time claimants" do
     now = Time.current
 
-    claims = concurrently do |index|
+    claims = run_concurrently do |index|
       AhoyDashboard::Scheduling::ClaimService.call(key: @key, token: "worker_#{index}", now: now)
     end
 
-    expect([claims.count { |claim| claim }, @connection_ids.uniq.length]).to eq([1, 2])
+    expect([ claims.count { |claim| claim }, concurrent_backends.uniq.length ]).to eq([ 1, 2 ])
   end
 
   it "adds every concurrent upsert increment atomically" do
     model = AhoyDashboard::SerpSpendDay
     date = Date.current
 
-    concurrently(count: 4) do
+    run_concurrently(count: 4) do
       AhoyDashboard::Compatibility::Upsert.new(
-        model: model, rows: [{ provider: @key, on: date, kind: :checks, units: 1 }],
-        unique_by: [:provider, :on, :kind],
+        model: model, rows: [ { provider: @key, on: date, kind: :checks, units: 1 } ],
+        unique_by: [ :provider, :on, :kind ],
         on_duplicate: Arel.sql("units = #{model.quoted_table_name}.units + excluded.units")
       ).call
     end
 
-    expect([model.find_by!(provider: @key).units, @connection_ids.uniq.length]).to eq([4, 4])
+    expect([ model.find_by!(provider: @key).units, concurrent_backends.uniq.length ]).to eq([ 4, 4 ])
   end
 end

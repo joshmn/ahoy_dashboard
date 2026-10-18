@@ -1,11 +1,3 @@
-<%# Both steps of the picker.
-
-    The shell is the command menu and the rows are the dropdown menus', because
-    that is what these two steps already are: a list of dimensions, then one
-    dimension's values. .pop-hd is its back step and every row is a menu item.
-
-    Every row is a button carrying what it would write, not a link, because
-    picking here fills in a field rather than going anywhere. %>
 <%= dash_frame_tag AhoyDashboard::PickersController::FRAME do %>
   <% if facet.nil? %>
     <div class="pop-sc">
@@ -21,7 +13,6 @@
       <% end %>
     </div>
   <% else %>
-<%# The way back, which is the design's own menu head. %>
     <div class="pop-hd">
       <%= dash_icon_button :back,
             label: "Back to all facets",
@@ -40,8 +31,7 @@
         </p>
       <% else %>
         <% mono = facet.dimension? && dash_mono_dimension?(facet.dimension_key) %>
-        <% chip = facet.dimension? ? dash_chip_kind(facet.dimension_key) : nil %>
-        <% chip = nil unless chip.in?(%i[flag channel]) %>
+        <% chip = facet.dimension? ? dash_chip_kind(facet.dimension_key, favicon: false) : nil %>
 
         <% options.each do |option| %>
           <%= dash_menu_item note: (dash_number(option.visitors) if option.counted?),

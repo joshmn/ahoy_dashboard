@@ -55,10 +55,10 @@ module AhoyDashboard
 
       def fetch_counts
         columns = spans.map do |hours, weeks_ago|
-          from, to = bounds(hours, weeks_ago).map { |time| Sql.literal(time.utc.strftime("%Y-%m-%d %H:%M:%S.%6N")) }
+          from, to = bounds(hours, weeks_ago).map { |time| Timestamp.literal(time) }
 
           Arel.sql("count(distinct ahoy_visits.visitor_token) filter " \
-                   "(where ahoy_visits.started_at >= #{from}::timestamp and ahoy_visits.started_at < #{to}::timestamp)")
+                   "(where ahoy_visits.started_at >= #{from} and ahoy_visits.started_at < #{to})")
         end
 
         started_at = AhoyDashboard.visit.arel_table[:started_at]

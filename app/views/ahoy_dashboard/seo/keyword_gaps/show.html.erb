@@ -4,17 +4,11 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter %>
 
   <% if !@presenter.tracking? || !@presenter.site? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.rank_empty %>
-    <% end %>
+    <%= dash_empty_card **@presenter.rank_empty %>
   <% elsif @presenter.no_rivals? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.competitor_notice %>
-    <% end %>
+    <%= dash_empty_card **@presenter.competitor_notice %>
   <% elsif !@presenter.any? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.rank_empty(hint: "Competitors are set up, but no check in this range has scored them. Try a longer date range.") %>
-    <% end %>
+    <%= dash_empty_card **@presenter.rank_empty(hint: "Competitors are set up, but no check in this range has scored them. Try a longer date range.") %>
   <% else %>
     <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
 
@@ -44,10 +38,7 @@
                 </div>
               </td>
               <td>
-                <div class="seo-figure seo-figure--start">
-                  <%= tag.span(class: "seo-meter seo-meter--wide", **seo_bar(share)) %>
-                  <span class="seo-figure__pct"><%= @presenter.percent(share) %></span>
-                </div>
+                <%= seo_figure(share, @presenter.percent(share), wide: true) %>
               </td>
               <td class="num"><%= @presenter.number(appearances) %></td>
             </tr>
@@ -60,14 +51,7 @@
 
     <% @presenter.groups.each do |group| %>
       <%= dash_card class: "mt-3 seo-group", id: "gap-#{group.key}" do %>
-        <% group_title = capture do %>
-            <%= group.title %>
-            <%= dash_badge group.rows.size, tone: group.tone, class: "seo-count" %>
-        <% end %>
-        <%= dash_card_header group_title, title_class: "seo-group-title" do %>
-          <span class="g-hint"><%= group.note %></span>
-          <%= seo_csv(@presenter, group.key) %>
-        <% end %>
+        <%= seo_group_header(@presenter, group) %>
 
         <%= dash_table label: group.title, cols: @presenter.table_cols do %>
           <thead>

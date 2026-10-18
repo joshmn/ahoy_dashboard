@@ -1,8 +1,5 @@
 require "rails_helper"
 
-# This replaced a markdown library, so it has to be held to what a model
-# actually writes rather than to what is convenient to parse. Everything here
-# is a shape the assistant produces in ordinary use.
 RSpec.describe AhoyDashboard::Markdown do
   def render(text)
     described_class.to_html(text)
@@ -100,8 +97,6 @@ RSpec.describe AhoyDashboard::Markdown do
       expect(render("`a **b** c`")).to eq("<p><code>a **b** c</code></p>")
     end
 
-    # The placeholder scheme this replaced would have turned a bare number in
-    # prose into a code span.
     it "leaves bare numbers in prose alone next to a code span" do
       expect(render("`x` gave 0 rows and 1 warning"))
         .to eq("<p><code>x</code> gave 0 rows and 1 warning</p>")
@@ -123,8 +118,6 @@ RSpec.describe AhoyDashboard::Markdown do
         .to eq(%(<p><a href="https://example.com/a">docs</a></p>))
     end
 
-    # Not a security boundary, the sanitizer is. This is so the reader sees what
-    # was written instead of a link that quietly lost its destination.
     it "leaves a scheme it does not know as plain text" do
       expect(render("[x](javascript:alert(1))")).to eq("<p>[x](javascript:alert(1))</p>")
       expect(render("[m](mailto:a@b.c)")).to eq("<p>[m](mailto:a@b.c)</p>")
@@ -132,8 +125,6 @@ RSpec.describe AhoyDashboard::Markdown do
   end
 
   describe "what it does not understand" do
-    # The contract: an unsupported shape degrades to the characters the model
-    # typed. It never swallows content and never emits a broken tag.
     it "leaves an image as its literal text" do
       expect(render("![alt](/a.png)")).to eq("<p>!<a href=\"/a.png\">alt</a></p>")
     end
@@ -152,8 +143,6 @@ RSpec.describe AhoyDashboard::Markdown do
     end
   end
 
-  # Whatever this produces goes through the same allowlist kramdown's output
-  # did, so nothing it emits can widen what reaches the page.
   describe "through the sanitizer the helper applies" do
     let(:view) { ActionView::Base.empty.tap { |v| v.extend(AhoyDashboard::DashboardHelper) } }
 

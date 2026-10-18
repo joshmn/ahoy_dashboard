@@ -8,15 +8,5 @@ FactoryBot.define do
     depth { name.to_s.split(",").size - 1 }
     children_count { 0 }
     synced_at { Time.current }
-
-    trait :state do
-      name { "Illinois,United States" }
-      kind { "state" }
-    end
-
-    trait :city do
-      name { "Chicago,Illinois,United States" }
-      kind { "city" }
-    end
   end
 end

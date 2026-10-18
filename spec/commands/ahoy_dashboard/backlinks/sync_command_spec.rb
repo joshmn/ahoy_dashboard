@@ -1,10 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Backlinks::SyncCommand do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:today) { now.to_date }
   let(:domains_endpoint) { AhoyDashboard::Serp::Adapters::DataForSeoAdapter::BACKLINK_ENDPOINT }
   let(:anchors_endpoint) { AhoyDashboard::Serp::Adapters::DataForSeoAdapter::ANCHOR_ENDPOINT }
@@ -41,9 +38,9 @@ RSpec.describe AhoyDashboard::Backlinks::SyncCommand do
   end
 
   def stored(domain, authority:, provider: "dataforseo")
-    AhoyDashboard::BacklinkDomain.create!(domain: domain, authority: authority, links: 1,
-                                          first_seen_on: today - 30, last_seen_on: today - 1,
-                                          provider: provider)
+    create(:dash_backlink_domain, domain: domain, authority: authority, links: 1,
+           first_seen_on: today - 30, last_seen_on: today - 1,
+           provider: provider)
   end
 
   it "counts both requests against the provider's ceiling" do
@@ -85,6 +82,30 @@ RSpec.describe AhoyDashboard::Backlinks::SyncCommand do
     expect(events[:refused]).to eq("Backlinks would come from sample data. Choose a real search provider.")
     expect(AhoyDashboard::BacklinkDomain.count).to be_zero
     expect(AhoyDashboard::BacklinkSample.count).to be_zero
+  end
+
+  it "fails on a refused login rather than calling it a quota" do
+    stub_request(:post, domains_endpoint)
+      .to_return(status: 401, body: { "status_code" => 40_100, "status_message" => "Unauthorized." }.to_json)
+
+    events = described_class.call
+
+    expect(events[:failed]).to eq("Unauthorized.")
+    expect(events).not_to have_key(:rate_limited)
+    expect(provider.reload.last_error).to eq("Unauthorized.")
+    expect(provider.spent_this_month).to eq(3)
+  end
+
+  it "keeps a referrer whose first seen date it cannot read, without the date" do
+    body = dataforseo_body(items: [ { "domain" => "a.com", "rank" => 50, "backlinks" => 3, "nofollow_backlinks" => 0,
+                                      "first_seen" => "not a date" } ])
+    stub_request(:post, domains_endpoint).to_return(json(body))
+    stub_anchors
+
+    events = described_class.call
+
+    expect(events[:ok].gained).to eq(1)
+    expect(AhoyDashboard::BacklinkDomain.find_by!(domain: "a.com").first_seen_on).to eq(today)
   end
 
   it "refuses without a login" do
@@ -129,8 +150,35 @@ RSpec.describe AhoyDashboard::Backlinks::SyncCommand do
     expect(AhoyDashboard::BacklinkDomain.find_by(domain: "low.com").lost_on).to be_nil
   end
 
+  it "adds sites it has not seen, refreshes the ones it knew and brings lost ones back" do
+    known = stored("known.com", authority: 20)
+    back = stored("back.com", authority: 30)
+    back.update!(lost_on: today - 5)
+    stub_domains([ "new.com", 50 ], [ "known.com", 60 ], [ "back.com", 70 ])
+    stub_anchors
+
+    events = described_class.call
+
+    expect(events[:ok]).to have_attributes(domains: 3, gained: 1, lost: 0, returned: 1)
+    expect(known.reload).to have_attributes(authority: 60, links: 3, first_seen_on: today - 30,
+                                            last_seen_on: today, lost_on: nil)
+    expect(back.reload).to have_attributes(authority: 70, first_seen_on: today - 30, last_seen_on: today, lost_on: nil)
+    expect(AhoyDashboard::BacklinkDomain.find_by(domain: "new.com"))
+      .to have_attributes(authority: 50, links: 3, first_seen_on: today, last_seen_on: today, provider: "dataforseo")
+  end
+
+  it "writes the whole profile in one statement however many sites came back" do
+    stored("known.com", authority: 20)
+    stub_domains(*(1..20).map { |n| [ "site#{n}.com", n ] }, [ "known.com", 60 ])
+    stub_anchors
+    writes = captured_sql(/\A\s*(INSERT|UPDATE)\s+(INTO\s+)?"ahoy_dashboard_backlink_domains"/i, cached: true) { described_class.call }
+
+    expect(writes.size).to eq(2)
+    expect(AhoyDashboard::BacklinkDomain.count).to eq(21)
+  end
+
   it "drops anchor text the provider stopped returning" do
-    AhoyDashboard::BacklinkAnchor.create!(text: "old anchor", links: 900, domains: 40, seen_on: today - 10)
+    create(:dash_backlink_anchor, text: "old anchor", links: 900, domains: 40, seen_on: today - 10)
     stub_domains([ "a.com", 50 ])
     stub_anchors("this guide")
 
@@ -140,7 +188,7 @@ RSpec.describe AhoyDashboard::Backlinks::SyncCommand do
   end
 
   it "keeps the anchors it had when the anchor lookup fails" do
-    AhoyDashboard::BacklinkAnchor.create!(text: "old anchor", links: 900, domains: 40, seen_on: today - 10)
+    create(:dash_backlink_anchor, text: "old anchor", links: 900, domains: 40, seen_on: today - 10)
     stub_domains([ "a.com", 50 ])
     stub_request(:post, anchors_endpoint).to_return(status: 500, body: "")
 
@@ -151,8 +199,8 @@ RSpec.describe AhoyDashboard::Backlinks::SyncCommand do
 
   it "clears out sample rows on the first real sync instead of reporting them lost" do
     stored("reddit.com", authority: 90, provider: "fake")
-    AhoyDashboard::BacklinkSample.create!(on: today - 1, domains: 11, links: 40, provider: "fake")
-    AhoyDashboard::BacklinkAnchor.create!(text: "read more", links: 90, domains: 4, seen_on: today - 1)
+    create(:dash_backlink_sample, on: today - 1, domains: 11, links: 40, provider: "fake")
+    create(:dash_backlink_anchor, text: "read more", links: 90, domains: 4, seen_on: today - 1)
     stub_domains([ "a.com", 50 ])
     stub_anchors
 

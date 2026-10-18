@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::FunnelQuery do
   let(:day) { dash_day_range(2026, 8, 11) }
@@ -78,8 +77,6 @@ RSpec.describe AhoyDashboard::FunnelQuery do
       expect(step(result, 2).visitors).to be_zero
     end
 
-    # The greedy read has to keep looking after the first match. Somebody who
-    # asked, went back to the page, then asked again did walk the funnel.
     it "counts a step that fired again after the step before it" do
       one = visit(visitor: "second-pass")
       dash_goal(one, "consult_requested", at: noon)
@@ -202,8 +199,6 @@ RSpec.describe AhoyDashboard::FunnelQuery do
       expect(result.steps.map(&:dropoff_rate)).to eq([ nil, 57.1, 66.7 ])
     end
 
-    # nil is not zero. The first step has no step before it, so there is no
-    # drop-off to report rather than a drop-off of none.
     it "leaves the first step's drop-off unanswered" do
       result = described_class.call(scope: scope, funnel: funnel)
 
@@ -258,9 +253,6 @@ RSpec.describe AhoyDashboard::FunnelQuery do
       expect(described_class.call(scope: with_bots, funnel: funnel).steps.map(&:visitors)).to eq([ 1, 1, 0 ])
     end
 
-    # A page filter narrows the sessions the funnel is read over. It must not
-    # narrow the event rows as well, or a custom event step reads zero because a
-    # conversion carries no path.
     it "narrows to the sessions a page filter picked without gutting the steps" do
       seen = visit(visitor: "saw-the-page")
       dash_page_view(seen, path: "/going-in/faq", at: noon)
@@ -299,16 +291,9 @@ RSpec.describe AhoyDashboard::FunnelQuery do
 
       funnel.funnel_steps.load
 
-      reads = 0
-      subscription = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
-        reads += 1 if payload[:sql].to_s.include?("tm_funnel")
-      end
+      reads = captured_sql("tm_funnel", cached: true) { described_class.call(scope: scope, funnel: funnel).steps.map(&:visitors) }
 
-      described_class.call(scope: scope, funnel: funnel).steps.map(&:visitors)
-
-      ActiveSupport::Notifications.unsubscribe(subscription)
-
-      expect(reads).to eq(1)
+      expect(reads.size).to eq(1)
     end
   end
 end

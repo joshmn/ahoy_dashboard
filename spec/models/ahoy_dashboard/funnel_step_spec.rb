@@ -55,7 +55,9 @@ RSpec.describe AhoyDashboard::FunnelStep do
     it "is refused while the goal is still a step" do
       goal = funnel.goals.first
 
-      expect { goal.destroy }.to raise_error(ActiveRecord::InvalidForeignKey)
+      expect { goal.destroy }.to raise_error(ActiveRecord::StatementInvalid) { |error|
+        expect(error.cause).to be_a(PG::ForeignKeyViolation).or be_a(PG::RestrictViolation)
+      }
     end
 
     it "is fine for a goal no funnel uses" do

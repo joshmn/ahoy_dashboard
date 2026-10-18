@@ -24,14 +24,8 @@ module AhoyDashboard
 
       INITIALIZER = "config/initializers/ahoy_dashboard.rb".freeze
 
-      # Not /analytics and not /dashboard. The first is on every blocklist a
-      # browser extension ships, and the second is the first thing anybody
-      # guesses. Mount it somewhere of your own if you would rather.
       DEFAULT_MOUNT = "/analytics-dashboard".freeze
 
-      # A route path and nothing else. The value is written into routes.rb
-      # inside a double quoted string, so anything that could close that string
-      # or open a second statement is refused rather than escaped.
       SAFE_MOUNT = %r{\A/[a-zA-Z0-9\-_/]*\z}
 
       SCOPE = "ahoy_dashboard".freeze
@@ -95,7 +89,6 @@ module AhoyDashboard
         value.to_s.split(",").map(&:strip).reject(&:empty?)
       end
 
-      # First, so a bad --at or feature name fails before anything has been written.
       def check_options
         if @stray.any?
           flag = skip.any? ? "--skip" : "--only"

@@ -1,11 +1,5 @@
 module AhoyDashboard
   module Seo
-    # Us against every other site being tracked, search by search. This costs
-    # nothing to run because it was already paid for: one search is fetched once
-    # and every site attached to it is scored off the same page, so a rival is a
-    # row in serp_sites rather than a second bill.
-    #
-    # Four buckets. Missing is the one worth opening the page for.
     class KeywordGapQuery
       BUCKETS = %i[missing weak strong alone nobody].freeze
 
@@ -19,7 +13,13 @@ module AhoyDashboard
         end
       end
 
-      Row = Data.define(:keyword, :query, :location, :ours, :rivals) do
+      Row = Data.define(:keyword, :location, :ours, :rivals) do
+        include Serp::Placed
+
+        def query
+          keyword.query
+        end
+
         def ranked?
           ours&.ranked?
         end
@@ -48,10 +48,6 @@ module AhoyDashboard
           return :alone if contenders.empty?
 
           position < best_rival.position ? :strong : :weak
-        end
-
-        def place
-          Serp::Location.parse(location)
         end
       end
 
@@ -94,8 +90,6 @@ module AhoyDashboard
           end
         end
 
-        # How much of the tracked set each rival actually turns up for, which is
-        # the only honest way to say whether a rival is a rival.
         def presence
           rivals.map do |rival|
             appearances = rows.count { |row| row.rivals.any? { |stand| stand.site.id == rival.id && stand.ranked? } }
@@ -130,14 +124,10 @@ module AhoyDashboard
       end
 
       def rows
-        pairs.map do |keyword_id, location|
-          keyword = keywords[keyword_id]
-          next if keyword.nil?
-
-          Row.new(keyword: keyword, query: keyword.query, location: location,
-                  ours: standing_for(site, keyword_id, location),
-                  rivals: rivals.map { |rival| standing_for(rival, keyword_id, location) })
-        end.select { |value| value }
+        pairs.map do |keyword, location|
+          Row.new(keyword: keyword, location: location, ours: standing_for(site, keyword.id, location),
+                  rivals: rivals.map { |rival| standing_for(rival, keyword.id, location) })
+        end
       end
 
       def standing_for(candidate, keyword_id, location)
@@ -149,28 +139,23 @@ module AhoyDashboard
 
       def targets
         @targets ||= AhoyDashboard::SerpKeywordTarget.tracked
-          .where(keyword_id: pairs.map(&:first).uniq).pluck(:keyword_id, :site_id).to_set
+          .where(keyword_id: pairs.map { |keyword, _location| keyword.id }.uniq).pluck(:keyword_id, :site_id).to_set
       end
 
-      # Every search either side turned up for, so a search only the rival is
-      # tracked on still gets a row rather than being dropped for having no
-      # reading of ours.
       def pairs
-        @pairs ||= latest.keys.map { |_site_id, keyword_id, location| [ keyword_id, location ] }.uniq
+        @pairs ||= latest.values.map { |check| [ check.keyword, check.location ] }.uniq
       end
 
       def latest
-        @latest ||= AhoyDashboard::SerpCheck
-          .where(status: AhoyDashboard::SerpCheck.statuses[:success])
+        @latest ||= AhoyDashboard::SerpCheck.success
+          .where(site_id: [ site.id, *rivals.map(&:id) ])
           .in_range(range)
           .for_tag(tag)
+          .at_current_places
           .select("distinct on (site_id, keyword_id, location) ahoy_dashboard_serp_checks.*")
           .order(Arel.sql("site_id, keyword_id, location, checked_at desc, id desc"))
+          .includes(:keyword)
           .index_by { |check| [ check.site_id, check.keyword_id, check.location ] }
-      end
-
-      def keywords
-        @keywords ||= AhoyDashboard::SerpKeyword.where(id: pairs.map(&:first).uniq).index_by(&:id)
       end
     end
   end

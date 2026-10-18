@@ -1,6 +1,3 @@
-<%# Wrapped in a frame with no src of its own, so the dashboard can embed this by
-    pointing a frame of the same name at this page and the response cannot end up
-    referencing itself. %>
 <%= dash_frame_tag AhoyDashboard::GoalConversionsPresenter::FRAME do %>
   <%= render "ahoy_dashboard/goal_conversions/card", presenter: @presenter %>
 <% end %>

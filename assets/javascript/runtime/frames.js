@@ -1,4 +1,5 @@
 import { FrameQueue } from "./frame_queue.js"
+import { modified } from "./keys.js"
 
 const queue = new FrameQueue(2)
 const connected = new Set()
@@ -175,7 +176,7 @@ const navigable = (link) => {
 
 const onClick = (event) => {
   if (event.defaultPrevented || event.button !== 0) return
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  if (modified(event)) return
 
   const link = event.target instanceof Element ? event.target.closest("a[href]") : null
   if (!link || !navigable(link)) return
@@ -198,12 +199,6 @@ const onSubmit = (event) => {
 
   const get = (form.method || "get").toLowerCase() === "get"
 
-  // A GET form inside a frame resolves back into it, the way a link does.
-  // Anything that writes has to say so: every other form in here is a real
-  // navigation with a redirect and a flash behind it, and quietly swallowing
-  // those into whichever frame they happened to sit in would break all of them.
-  // data-tm-frame is that opt in, and the response is whatever the redirect
-  // lands on, read for this frame's id the same as any other load.
   if (!get && !form.hasAttribute("data-tm-frame")) return
 
   event.preventDefault()

@@ -1,25 +1,17 @@
 module AhoyDashboard
-  # One keyword's page: the four figures, the series behind whichever one is
-  # selected, the days it was recorded on and the pages it landed on.
-  #
-  # Position runs the other way from everything else on the dashboard, so a fall
-  # in the number is an improvement and the change reads as better or worse
-  # rather than up or down. Click through and position also move in units nobody
-  # wants a percentage of, so those changes are printed as the distance moved.
   class SearchConsoleKeywordPresenter
+    include AhoyDashboard::Seo::Formatting
+
     DEFAULT_SERIES = "clicks".freeze
 
-    # short is what a column heading calls it. The long label names the measure
-    # where there is room for it; four stats across a dialog is not that, and
-    # "Click through rate" wrapping to two lines makes one tile taller than the
-    # three beside it.
+    DELTA_KINDS = { "ctr" => :points, "position" => :places }.freeze
+
     SERIES = {
       "clicks" => { label: "Clicks", short: "Clicks", format: :integer, kind: :area },
       "impressions" => { label: "Impressions", short: "Impressions", format: :integer, kind: :area },
       "ctr" => { label: "Click through rate", short: "CTR", format: :rate, kind: :line },
       "position" => { label: "Average position", short: "Position", format: :decimal, kind: :line }
     }.freeze
-
 
     Figure = Data.define(:key, :label, :short, :value, :display, :delta, :against, :active, :path) do
       def active?
@@ -33,19 +25,13 @@ module AhoyDashboard
 
     attr_reader :query, :result, :series
 
+    delegate :keyword, :slice, to: :result
+
     def initialize(query:, result:, series: nil, context: SearchConsole::PageContext.new)
       @query = query
       @result = result
       @series = SERIES.key?(series.to_s) ? series.to_s : DEFAULT_SERIES
       @context = context
-    end
-
-    def keyword
-      result.keyword
-    end
-
-    def slice
-      result.slice
     end
 
     def menus
@@ -64,10 +50,6 @@ module AhoyDashboard
 
     def landings_line
       "Landing pages"
-    end
-
-    def details_path
-      path(view: DETAILS_VIEW)
     end
 
     DETAILS_VIEW = "details".freeze
@@ -93,10 +75,8 @@ module AhoyDashboard
       parts.join(" · ")
     end
 
-    # The period's own name where it has one, and the dates only for a custom
-    # range. Lower-casing "Jul 17 to Aug 15" turned the month into "aug".
     def range_label
-      query.period.custom? ? query.range_label : query.period.label
+      query.range_title
     end
 
     def window_label
@@ -105,9 +85,9 @@ module AhoyDashboard
       first = result.window.begin
       last = result.window.end
 
-      return first.strftime("%b %-d, %Y") if first == last
+      return long_date(first) if first == last
 
-      "#{first.strftime("%b %-d, %Y")} to #{last.strftime("%b %-d, %Y")}"
+      "#{long_date(first)} to #{long_date(last)}"
     end
 
     def figures
@@ -141,11 +121,6 @@ module AhoyDashboard
       end
     end
 
-    # share is the page's cut of what the pages add up to, not of the keyword's
-    # own clicks. Those two are different numbers on purpose: Google withholds
-    # far more at query by page than at query alone, so the pages never account
-    # for the whole keyword and a share against the keyword would read as pages
-    # going missing rather than as Google withholding them.
     def landings
       counted = result.pages.sum(&:clicks)
 
@@ -161,15 +136,8 @@ module AhoyDashboard
       end
     end
 
-    # The sparkline's numbers, in order. A day the keyword grain was never pulled
-    # for is not a day with no impressions, so it is left out rather than drawn
-    # as a zero: a gap in the pull would otherwise read as the keyword dying.
     def spark_values
       result.recorded_days.map { |day| point_value(day).to_f }
-    end
-
-    def chart_kind
-      SERIES.fetch(series)[:kind]
     end
 
     def chart_data
@@ -181,6 +149,7 @@ module AhoyDashboard
     def chart_options
       {
         library: {
+          tmFill: SERIES.fetch(series)[:kind] == :area,
           plugins: { tmFormat: { label: series_label, value: format_type.to_s, interval: "day" } },
           scales: { y: { reverse: series == "position" } }
         }
@@ -188,13 +157,7 @@ module AhoyDashboard
     end
 
     def period_options
-      AhoyDashboard::SeoRange.periods.map do |period|
-        {
-          label: period.label,
-          url: link_for(query.with(period: period.key).to_query),
-          active: period.key == query.period.key
-        }
-      end
+      AhoyDashboard::Seo::Periods.menu(query) { |period| link_for(query.with(period: period.key).to_query) }
     end
 
     def connection_path
@@ -231,15 +194,14 @@ module AhoyDashboard
     def seen_note
       return nil if result.seen.nil?
 
-      "First recorded #{result.seen.begin.strftime("%b %-d, %Y")}, last seen " \
-        "#{result.seen.end.strftime("%b %-d, %Y")}."
+      "First recorded #{long_date(result.seen.begin)}, last seen #{long_date(result.seen.end)}."
     end
 
     def comparison_note
       return nil unless result.comparable?
 
-      "Compared against #{result.previous_window.begin.strftime("%b %-d")} to " \
-        "#{result.previous_window.end.strftime("%b %-d, %Y")}, the same length of time before this one."
+      "Compared against #{result.previous_window.begin.strftime(AhoyDashboard::DateFormat::SHORT)} to " \
+        "#{long_date(result.previous_window.end)}, the same length of time before this one."
     end
 
     def pages_note
@@ -255,12 +217,9 @@ module AhoyDashboard
     end
 
     def empty_action
-      if slice.any?
-        return { label: "Show all devices and countries", url: path(device: nil, country: nil),
-                 data: { tm_frame: "_top" }, primary: true }
-      end
+      return menus.clear_action(data: AhoyDashboard::SetupNotice::TOP) if slice.any?
 
-      { label: "Search Console settings", url: connection_path, data: { tm_frame: "_top" }, primary: false }
+      AhoyDashboard::Seo::SearchConsoleEmptyState.settings_action(routes)
     end
 
     def empty_title
@@ -335,16 +294,15 @@ module AhoyDashboard
     end
 
     def stamp(date)
-      (@time_zone ||= AhoyDashboard.time_zone).local(date.year, date.month, date.day)
+      time_zone.local(date.year, date.month, date.day)
+    end
+
+    def long_date(date)
+      date.strftime(AhoyDashboard::DateFormat::LONG)
     end
 
     def value_for(totals, key)
-      case key
-      when "impressions" then totals.impressions
-      when "ctr" then totals.ctr
-      when "position" then totals.position
-      else totals.clicks
-      end
+      totals.public_send(key)
     end
 
     def display(key, value)
@@ -355,64 +313,21 @@ module AhoyDashboard
       end
     end
 
-    # Counts move by proportion, click through by percentage points, and
-    # position by places. Printing a percentage change in an average position
-    # would be a number about a number.
     def change_for(key)
       return nil unless result.comparable?
 
-      current = value_for(result.totals, key)
-      before = value_for(result.previous, key)
-
-      case key
-      when "ctr" then points_change(current, before)
-      when "position" then places_change(current, before)
-      else percent_change(current, before)
-      end
-    end
-
-    def percent_change(current, before)
-      return nil unless before.to_f.positive?
-
-      moved = ((current - before) / before.to_f * 100).round(1)
-
-      AhoyDashboard::Delta.build("#{moved.abs}%", moved)
-    end
-
-    def points_change(current, before)
-      moved = ((current - before) * 100).round(1)
-
-      AhoyDashboard::Delta.build("#{moved.abs} pts", moved)
-    end
-
-    def places_change(current, before)
-      return nil unless before.to_f.positive?
-
-      moved = (current - before).round(1)
-
-      AhoyDashboard::Delta.build(moved.abs.to_s, moved, inverted: true)
+      AhoyDashboard::Delta.between(DELTA_KINDS.fetch(key, :percent), now: value_for(result.totals, key),
+                                   before: value_for(result.previous, key), require_before: key == "position")
     end
 
     def covered_label
-      "#{result.covered.begin.strftime("%b %-d, %Y")} to #{result.covered.end.strftime("%b %-d, %Y")}"
+      "#{long_date(result.covered.begin)} to #{long_date(result.covered.end)}"
     end
 
     def nothing_pulled_note
       return "Nothing has been pulled at the keyword grain yet." if result.covered.nil?
 
       "The keyword record runs #{covered_label}, and none of that is inside #{range_label.downcase}."
-    end
-
-    def number(value)
-      ActiveSupport::NumberHelper.number_to_delimited(value.to_i)
-    end
-
-    def percentage(value)
-      "#{(value.to_f * 100).round(1)}%"
-    end
-
-    def place(value)
-      value.to_f.round(1)
     end
 
     def routes

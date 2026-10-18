@@ -1,45 +1,36 @@
 <% content_for :dash_settings_section, "alert_rules" %>
 <% content_for :title, @rule.name %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: @rule.name,
-          lede: "#{@rule.watches}. Fires when #{@rule.condition}." %>
+<%= dash_page_head title: @rule.name,
+      lede: "#{@rule.watches}. Fires when #{@rule.condition}." %>
 
-    <% waiting = @rule.waiting_on %>
-    <% if waiting %>
-      <%= render "ahoy_dashboard/shared/feature_state", state: waiting %>
-    <% end %>
+<% waiting = @rule.waiting_on %>
+<% if waiting %>
+  <%= render "ahoy_dashboard/shared/feature_state", state: waiting %>
+<% end %>
 
-    <%= dash_card do %>
-      <%= dash_form_with model: @rule, url: settings_alert_rule_path(@rule), method: :patch, card: true do |form| %>
-        <%= form.grid do %>
-          <% if waiting %>
-            <%= form.select :enabled, [ [ "On", true ], [ "Off", false ] ], { selected: false }, label: "Status",
-                  disabled: true, hint: "Needs #{waiting.label}, which isn't installed." %>
-          <% else %>
-            <%= form.select :enabled, [ [ "On", true ], [ "Off", false ] ], {}, label: "Status" %>
-          <% end %>
+<%= dash_card do %>
+  <%= dash_form_with model: @rule, url: settings_alert_rule_path(@rule), method: :patch, card: true do |form| %>
+    <%= form.grid do %>
+      <%= form.select :enabled, @rule.status_options, (waiting ? { selected: false } : {}), label: "Status",
+            disabled: waiting.present?, hint: ("Needs #{waiting.label}, which isn't installed." if waiting) %>
 
-          <%= form.select :severity, AhoyDashboard::AlertRule.severities.keys.map { |key| [ key.capitalize, key ] },
-                {}, label: "Severity" %>
+      <%= form.select :severity, @rule.severity_options, {}, label: "Severity" %>
 
-          <% if @rule.definition.default_threshold %>
-            <%= form.number_field :threshold, label: @rule.definition.unit.to_s.capitalize.presence || "Threshold",
-                  placeholder: @rule.definition.default_threshold, step: 1,
-                  min: @rule.definition.threshold_range&.begin, max: @rule.definition.threshold_range&.end,
-                  hint: "Use a whole number #{@rule.definition.threshold_requirement}. Leave it blank to use the default, #{@rule.definition.default_threshold}. Start strict and loosen it if the rule stays quiet." %>
-          <% end %>
+      <% if @rule.definition.default_threshold %>
+        <%= form.number_field :threshold, label: @rule.definition.unit.to_s.capitalize.presence || "Threshold",
+              placeholder: @rule.definition.default_threshold, step: 1,
+              min: @rule.definition.threshold_range&.begin, max: @rule.definition.threshold_range&.end,
+              hint: "Use a whole number #{@rule.definition.threshold_requirement}. Leave it blank to use the default, #{@rule.definition.default_threshold}. Start strict and loosen it if the rule stays quiet." %>
+      <% end %>
 
-          <% if @rule.definition.default_floor %>
-            <%= form.number_field :floor, label: "Floor", min: 0, suffix: "visitors",
-                  placeholder: @rule.definition.default_floor,
-                  hint: "Leave it blank to use the default, #{@rule.definition.default_floor}. Keeps a quiet site from tripping the rule on tiny numbers." %>
-          <% end %>
-        <% end %>
-
-        <%= form.actions "Save", cancel: settings_alert_rules_path %>
+      <% if @rule.definition.default_floor %>
+        <%= form.number_field :floor, label: "Floor", min: 0, suffix: "visitors",
+              placeholder: @rule.definition.default_floor,
+              hint: "Leave it blank to use the default, #{@rule.definition.default_floor}. Keeps a quiet site from tripping the rule on tiny numbers." %>
       <% end %>
     <% end %>
-  </section>
-</div>
+
+    <%= form.actions "Save", cancel: settings_alert_rules_path %>
+  <% end %>
+<% end %>

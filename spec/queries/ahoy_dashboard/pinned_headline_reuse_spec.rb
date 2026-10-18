@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Pinned headline reuse" do
   let(:now) { dash_time(2026, 8, 11, 14, 30) }
@@ -10,8 +9,7 @@ RSpec.describe "Pinned headline reuse" do
 
   before do
     [-2.days, -1.day, -1.hour, 0].each_with_index do |offset, index|
-      visit = dash_visit(started_at: now + offset, visitor: "reader-#{index % 2}", country: index.even? ? "US" : "CA")
-      dash_page_view(visit, path: "/first")
+      visit = dash_landing("/first", at: now + offset, visitor: "reader-#{index % 2}", country: index.even? ? "US" : "CA")
       dash_page_view(visit, path: "/second", at: now + offset + 2.hours)
     end
   end
@@ -40,13 +38,7 @@ RSpec.describe "Pinned headline reuse" do
   it "runs only the comparison aggregate when current readings match" do
     saved = question
     prepared = headline
-    statements = []
-    subscriber = lambda do |*, payload|
-      if !payload[:cached] && payload[:sql].match?(/\bFROM\s+"?ahoy_visits\b/i)
-        statements << payload[:sql]
-      end
-    end
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+    statements = captured_sql(/\bFROM\s+"?ahoy_visits\b/i) do
       AhoyDashboard.visit.uncached { AhoyDashboard::PinnedQuestionsQuery.call(questions: [saved], headline: prepared) }
     end
 

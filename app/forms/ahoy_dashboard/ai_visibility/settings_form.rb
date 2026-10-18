@@ -24,6 +24,10 @@ module AhoyDashboard
         prompts.to_s.split(/\r?\n/).map(&:squish).reject(&:blank?).uniq(&:downcase)
       end
 
+      def frequency_options
+        AiVisibility::FREQUENCIES.map { |key, entry| [ key, entry[:label] ] }
+      end
+
       private
 
       def prompts_fit

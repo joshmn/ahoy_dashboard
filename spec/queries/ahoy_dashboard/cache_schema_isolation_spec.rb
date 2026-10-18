@@ -1,13 +1,12 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Analytics cache schema isolation" do
   let(:connection) { ActiveRecord::Base.connection }
   let(:range) { dash_day_range(2026, 8, 10) }
   let(:tables) do
-    %w[ahoy_visits ahoy_events ahoy_dashboard_search_console_rows
+    %w[ahoy_visits ahoy_events ahoy_dashboard_search_console_rows ahoy_dashboard_search_console_keywords
        ahoy_dashboard_search_console_totals ahoy_dashboard_search_console_days]
   end
 
@@ -49,6 +48,7 @@ RSpec.describe "Analytics cache schema isolation" do
       dash_goal(visit, label, "custom_#{label}" => "value")
     end
     create(:dash_search_console_row, date: range.begin.to_date, query: label, clicks: count)
+    create(:dash_search_console_keyword, date: range.begin.to_date, query: label, clicks: count)
     create(:dash_search_console_total, date: range.begin.to_date, clicks: count)
     create(:dash_search_console_day, date: range.begin.to_date, scanned_at: range.begin)
   end

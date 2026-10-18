@@ -1,18 +1,11 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard command palette", type: :request do
-  let(:document) { Nokogiri::HTML5(response.body) }
   let(:links) { document.css("a.ck-item") }
 
   before { sign_in(create(:user, :admin)) }
-
-  def open_palette
-    path = Nokogiri::HTML5(response.body).at_css("#tm-palette")["data-commands-url"]
-    get(path, headers: { "Tm-Frame" => "tm-palette-commands" })
-  end
 
   it "keeps every command within the engine mount" do
     get("/telemetry/settings/goals")
@@ -32,7 +25,7 @@ RSpec.describe "Dashboard command palette", type: :request do
     get("/telemetry", params: { period: "7d", filters: [{ dimension: "country", operator: "is", value: "CA" }] })
     open_palette
     metric = links.find { |link| link.text.strip == "Total pageviews" }
-    params = Rack::Utils.parse_nested_query(URI.parse(metric["href"]).query)
+    params = link_query(metric["href"])
 
     expect(params.fetch("filters")).to include("dimension" => "country", "operator" => "is", "value" => "CA")
   end

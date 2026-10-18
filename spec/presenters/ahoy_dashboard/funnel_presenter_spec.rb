@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::FunnelPresenter do
   let(:query) { AhoyDashboard::QueryForm.from_params({}) }
@@ -48,8 +47,6 @@ RSpec.describe AhoyDashboard::FunnelPresenter do
     expect(details.frame_id).to eq("report_details_funnel_#{funnel.id}")
   end
 
-  # Every bar is read against step one, not against the longest row, so the top
-  # of a funnel is always full and the shape underneath it is the drop.
   it "scales every bar against the first step" do
     expect(presenter.rows.map(&:share)).to eq([ 1.0, 0.25 ])
   end
@@ -59,8 +56,6 @@ RSpec.describe AhoyDashboard::FunnelPresenter do
     expect(presenter.rows.last.values["conversion_rate"]).to eq("25.0%")
   end
 
-  # nil is not zero. The first step has nothing before it to have lost anybody
-  # from, so the column reads blank rather than claiming it lost none.
   it "leaves the first step's loss blank" do
     expect(presenter.rows.first.values["dropoff"]).to eq("")
     expect(presenter.rows.first.values["dropoff_rate"]).to eq("")

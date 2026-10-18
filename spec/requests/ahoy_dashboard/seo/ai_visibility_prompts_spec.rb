@@ -1,10 +1,6 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard AI visibility prompt", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
   let(:prompt) { create(:dash_ai_prompt, text: "best federal prison consultant") }
 
   before { sign_in create(:user, :admin) }

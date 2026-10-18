@@ -22,11 +22,6 @@ class CreateAhoyDashboardPlaces < ActiveRecord::Migration[6.0]
     add_index :ahoy_dashboard_places, :synced_at,
               name: "index_ahoy_dashboard_places_on_synced_at"
 
-    # Typing into the picker is a prefix match against the place's own name, not
-    # its whole comma separated path, so this is the index that answers it. A
-    # plain btree cannot serve LIKE 'chicago%' under a non-C collation; the
-    # pattern ops class is what makes the prefix an index range rather than a
-    # scan of a quarter of a million rows.
     add_index :ahoy_dashboard_places, "lower(label) text_pattern_ops",
               name: "index_ahoy_dashboard_places_on_label_prefix"
   end

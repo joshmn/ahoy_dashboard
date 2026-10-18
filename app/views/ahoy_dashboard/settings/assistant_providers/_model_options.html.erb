@@ -1,0 +1,5 @@
+<datalist id="<%= AhoyDashboard::Settings::AssistantProviders::ModelsController::LIST %>">
+  <% options.each do |option| %>
+    <%= tag.option(value: option.id, label: option.label) %>
+  <% end %>
+</datalist>

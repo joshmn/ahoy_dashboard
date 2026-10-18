@@ -189,9 +189,9 @@ A keyword can carry any number of tags. One with none only shows under All tags,
 
 ## Edit, pause and delete
 
-Editing changes the keyword in place for places, depth and cadence: its old readings stay with it, and a reading for a place you remove drops out of Rankings right away, tiles, distribution and AI overviews included, even though it's not deleted. Add the place back and it shows again.
+Editing changes the keyword in place for places, depth and cadence: its old readings stay with it, and a reading for a place you remove drops out of Rankings, the [SEO reports](seo-reports.md) and rank alerts right away, tiles, distribution and AI overviews included, even though it's not deleted. Add the place back and it shows again.
 
-Change the keyword's phrase, device or language and its history starts over instead: readings for the old search move to a paused copy that keeps the old settings, tags and sites, and it sits in the keyword list where you can delete it if you don't want it. The new keyword is checked again within the hour, like any new keyword. If the new search already exists as a keyword, the save is rejected instead of colliding with it.
+Change the keyword's phrase, device or language and its history starts over instead: readings for the old search move to a paused copy that keeps the old settings, tags and sites, and it sits in the keyword list where you can delete it if you don't want it. The new keyword is checked again within the hour, like any new keyword. If the new search already exists as a keyword, even with different capitals, the save is rejected instead of colliding with it.
 
 Tick a new site on a keyword and the dashboard reads that site's positions out of every search already stored, for free. The notice says how many were read again.
 

@@ -49,7 +49,7 @@ module AhoyDashboard
             ahoy_dashboard/settings/serp_keyword_imports
           ]),
       new(key: "serp_providers", label: "Search provider", group: "Search",
-          route: :settings_serp_providers_path, glyph: :globe, features: %i[serp keywords backlinks],
+          route: :settings_serp_providers_path, glyph: :globe, features: Installation::PROVIDER_FEATURES,
           controllers: %w[ahoy_dashboard/settings/serp_providers ahoy_dashboard/settings/search_options]),
       new(key: "alert_rules", label: "Alerts", group: "Search",
           route: :settings_alert_rules_path, glyph: :bell, features: :alerts),

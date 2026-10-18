@@ -1,10 +1,5 @@
-<%# The strip and the chart are one card, so the row that holds the tiles also
-    holds the controls that change how the chart is drawn. A tile with no
-    comparison prints no pill rather than an empty one; the space is held by the
-    row, so switching metric cannot change the height of anything. %>
-<% comparing = query.comparison.present? %>
-<% comparison_label = comparing ? @presenter.comparison_label : AhoyDashboard::DashboardPresenter::COMPARISON_LABELS["previous_period"] %>
-<% comparison_toggle = comparing ? nil : "previous_period" %>
+<% comparing = @presenter.comparing? %>
+<% comparison_label = @presenter.comparison_switch_label %>
 
 <div class="stat-row">
   <%= form_with url: root_path,
@@ -24,11 +19,7 @@
   <% end %>
 
   <div class="chart-controls">
-<%# A link rather than a checkbox: it has to survive the JavaScript being off,
-    and everything else on this screen is a link too. Which comparison is picked
-    stays in the bar's menu, because there are three of them and a switch can
-    only say two. %>
-    <%= link_to root_path(query.with(comparison: comparison_toggle).to_query),
+    <%= link_to @presenter.comparison_switch_path,
           class: "cmp",
           role: "switch", data: { tm_frame: "_top" },
           "aria-checked": comparing.to_s,

@@ -61,7 +61,7 @@ module AhoyDashboard
 
         def exists_sql(family, floor)
           conditions = [ "ahoy_events.visit_id = ahoy_visits.id" ]
-          conditions << "ahoy_events.time >= #{AhoyDashboard.event.connection.quote(floor)}::timestamp" if floor
+          conditions << "ahoy_events.time >= #{Sql.timestamp(floor)}" if floor
           conditions.concat(family.map { |group| group_sql(group, candidate: true) })
 
           "EXISTS (SELECT 1 FROM #{AhoyDashboard.event.quoted_table_name} WHERE #{conditions.join(' AND ')})"

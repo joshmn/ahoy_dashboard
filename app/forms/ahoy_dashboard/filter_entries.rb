@@ -5,7 +5,6 @@ module AhoyDashboard
     FIELDS = %i[dimension operator value group block].freeze
     ROW_FIELDS = [ :dimension, :operator, :block, :values_text, { values: [], entries: FIELDS } ].freeze
     PERMITTED = { filters: FIELDS, rows: ROW_FIELDS }.freeze
-    GROUP_FORMAT = /\A\d{1,6}\z/
     SET_SLOT = /\Aset:(\d{1,6})\z/
     SHOWN = 3
 
@@ -20,6 +19,10 @@ module AhoyDashboard
 
       def negative?
         AhoyDashboard::Filter::NEGATIVE_OPERATORS.include?(operator)
+      end
+
+      def operator_options
+        AhoyDashboard::Filter.operator_options
       end
 
       def found
@@ -66,6 +69,9 @@ module AhoyDashboard
 
     included do
       attribute :rows
+      attribute :filters
+
+      validate :every_filter_is_readable
     end
 
     def entries
@@ -92,14 +98,6 @@ module AhoyDashboard
       AhoyDashboard::FilterBlocks.from_entries(entries)
     end
 
-    # Take one row, or one set, and hand back a form to redraw,
-    # without saving. Not saved on purpose: removing the only filter would fail
-    # the minimum, and answering a remove with a validation error rather than
-    # with the row gone reads as the button not working. Everything else typed
-    # in came along in the same submit and survives.
-    #
-    # Returns self unchanged for a slot that is not there, which is what a
-    # hand-edited value is.
     def without_slot(slot)
       current = filter_rows
       set = slot.to_s[SET_SLOT, 1]
@@ -159,23 +157,24 @@ module AhoyDashboard
 
     def rows_from_param
       pairs(rows).map do |key, raw|
-        next unless raw.respond_to?(:[])
+        entry = AhoyDashboard::FilterEntry.read(raw)
+        next if entry.nil?
 
-        block = blocks? ? block_of(raw) : 0
-        members = list(raw[:entries] || raw["entries"]).map { |entry| filter_row(entry)&.except("group", "block") }.select { |value| value }
+        block = blocks? ? entry.block : 0
+        members = list(entry.field(:entries)).map { |member| filter_row(member)&.except("group", "block") }.select { |value| value }
         next row_of(key, members).with(block: block) if members.any?
 
-        values = typed_values(raw)
+        values = typed_values(entry)
         next if values.empty?
 
-        Row.new(key: key.to_s, dimension: read_entry(raw, :dimension), operator: operator_of(raw),
+        Row.new(key: key.to_s, dimension: entry.dimension_key.strip, operator: operator_of(entry),
                 values: values, members: [], block: block)
       end.select { |value| value }
     end
 
-    def typed_values(raw)
-      text = raw[:values_text] || raw["values_text"]
-      source = text.nil? ? list(raw[:values] || raw["values"]) : text.to_s.split(/\r?\n/)
+    def typed_values(entry)
+      text = entry.field(:values_text)
+      source = text.nil? ? list(entry.field(:values)) : text.to_s.split(/\r?\n/)
 
       source.map { |value| value.to_s.strip }.reject(&:blank?).uniq
     end
@@ -217,39 +216,32 @@ module AhoyDashboard
     end
 
     def raw_entries
-      raw = filters
-      return Array(raw) unless raw.respond_to?(:key?)
-      return [ raw ] if raw.key?(:dimension) || raw.key?("dimension")
-
-      raw.respond_to?(:values) ? raw.values : []
+      AhoyDashboard::Filters.entries(filters: filters)
     end
 
-    # A row with no value is an empty slot. Filters.build drops a blank value
-    # too, so keeping it would save a row that reads back as nothing.
-    def filter_row(entry)
-      return nil unless entry.respond_to?(:[])
+    def filter_row(raw)
+      entry = AhoyDashboard::FilterEntry.read(raw)
+      return nil if entry.nil?
 
-      value = read_entry(entry, :value)
+      value = entry.value.strip
       return nil if value.blank?
 
-      row = { "dimension" => read_entry(entry, :dimension), "operator" => operator_of(entry), "value" => value }
-      group = read_entry(entry, :group)
-      row["group"] = group.to_i if group.match?(GROUP_FORMAT)
-      row["block"] = block_of(entry) if blocks?
+      row = { "dimension" => entry.dimension_key.strip, "operator" => operator_of(entry), "value" => value }
+      group = entry.group
+      row["group"] = group if group
+      row["block"] = entry.block if blocks?
       row
     end
 
-    def block_of(entry)
-      raw = read_entry(entry, :block)
-      raw.match?(GROUP_FORMAT) ? raw.to_i : 0
-    end
-
     def operator_of(entry)
-      read_entry(entry, :operator).presence || AhoyDashboard::Filter::DEFAULT_OPERATOR
+      entry.field(:operator).to_s.strip.presence || AhoyDashboard::Filter::DEFAULT_OPERATOR
     end
 
-    def read_entry(entry, key)
-      (entry[key.to_s] || entry[key]).to_s.strip
+    def every_filter_is_readable
+      return if entries.none?
+      return if entries.all? { |entry| AhoyDashboard::Filters.readable_entry?(entry) }
+
+      errors.add(:filters, "name a property or a match this dashboard does not have")
     end
   end
 end

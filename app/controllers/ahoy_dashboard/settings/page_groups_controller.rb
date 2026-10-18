@@ -1,33 +1,29 @@
 module AhoyDashboard
   module Settings
-    class PageGroupsController < AhoyDashboard::BaseController
+    class PageGroupsController < AhoyDashboard::Settings::BaseController
       before_action :set_record, only: [ :edit, :update, :destroy ]
 
       def index
         @records = AhoyDashboard::PageGroup.listed
-        # Deleting asks in the row rather than in a dialog, so the thing being
-        # deleted stays on screen while the question is answered.
-        @confirming = params[:confirm].presence
       end
 
       def new
         @form = AhoyDashboard::PageGroupForm.new
-        @paths = recent_paths
+        set_preview
       end
 
       def create
         @form = AhoyDashboard::PageGroupForm.new(record_params)
 
-        AhoyDashboard::PageGroups::CreateCommand.call(form: @form) do
+        AhoyDashboard::Records::SaveCommand.call(record: AhoyDashboard::PageGroup.new, form: @form, append: true) do
           on(:ok) { redirect_to settings_page_groups_path, notice: "Rule added." }
           on(:invalid) { |form| rejected(form, :new) }
-          on(:duplicate) { |form| rejected(form, :new) }
         end
       end
 
       def edit
         @form = AhoyDashboard::PageGroupForm.from_record(@record)
-        @paths = recent_paths
+        set_preview
       end
 
       def update
@@ -35,15 +31,14 @@ module AhoyDashboard
 
         @form = AhoyDashboard::PageGroupForm.new(record_params)
 
-        AhoyDashboard::PageGroups::UpdateCommand.call(record: @record, form: @form) do
+        AhoyDashboard::Records::SaveCommand.call(record: @record, form: @form) do
           on(:ok) { redirect_to settings_page_groups_path, notice: "Rule saved." }
-          on(:invalid) { |form| rejected(form, :edit) }
-          on(:duplicate) { |form| rejected(form, :edit) }
+          on(:invalid) { |form| rejected(form) }
         end
       end
 
       def destroy
-        AhoyDashboard::PageGroups::DestroyCommand.call(record: @record) do
+        AhoyDashboard::Records::DestroyCommand.call(record: @record) do
           on(:ok) { redirect_to settings_page_groups_path, notice: "Rule deleted." }
         end
       end
@@ -59,16 +54,18 @@ module AhoyDashboard
       end
 
       def move
-        AhoyDashboard::PageGroups::MoveCommand.call(record: @record, direction: nudge) do
-          on(:ok) { redirect_to settings_page_groups_path }
-          on(:nothing_to_do) { redirect_to settings_page_groups_path }
-        end
+        AhoyDashboard::Records::MoveCommand.call(record: @record, direction: nudge)
+        redirect_to settings_page_groups_path
       end
 
-      def rejected(form, template)
+      def rejected(form, template = :edit)
         @form = form
-        @paths = recent_paths
-        render template, status: :unprocessable_entity
+        set_preview
+        super
+      end
+
+      def set_preview
+        @preview = AhoyDashboard::Settings::PagePatternPreview.new(paths: recent_paths, patterns: @form.pattern_list)
       end
 
       def recent_paths

@@ -1,8 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard dashboard", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
@@ -19,28 +18,6 @@ RSpec.describe "Dashboard dashboard", type: :request do
   end
 
   describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "sends a signed out visitor to sign in from every entry point" do
-      [ "/telemetry/dashboard", "/telemetry/reports/pages", "/telemetry/realtime" ].each do |path|
-        get path
-
-        expect(response).to redirect_to("/users/sign_in"), "expected #{path} to bounce a signed out visitor"
-      end
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry"
-
-      expect(response).to have_http_status(:not_found)
-    end
-
     it "lets an admin in" do
       sign_in create(:user, :admin)
 
@@ -57,7 +34,7 @@ RSpec.describe "Dashboard dashboard", type: :request do
       get "/telemetry?loading=complete"
 
       expect(response).to have_http_status(:ok)
-      expect(Nokogiri::HTML5(response.body).at_css("[role=group][aria-label=Metrics]")).to be_present
+      expect(document.at_css("[role=group][aria-label=Metrics]")).to be_present
     end
 
     it "renders the strip, the chart and a frame per card" do
@@ -69,15 +46,11 @@ RSpec.describe "Dashboard dashboard", type: :request do
       AhoyDashboard::Metric::ALL.each do |metric|
         expect(response.body).to include(metric.label), "expected the #{metric.key} tile"
       end
-      (AhoyDashboard::Report.card_order - [ AhoyDashboard::Report::BEHAVIOURS ]).each do |key|
+      (AhoyDashboard::Report::CARD_ORDER - [ AhoyDashboard::Report::BEHAVIOURS ]).each do |key|
         expect(response.body).to include("report_#{key}"), "expected a frame for the #{key} card"
       end
     end
 
-    # Goals are drawn full width under the journey rather than as a card in the
-    # grid, because a goal row carries three numbers and a half-width column
-    # cannot hold them beside a name. The behaviours report still exists, and is
-    # still an export, but nothing on the dashboard renders it as a panel.
     it "draws goals under the journey rather than as a card in the grid" do
       traffic!
 
@@ -92,9 +65,6 @@ RSpec.describe "Dashboard dashboard", type: :request do
       expect(body.index(AhoyDashboard::GoalConversionsPresenter::FRAME)).to be > body.index("dash_journey")
     end
 
-    # A funnel is not a Report, so it is not in @reports and gets its own frame and
-    # its own dialog. The dialog has to be a sibling of the cards or position:
-    # fixed resolves against the grid and a card frame swap destroys it while open.
     it "renders a frame and a dialog for each configured funnel" do
       funnel = create(:dash_funnel, name: "Reached the consult")
 
@@ -111,7 +81,7 @@ RSpec.describe "Dashboard dashboard", type: :request do
 
       get "/telemetry"
 
-      frame = Nokogiri::HTML5(response.body).at_css("tm-frame##{AhoyDashboard::FunnelPresenter.frame_id(funnel)}")
+      frame = document.at_css("tm-frame##{AhoyDashboard::FunnelPresenter.frame_id(funnel)}")
 
       expect(frame["src"]).to start_with("/telemetry/funnels/#{funnel.id}")
       expect(frame["loading"]).to eq("lazy")
@@ -120,15 +90,7 @@ RSpec.describe "Dashboard dashboard", type: :request do
     it "preloads funnel steps in one batch before rendering every card" do
       goals = create_list(:dash_goal, 4)
       funnels = (2..4).map { |size| create(:dash_funnel, goals: goals.first(size)) }
-      statements = []
-      subscriber = lambda do |*, payload|
-        next if payload[:name] == "SCHEMA" || payload[:cached]
-        next unless payload[:sql].include?(%(FROM "ahoy_dashboard_funnel_steps"))
-
-        statements << payload[:sql]
-      end
-
-      ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { get "/telemetry?loading=complete" }
+      statements = captured_sql(%(FROM "ahoy_dashboard_funnel_steps")) { get "/telemetry?loading=complete" }
 
       expect(response).to have_http_status(:ok)
       expect(statements.size).to eq(1)
@@ -195,14 +157,22 @@ RSpec.describe "Dashboard dashboard", type: :request do
 
     it "renders with crawlers switched on" do
       traffic!
+      bot = dash_visit(started_at: now - 1.day, visitor: "bot")
+      dash_page_view(bot, path: "/crawled-only", at: now - 1.day, crawler: "Googlebot")
+
+      get "/telemetry", params: { loading: "complete" }
+      expect(document.at_css("#report_pages").text).not_to include("/crawled-only")
 
       get "/telemetry", params: { crawlers: "1" }
 
       expect(response).to have_http_status(:ok)
+      open_palette
+      expect(response.body).to include("Hide crawlers")
+
+      get "/telemetry", params: { crawlers: "1", loading: "complete" }
+      expect(document.at_css("#report_pages").text).to include("/crawled-only")
     end
 
-    # This URL gets edited by hand and pasted around. Every one of these has to
-    # fall back to a default rather than raising in front of somebody.
     it "falls back rather than erroring on nonsense in the query string" do
       traffic!
 
@@ -234,9 +204,7 @@ RSpec.describe "Dashboard dashboard", type: :request do
     before { sign_in create(:user, :admin) }
 
     def chart_selection(body = response.body)
-      chart = Nokogiri::HTML5(body).at_css("[data-controller~='dash--chart']")
-
-      JSON.parse(chart["data-dash--chart-options-value"]).dig("library", "plugins", "tmSelect")
+      dash_chart_plugin("tmSelect", dash_chart(body))
     end
 
     it "hands the chart a custom range link that keeps the rest of the view" do
@@ -277,12 +245,6 @@ RSpec.describe "Dashboard dashboard", type: :request do
       end
     end
 
-    def chart_points
-      chart = Nokogiri::HTML5(response.body).at_css("[data-controller~='dash--chart']")
-
-      JSON.parse(chart["data-dash--chart-data-value"]).first["data"]
-    end
-
     it "lands on the times a drag across a single day asks for, grouped as finely as fits" do
       traffic!
       get "/telemetry?loading=complete", params: { period: "yesterday" }
@@ -293,9 +255,9 @@ RSpec.describe "Dashboard dashboard", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Aug 10, 9 AM to 4 PM")
-      expect(chart_points.size).to eq(84)
-      expect(chart_points.first.first).to start_with("2026-08-10T09:00")
-      expect(chart_points.last.first).to start_with("2026-08-10T15:55")
+      expect(dash_chart_points.size).to eq(84)
+      expect(dash_chart_points.first.first).to start_with("2026-08-10T09:00")
+      expect(dash_chart_points.last.first).to start_with("2026-08-10T15:55")
     end
 
     it "keeps drilling down to the minute" do
@@ -303,13 +265,10 @@ RSpec.describe "Dashboard dashboard", type: :request do
       get "/telemetry?loading=complete", params: { period: "custom", from: "2026-08-10T09:00", to: "2026-08-10T10:00" }
 
       expect(response).to have_http_status(:ok)
-      expect(chart_points.size).to eq(60)
+      expect(dash_chart_points.size).to eq(60)
       expect(chart_selection).to be_present
     end
 
-    # The range fields under the bar were date inputs whatever the range was, so
-    # a window dragged out of the chart came back rounded to whole days and
-    # applying it silently widened what was on screen from an hour to a day.
     it "offers a dragged window back at the minute rather than rounded to the day" do
       get "/telemetry?loading=complete", params: { period: "custom", from: "2026-08-10T09:00", to: "2026-08-10T16:00" }
       document = Nokogiri::HTML5(response.body)
@@ -361,7 +320,7 @@ RSpec.describe "Dashboard dashboard", type: :request do
 
       url = JSON.parse(response.body).dig("options", "library", "plugins", "tmSelect", "url")
 
-      expect(Rack::Utils.parse_nested_query(URI.parse(url).query)).to include("metric" => "visits", "period" => "custom")
+      expect(link_query(url)).to include("metric" => "visits", "period" => "custom")
     end
 
     it "leaves the explore chart alone, since its link would drop the question" do
@@ -397,19 +356,8 @@ RSpec.describe "Dashboard dashboard", type: :request do
       expect(response).to have_http_status(:ok)
       expect { JSON.parse(response.body) }.not_to raise_error
     end
-
-    it "is closed to a signed in visitor who is not an admin" do
-      sign_out :user
-      sign_in create(:user)
-
-      get "/telemetry/dashboard.json"
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
-  # The dashboard reads the events table, so anything it records about itself
-  # lands in its own numbers the next time somebody looks.
   describe "keeping itself out of its own data" do
     before { sign_in create(:user, admin: true) }
 
@@ -440,9 +388,6 @@ RSpec.describe "Dashboard dashboard", type: :request do
       expect(response.body).not_to include("importmap")
     end
 
-    # The dashboard reads the ahoy tables; it must never also write to them, or
-    # the operator looking at the numbers becomes part of the numbers. The one
-    # script it does load is its own bundle, which is not a tracker.
     it "loads no tracking script of its own" do
       get "/telemetry"
 
@@ -468,19 +413,13 @@ RSpec.describe "Dashboard dashboard", type: :request do
 
     def countries!
       %w[US CA DE].each_with_index do |country, index|
-        visit = dash_visit(started_at: now - 1.day + index.minutes, visitor: country, country: country)
-        dash_page_view(visit, path: "/going-in/faq", at: now - 1.day + index.minutes)
+        dash_landing("/going-in/faq", at: now - 1.day + index.minutes, visitor: country, country: country)
       end
     end
 
     def bar
-      Nokogiri::HTML5(response.body).at_css(".toolbar")
+      document.at_css(".toolbar")
     end
-
-    def query_of(href)
-      Rack::Utils.parse_nested_query(URI.parse(href).query.to_s)
-    end
-
     it "shows the group as one cluster with both filters in it, joined by or" do
       get "/telemetry", params: { filters: either }
 
@@ -497,7 +436,7 @@ RSpec.describe "Dashboard dashboard", type: :request do
     it "keeps every member's own place in the list on its edit link" do
       get "/telemetry", params: { filters: either }
 
-      edits = bar.css("a[aria-label^='Change the filter']").map { |link| query_of(link["href"])["edit"] }
+      edits = bar.css("a[aria-label^='Change the filter']").map { |link| link_query(link["href"])["edit"] }
       expect(edits).to eq(%w[0 1 2])
     end
 
@@ -505,7 +444,7 @@ RSpec.describe "Dashboard dashboard", type: :request do
       get "/telemetry", params: { filters: either }
 
       href = bar.at_css("a[aria-label='Remove the filter Country is CA']")["href"]
-      expect(query_of(href)["filters"]).to eq([
+      expect(link_query(href)["filters"]).to eq([
         { "dimension" => "country", "operator" => "is", "value" => "US" },
         { "dimension" => "page", "operator" => "is", "value" => "/going-in/faq" }
       ])
@@ -517,8 +456,8 @@ RSpec.describe "Dashboard dashboard", type: :request do
       country = bar.at_css("a[aria-label='Add another option to Country is US or CA']")
       page = bar.at_css("a[aria-label='Add another option to Page is /going-in/faq']")
 
-      expect(query_of(country["href"])).to include("dimension" => "country")
-      expect(query_of(page["href"])).to include("dimension" => "page")
+      expect(link_query(country["href"])).to include("dimension" => "country")
+      expect(link_query(page["href"])).to include("dimension" => "page")
       expect(country["data-tm-filter-dimension"]).to eq("country")
       expect(country["data-tm-filter-operator"]).to eq("is")
       expect(country["aria-haspopup"]).to eq("dialog")

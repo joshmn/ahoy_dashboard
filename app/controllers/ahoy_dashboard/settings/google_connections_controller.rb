@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class GoogleConnectionsController < AhoyDashboard::BaseController
+    class GoogleConnectionsController < AhoyDashboard::Settings::BaseController
       requires_installed :search_console
 
       include AhoyDashboard::SearchConsoleScreen

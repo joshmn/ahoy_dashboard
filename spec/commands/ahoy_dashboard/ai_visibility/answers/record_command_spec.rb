@@ -11,7 +11,7 @@ RSpec.describe AhoyDashboard::AiVisibility::Answers::RecordCommand do
 
     [ { "type" => "response.output_item.done", "output_index" => 0, "item" => response["output"].first },
       { "type" => "response.completed", "response" => response } ]
-      .map { |event| "event: #{event["type"]}\ndata: #{JSON.generate(event)}\n\n" }.join
+      .map { |event| openai_frame(event) }.join
   end
 
   it "stores the answer, what it found and every source in order" do
@@ -96,6 +96,16 @@ RSpec.describe AhoyDashboard::AiVisibility::Answers::RecordCommand do
     expect(events).to have_key(:duplicate)
     expect(a_request(:post, endpoint)).not_to have_been_made
     expect(AhoyDashboard::AiVisibility::Answer.count).to eq(1)
+  end
+
+  it "looks the assistant up once per answer" do
+    create(:dash_ai_assistant, :keyed)
+    stub_request(:post, endpoint).to_return(status: 200, body: reply("Nothing about us."))
+    allow(AhoyDashboard::AiVisibility::Assistant).to receive(:for).and_call_original
+
+    described_class.call(run: run, prompt: prompt, assistant: "openai", model: "gpt-5")
+
+    expect(AhoyDashboard::AiVisibility::Assistant).to have_received(:for).once
   end
 
   it "claims a request before HTTP so duplicate delivery cannot spend twice" do

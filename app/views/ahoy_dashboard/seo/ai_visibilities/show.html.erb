@@ -11,9 +11,7 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false, controls: controls %>
 
   <% if @presenter.setup_notice %>
-    <%= dash_card class: "seo-notice-card" do %>
-      <%= dash_empty compact: true, **@presenter.setup_notice %>
-    <% end %>
+    <%= dash_empty_card card_class: "seo-notice-card", compact: true, **@presenter.setup_notice %>
   <% else %>
     <%= dash_unavailable_notice "Run now", @presenter.run_reason, fix: @presenter.run_fix %>
   <% end %>
@@ -26,9 +24,7 @@
 
   <% if !@presenter.any? %>
     <% unless @presenter.setup_notice %>
-      <%= dash_card do %>
-        <%= dash_empty(**@presenter.empty_state) %>
-      <% end %>
+      <%= dash_empty_card(**@presenter.empty_state) %>
     <% end %>
   <% else %>
     <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
@@ -42,10 +38,10 @@
         <% lines = @presenter.lines %>
         <div class="chart-wrap seo-plot">
           <div class="seo-plot__frame">
-            <svg viewBox="0 0 640 <%= @presenter.plot_height %>" preserveAspectRatio="none" role="img"
+            <svg viewBox="0 0 <%= AhoyDashboard::SeoHelper::PLOT_WIDTH %> <%= @presenter.plot_height %>" preserveAspectRatio="none" role="img"
                  aria-label="Mention rate by assistant and model, <%= @presenter.first_date %> to <%= @presenter.last_date %>">
               <% lines.each do |line| %>
-                <path d="<%= line.path %>" fill="none" vector-effect="non-scaling-stroke"
+                <path d="<%= seo_plot(line.values, height: @presenter.plot_height, floor: 0, ceiling: 1, inset: @presenter.plot_inset, places: 1) %>" fill="none" vector-effect="non-scaling-stroke"
                       style="stroke: <%= line.color %>; stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round<%= "; stroke-dasharray: #{line.dash}" if line.dash %>"></path>
               <% end %>
             </svg>
@@ -92,7 +88,7 @@
               <td class="num"><%= @presenter.number(row.answers) %></td>
               <td class="num"><%= @presenter.number(row.mentioned) %> <span class="t2">(<%= @presenter.percent(row.mention_rate) %>)</span></td>
               <td class="num"><%= @presenter.number(row.cited) %> <span class="t2">(<%= @presenter.percent(row.citation_rate) %>)</span></td>
-              <td class="num"><%= @presenter.position_of(row) %></td>
+              <td class="num"><%= @presenter.decimal(row.average_position) %></td>
             </tr>
           <% end %>
         </tbody>

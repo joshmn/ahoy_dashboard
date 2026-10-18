@@ -1,24 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard jobs", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
-  before do
-    allow(AhoyDashboard::Serp).to receive(:enabled?).and_return(false)
-    allow(AhoyDashboard::Alerts).to receive(:enabled?).and_return(true)
-    allow(AhoyDashboard::SearchConsole).to receive(:enabled?).and_return(false)
-    allow(AhoyDashboard::Backlinks).to receive(:enabled?).and_return(false)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/job_runs"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-  end
+  before { allow(AhoyDashboard::Alerts).to receive(:enabled?).and_return(true) }
 
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
@@ -123,6 +106,33 @@ RSpec.describe "Dashboard jobs", type: :request do
 
       expect(response).to redirect_to("/telemetry/settings/job_runs/alerts")
       expect(AhoyDashboard::JobRun.for("alerts")).to have_attributes(status: "running", runs_count: 1)
+    end
+
+    describe "starting a job that is already queued" do
+      around do |example|
+        if ActiveJob.gem_version < Gem::Version.new("6.1")
+          previous = ActiveJob::Base.return_false_on_aborted_enqueue
+          ActiveJob::Base.return_false_on_aborted_enqueue = false
+          begin
+            example.run
+          ensure
+            ActiveJob::Base.return_false_on_aborted_enqueue = previous
+          end
+        else
+          example.run
+        end
+      end
+
+      it "refuses the second start and says the first is still going" do
+        create(:dash_alert_rule)
+
+        post "/telemetry/settings/job_runs/alerts/run"
+        post "/telemetry/settings/job_runs/alerts/run"
+
+        expect(response).to redirect_to("/telemetry/settings/job_runs/alerts")
+        expect(flash[:alert]).to eq("Alert rules is already queued or running.")
+        expect(AhoyDashboard::JobRun.for("alerts").runs_count).to eq(1)
+      end
     end
 
     it "counts a start from the Check now button on Alerts" do

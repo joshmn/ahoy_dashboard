@@ -1,18 +1,11 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::HiddenVisitsQuery do
   let(:range) { dash_day_range(2026, 8, 10) }
 
-  around do |example|
-    previous = Rails.cache
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    example.run
-  ensure
-    Rails.cache = previous
-  end
+  include_context "with a memory cache"
 
   before do
     AhoyDashboard::Preferences.write(:site, internal_ips: ["127.0.0.0/8"])

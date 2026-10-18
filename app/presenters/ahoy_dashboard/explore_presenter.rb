@@ -1,59 +1,22 @@
 module AhoyDashboard
-  # One composed question and its answer.
-  #
-  # A ReportPresenter with no report behind it: the rows, the columns, the bar
-  # widths and the label handling are all the same job a card does, so they are
-  # inherited rather than written twice. What a report supplies and an explore
-  # does not is a key to build paths from, so every path here is rebuilt off the
-  # question instead.
   class ExplorePresenter < AhoyDashboard::ReportPresenter
-    TITLE = "Explore".freeze
-
     attr_reader :explore, :row_total
 
     def initialize(query:, explore:, result:, row_total: nil)
-      @query = query
+      super(query: query, result: result, page: explore.page, details: true, dimension: explore.dimension,
+            property_keys: [], term: explore.term)
       @explore = explore
-      @result = result
       @row_total = row_total
-      @page = explore.page
-      @details = true
-      @dimension = explore.dimension
-      @property_keys = []
-      @report = nil
-      @tab = nil
-    end
-
-    def title
-      TITLE
     end
 
     def label_column
       dimension.label
     end
 
-    def term
-      explore.term
-    end
-
-    def tabs
-      []
-    end
-
-    def property?
-      false
-    end
-
-    def property_options
-      []
-    end
-
     def heading
       "#{query.metric.label} by #{dimension.label.downcase}"
     end
 
-    # What the question is, in the order the sentence reads it. Kept out of the
-    # view so the CSV filename and the page title cannot drift from the heading.
     def summary
       parts = [ range_label ]
       parts << "#{query.filters.count} #{'filter'.pluralize(query.filters.count)}" if query.filters.any?
@@ -101,9 +64,6 @@ module AhoyDashboard
       index.positive? && !columns_chosen?
     end
 
-    # Saving a question is handing this URL to the form that names it. The
-    # question is the query string, so there is nothing to serialise: what gets
-    # stored is what is in the address bar.
     def question_params
       params_for(page: nil, q: nil, saved: nil).reject { |_key, value| value.blank? }
     end
@@ -112,9 +72,6 @@ module AhoyDashboard
       routes.new_settings_saved_query_path(question: question_params)
     end
 
-    # Editing an existing one is the same trip with the record named. Explore is
-    # where a question is composed, so it is where a question is changed; the
-    # form only ever holds the name and the pin.
     def update_path
       routes.edit_settings_saved_query_path(saved_query, question: question_params)
     end
@@ -136,26 +93,17 @@ module AhoyDashboard
       end
     end
 
-    def dimension_options
-      dimension_groups.flat_map(&:last)
-    end
-
     def dimension_groups
       AhoyDashboard::Dimension.grouped(AhoyDashboard::ExploreForm.dimensions).map do |group, candidates|
         [ group, candidates.map { |candidate| dimension_item(candidate) } ]
       end
     end
 
-    # Every column the dimension can answer, and clicking one adds or drops it.
-    # A dimension that cannot answer a metric does not offer it, rather than
-    # offering it and printing 0.
     def column_options
       shown = columns.map(&:key)
 
       explore.available_columns.map do |key|
-        metric = AhoyDashboard::Metric.find_by_key(key)
-
-        menu_item(metric&.label || key.humanize, query.to_query,
+        menu_item(AhoyDashboard::Metric.find(key).label, query.to_query,
                   explore: explore.toggling(key).to_query,
                   active: shown.include?(key))
       end
@@ -170,16 +118,10 @@ module AhoyDashboard
       [ [ "Columns", column_options ], [ "Traffic", traffic ] ]
     end
 
-    # Custom is seeded with the window on screen, the way the dashboard's period
-    # menu seeds it, so picking it opens the range fields on the range somebody
-    # was already looking at rather than on a silent fall back to 30 days.
     def period_options
-      AhoyDashboard::Period::ALL.map do |period|
-        params = query.with(period: period.key).to_query
-        params = params.merge(from: query.range_from_field, to: query.range_to_field) if period.custom?
-
-        menu_item(period.label, params, active: period.key == query.period.key)
-      end
+      AhoyDashboard::PeriodMenu.items(query: query) do |period, seed|
+        path_for(query.with(period: period.key).to_query.merge(seed))
+      end.map(&:to_menu_item)
     end
 
     def interval_options
@@ -235,8 +177,6 @@ module AhoyDashboard
       path_for(query.without_filter_params(index))
     end
 
-    # Clicking a row narrows the question and stays on it, rather than throwing
-    # somebody back to the dashboard the way a card row does.
     def filter_params(row)
       query.filter_link_params(dimension.key, row.value).merge(explore.to_query.except(:page))
     end
@@ -245,9 +185,7 @@ module AhoyDashboard
       routes.explore_path(filter_params(row))
     end
 
-    def filename
-      today = Time.current.in_time_zone(AhoyDashboard.time_zone).to_date.iso8601
-
+    def csv_filename
       "ahoy-dashboard-explore-#{dimension.key.parameterize}-#{today}.csv"
     end
 

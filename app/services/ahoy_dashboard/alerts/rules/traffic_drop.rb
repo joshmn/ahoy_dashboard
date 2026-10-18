@@ -15,7 +15,7 @@ module AhoyDashboard
         end
 
         def fired?
-          reading.usual >= floor && reading.visitors * 100 <= threshold * reading.usual
+          reading.usual.positive? && reading.usual >= floor && reading.visitors * 100 <= threshold * reading.usual
         end
 
         def recovered?
@@ -32,7 +32,7 @@ module AhoyDashboard
         end
 
         def percent_down
-          ((reading.usual - reading.visitors) * 100 / reading.usual).floor
+          percent_drop(previous: reading.usual, current: reading.visitors)
         end
       end
     end

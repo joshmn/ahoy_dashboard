@@ -30,6 +30,11 @@ module AhoyDashboard
         countries.map { |code| item(AhoyDashboard::SearchConsole::Countries.name(code), slice.country == code, country: code) }
     end
 
+    def clear_action(data: {})
+      { label: "Show all devices and countries", url: path.call(slice.with(device: nil, country: nil).to_h),
+        data: data, primary: true }
+    end
+
     private
 
     attr_reader :country_codes, :path

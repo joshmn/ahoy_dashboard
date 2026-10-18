@@ -1,15 +1,8 @@
 namespace :ahoy_dashboard do
-  not_installed = lambda do |name|
-    feature = AhoyDashboard::Installation.fetch(name)
-    next false if feature.installed?
-
-    puts "#{feature.label.downcase} is not installed. #{AhoyDashboard::Schedule.install_steps([ name ])}"
-    true
-  end
-
   desc "report what the serp tracking layer is configured with"
   task serp: :environment do
-    next if not_installed.call(:serp)
+    feature = AhoyDashboard::FeatureState.for(:serp)
+    next puts(feature.terminal_line) unless feature.installed?
 
     puts "config"
     puts "  enabled: #{AhoyDashboard::Serp.enabled?}"
@@ -60,7 +53,8 @@ namespace :ahoy_dashboard do
 
   desc "write the ranking rows for stored searches that predate them"
   task serp_backfill_results: :environment do
-    next if not_installed.call(:serp)
+    feature = AhoyDashboard::FeatureState.for(:serp)
+    next puts(feature.terminal_line) unless feature.installed?
 
     written = 0
     missing = 0
@@ -78,9 +72,10 @@ namespace :ahoy_dashboard do
 
   desc "check one tracked keyword now instead of waiting for the dispatcher"
   task :serp_check, [ :query, :location ] => :environment do |_task, args|
-    next if not_installed.call(:serp)
+    feature = AhoyDashboard::FeatureState.for(:serp)
+    next puts(feature.terminal_line) unless feature.installed?
 
-    keyword = AhoyDashboard::SerpKeyword.find_by(query: args[:query].to_s.strip)
+    keyword = AhoyDashboard::Serp::KeywordLookupQuery.call(text: args[:query], location: args[:location])
     abort "no keyword called #{args[:query].inspect}" if keyword.nil?
 
     location = args[:location].presence || keyword.locations.first
@@ -105,7 +100,8 @@ namespace :ahoy_dashboard do
   task :serp_search, [ :query, :location, :pages ] => :environment do |_task, args|
     query = args[:query].presence
     abort "give it a query: rails 'ahoy_dashboard:serp_search[federal prison visiting hours]'" if query.blank?
-    next if not_installed.call(:serp)
+    feature = AhoyDashboard::FeatureState.for(:serp)
+    next puts(feature.terminal_line) unless feature.installed?
 
     abort "serp tracking is switched off. switch it on under settings, features" unless AhoyDashboard::Serp.enabled?
 
@@ -134,12 +130,14 @@ namespace :ahoy_dashboard do
       results = adapter_class.requests_for(pages: pages).map do |request|
         adapter.search(query: query, request: request, location: location).tap { |page| spent += page.cost_units.to_i }
       end
+      spend.settle(spent, used: true)
     rescue AhoyDashboard::Serp::Error => e
       spend.settle(spent)
       record&.record_error!(e.message)
       abort "failed: #{e.message}"
+    ensure
+      spend.settle(spent)
     end
-    spend.settle(spent, used: true)
     result = AhoyDashboard::Serp::Result.combine(results)
     elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
 

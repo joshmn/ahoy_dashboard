@@ -1,15 +1,9 @@
 module AhoyDashboard
-  # The six top-stat metrics, plus the two the goals card needs. ALL is the six,
-  # because the stat strip and the top stats query iterate it; find resolves the
-  # extras as well so a card can name "conversion_rate" as a column.
   class Metric
     include ActiveModel::Model
 
     DEFAULT_KEY = "visitors".freeze
 
-    # Metrics where a fall is the good news, so the tile's change reads green
-    # going down. Everything else is the other way round, which is why this is a
-    # list of one rather than a flag on every metric.
     INVERTED = %w[bounce_rate].freeze
 
     attr_reader :key, :label, :short, :format_type
@@ -31,8 +25,6 @@ module AhoyDashboard
       new(key: "scroll_depth", label: "Scroll depth", short: "Scroll", format_type: :percent)
     ].freeze
 
-    # Numbers that belong to a row rather than to a session, so they are
-    # findable as a column without being charted or taking a tile in the strip.
     EXTRA = [
       new(key: "events", label: "Total conversions", short: "Events", format_type: :integer),
       new(key: "conversion_rate", label: "Conversion rate", short: "CR", format_type: :rate),
@@ -44,10 +36,6 @@ module AhoyDashboard
     INDEX = (ALL + EXTRA).index_by(&:key).freeze
 
     class << self
-      def all
-        ALL
-      end
-
       def find(key)
         INDEX.fetch(key.to_s) { raise ActiveRecord::RecordNotFound, "no dashboard metric #{key}" }
       end

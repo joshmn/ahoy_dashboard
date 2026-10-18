@@ -7,6 +7,8 @@ module AhoyDashboard
     class PromptAnswersQuery
       PER_GROUP = 100
 
+      Reading = Data.define(:answers, :assistant, :model, :terms)
+
       class << self
         def call(**options)
           new(**options).call
@@ -21,8 +23,8 @@ module AhoyDashboard
       end
 
       def call
-        PromptAnswersReading.new(answers: answers, assistant: assistant, model: model,
-                                 terms: [Serp.own_domain, *Seo::BrandTerms.current].compact.map(&:to_s).reject(&:blank?))
+        Reading.new(answers: answers, assistant: assistant, model: model,
+                    terms: [ Serp.own_domain, *Seo::BrandTerms.current ].compact.map(&:to_s).reject(&:blank?))
       end
 
       private

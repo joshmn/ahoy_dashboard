@@ -4,9 +4,7 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false, period: false %>
 
   <% if @presenter.setup_notice %>
-    <%= dash_card class: "seo-notice-card" do %>
-      <%= dash_empty compact: true, **@presenter.setup_notice %>
-    <% end %>
+    <%= dash_empty_card card_class: "seo-notice-card", compact: true, **@presenter.setup_notice %>
   <% else %>
     <%= dash_unavailable_notice "Look up", @presenter.lookup_reason, fix: @presenter.lookup_fix %>
   <% end %>
@@ -44,9 +42,7 @@
 
   <% if !@presenter.any? %>
     <% unless @presenter.setup_notice %>
-      <%= dash_card do %>
-        <%= dash_empty title: "No keyword ideas yet", hint: @presenter.ideas_hint %>
-      <% end %>
+      <%= dash_empty_card title: "No keyword ideas yet", hint: @presenter.ideas_hint %>
     <% end %>
   <% else %>
     <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
@@ -86,10 +82,7 @@
                 </div>
               </td>
               <td>
-                <div class="seo-figure">
-                  <%= tag.span(class: "seo-meter", **seo_bar(@presenter.volume_share(row))) %>
-                  <span class="seo-figure__num"><%= @presenter.volume_value(row) %></span>
-                </div>
+                <%= seo_figure(@presenter.volume_share(row), @presenter.volume_value(row), number: true) %>
               </td>
               <td class="num">
                 <% if row.difficulty %>
@@ -111,11 +104,7 @@
               </td>
               <% position = @presenter.position_label(row) %>
               <td class="num <%= row.tracked? ? "seo-pos" : "t2" %>">
-                <% if position %>
-                  <%= position %>
-                <% else %>
-                  <span class="nil">&mdash;</span>
-                <% end %>
+                <%= dash_value(position) %>
               </td>
               <td class="text-end"><%= seo_track_link(row.query) %></td>
             </tr>
@@ -149,7 +138,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <% @presenter.questions.first(14).each do |row| %>
+                  <% @presenter.listed_questions.each do |row| %>
                     <tr>
                       <td><div class="t-main"><%= seo_label(row.query) %></div></td>
                       <td class="num"><%= @presenter.volume_value(row) %></td>
@@ -184,10 +173,7 @@
                       <td><div class="t-main"><%= seo_label(cluster.name) %></div></td>
                       <td class="num t2"><%= @presenter.number(cluster.terms) %></td>
                       <td>
-                        <div class="seo-figure">
-                          <%= tag.span(class: "seo-meter", **seo_bar(@presenter.cluster_share(cluster))) %>
-                          <span class="seo-figure__num"><%= @presenter.number(cluster.volume) %></span>
-                        </div>
+                        <%= seo_figure(@presenter.cluster_share(cluster), @presenter.number(cluster.volume), number: true) %>
                       </td>
                     </tr>
                   <% end %>

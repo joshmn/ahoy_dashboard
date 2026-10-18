@@ -1,24 +1,16 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Dashboards::SnapshotEnqueueService do
   let(:snapshots) { AhoyDashboard::Dashboards }
   let(:key) { "snapshot-#{SecureRandom.hex(8)}" }
 
-  around do |example|
-    cache = Rails.cache
-    adapter = snapshots::SnapshotRefreshJob.queue_adapter
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    snapshots::SnapshotRefreshJob.queue_adapter = :test
-    travel_to(Time.utc(2026, 8, 11, 14, 30)) { example.run }
-  ensure
-    Rails.cache = cache
-    snapshots::SnapshotRefreshJob.queue_adapter = adapter
-  end
+  include_context "with a test snapshot queue"
 
-  before { AhoyDashboard::Preferences.write(:site, precomputed_dashboard: true) }
+  around { |example| travel_to(Time.utc(2026, 8, 11, 14, 30)) { example.run } }
+
+  before { precompute_dashboard! }
 
   it "enqueues only one refresh while its lease is outstanding" do
     2.times { described_class.call(expected_key: key) }
@@ -57,21 +49,13 @@ RSpec.describe AhoyDashboard::Dashboards::SnapshotEnqueueService do
   end
 
   it "derives the default dashboard identity when settings enqueue its first preparation" do
-    query = AhoyDashboard::QueryForm.from_params({period: "30d", filters: "none"})
-    expected = snapshots::SnapshotKeyQuery.call(query: query)
+    expected = default_snapshot_key
 
     expect(described_class.call.arguments.first).to eq(expected)
   end
 
   it "does not read traffic aggregates while enqueueing from settings" do
-    traffic_reads = []
-    capture = lambda do |*args|
-      sql = args.last[:sql]
-      traffic_reads << sql if sql.match?(/\b(?:FROM|JOIN)\s+"?ahoy_(?:visits|events)"?\b/i)
-    end
-    ActiveSupport::Notifications.subscribed(capture, "sql.active_record") { described_class.call }
-
-    expect(traffic_reads).to be_empty
+    expect(captured_sql(/\b(?:FROM|JOIN)\s+"?ahoy_(?:visits|events)"?\b/i, cached: true) { described_class.call }).to be_empty
   end
 
   it "does not prepare an unfiltered snapshot when a default segment is active" do

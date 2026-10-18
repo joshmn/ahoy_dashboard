@@ -1,12 +1,8 @@
 module AhoyDashboard
   module Backlinks
-    # Pull the profile and reconcile it against what is stored.
-    #
-    # Reconcile rather than replace. A domain that has stopped linking is the
-    # single most useful thing this table holds, and a delete-and-reinsert throws
-    # it away every time the job runs.
     class SyncCommand < AhoyDashboard::Command
       Outcome = Data.define(:domains, :gained, :lost, :returned)
+      REFRESHED = %i[authority links follow kind top_page last_seen_on lost_on provider].freeze
 
       SAMPLE_PROVIDER = "fake".freeze
 
@@ -29,7 +25,7 @@ module AhoyDashboard
         spend.settle(adapter.units_used, used: true)
 
         broadcast(:ok, outcome)
-      rescue Serp::AuthError, Serp::QuotaError => e
+      rescue Serp::QuotaError => e
         broken(e)
         broadcast(:rate_limited, e.message)
       rescue Serp::Error => e
@@ -63,7 +59,6 @@ module AhoyDashboard
       end
 
       def broken(error)
-        @spend&.settle(adapter&.units_used)
         record&.record_error!(error.message)
       end
 
@@ -96,29 +91,15 @@ module AhoyDashboard
       end
 
       def reconcile(referrers, provider, complete:)
-        seen = referrers.map(&:domain).compact.to_set
-        stored = AhoyDashboard::BacklinkDomain.where(domain: seen.to_a).index_by(&:domain)
-        gained = returned = 0
+        seen = referrers.map(&:domain).to_set
+        stored = AhoyDashboard::BacklinkDomain.where(domain: seen.to_a).pluck(:domain, :lost_on).to_h
+        rows = referrers.map { |referrer| attributes(referrer, provider) }
 
-        referrers.each do |referrer|
-          next if referrer.domain.blank?
-
-          row = stored[referrer.domain]
-
-          if row.nil?
-            AhoyDashboard::BacklinkDomain.create!(attributes(referrer, provider))
-            gained += 1
-          else
-            returned += 1 if row.lost?
-            row.update!(authority: referrer.authority, links: referrer.links, follow: referrer.follow,
-                        kind: referrer.kind, top_page: referrer.top_page, last_seen_on: today,
-                        lost_on: nil, provider: provider)
-          end
-        end
-
+        AhoyDashboard::BacklinkDomain.upsert_all(rows, unique_by: :domain, update_only: REFRESHED) if rows.any?
         lost = gone(referrers, seen, complete).update_all(lost_on: today, updated_at: now)
 
-        Outcome.new(domains: seen.size, gained: gained, lost: lost, returned: returned)
+        Outcome.new(domains: seen.size, gained: seen.count { |domain| !stored.key?(domain) },
+                    lost: lost, returned: stored.values.count(&:present?))
       end
 
       def gone(referrers, seen, complete)
@@ -133,7 +114,7 @@ module AhoyDashboard
         {
           domain: referrer.domain, authority: referrer.authority, links: referrer.links,
           follow: referrer.follow, kind: referrer.kind, top_page: referrer.top_page,
-          first_seen_on: referrer.first_seen_on || today, last_seen_on: today, provider: provider
+          first_seen_on: referrer.first_seen_on || today, last_seen_on: today, lost_on: nil, provider: provider
         }
       end
 
@@ -152,8 +133,6 @@ module AhoyDashboard
                                                        update_only: %i[links domains seen_on])
       end
 
-      # One row a day for the whole profile, so the count has a history even
-      # though the domain rows only ever hold the present.
       def sample(outcome, provider)
         live = AhoyDashboard::BacklinkDomain.live
 

@@ -1,46 +1,26 @@
 module AhoyDashboard
   module Reports
     module Digests
+      extend AhoyDashboard::Digests::Feature
+
       ROW_LIMIT = 5
 
-      PERIODS = AhoyDashboard::Digests::PERIODS
       Window = AhoyDashboard::Digests::Window
-      UnknownPeriodError = AhoyDashboard::Digests::UnknownPeriodError
 
-      def self.settings
-        Reports.settings
-      end
+      class << self
+        private
 
-      def self.periods
-        Preferences.read(:reports, :digest)
-      end
+        def feature
+          Reports
+        end
 
-      def self.period!(value)
-        AhoyDashboard::Digests.period!(value)
-      end
+        def preference_scope
+          :reports
+        end
 
-      def self.recipients
-        Preferences.read(:reports, :recipients)
-      end
-
-      def self.from
-        Preferences.read(:reports, :from)
-      end
-
-      def self.mailer
-        (settings[:mailer].presence || "AhoyDashboard::ReportMailer").to_s.constantize
-      end
-
-      def self.parent_mailer
-        (settings[:parent_mailer].presence || "ActionMailer::Base").to_s.constantize
-      end
-
-      def self.enabled?
-        Reports.enabled? && periods.any? && recipients.any?
-      end
-
-      def self.last_window(period, now: Time.current)
-        AhoyDashboard::Digests.last_window(period!(period), now: now)
+        def default_mailer
+          "AhoyDashboard::ReportMailer"
+        end
       end
     end
   end

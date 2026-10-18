@@ -1,35 +1,12 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe "Dashboard favicons", type: :request do
   let(:png) { "\x89PNG\r\n\x1a\n".b + "the rest of it".b }
   let(:icon_url) { "https://icons.duckduckgo.com/ip3/google.com.ico" }
 
-  around do |example|
-    previous = Rails.cache
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    example.run
-    Rails.cache = previous
-  end
+  include_context "with a memory cache"
 
   before { dash_visit(started_at: Time.current, referring_domain: "google.com") }
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/favicons/google.com"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/favicons/google.com"
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
 
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
@@ -94,9 +71,6 @@ RSpec.describe "Dashboard favicons", type: :request do
       expect { get "/telemetry/favicons/google.com" }.not_to have_enqueued_job(AhoyDashboard::FaviconFetchJob)
     end
 
-    # The row keeps its letter underneath the icon rather than swapping one for
-    # the other, so a domain with no icon, one still in flight and the whole
-    # thing switched off all read the same and none of them reflow the row.
     describe "on a source row" do
       before do
         visit = dash_visit(started_at: Time.current, visitor: "one",
@@ -106,7 +80,7 @@ RSpec.describe "Dashboard favicons", type: :request do
 
       def source_card
         get "/telemetry/reports/sources", params: { tab: "sources" }
-        Nokogiri::HTML5(response.body)
+        document
       end
 
       it "points the icon at our own host and leaves the letter behind it" do

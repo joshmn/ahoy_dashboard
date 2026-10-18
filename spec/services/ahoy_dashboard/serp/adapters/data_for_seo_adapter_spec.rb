@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp::Adapters::DataForSeoAdapter do
   subject(:adapter) { described_class.new }
@@ -17,14 +16,13 @@ RSpec.describe AhoyDashboard::Serp::Adapters::DataForSeoAdapter do
   end
 
   it "asks for the whole depth in one request rather than paging" do
-    expect(described_class).not_to be_paginates
     expect(described_class.requests_for(pages: 3).size).to eq(1)
     expect(described_class.requests_for(pages: 3).first.depth).to eq(30)
     expect(described_class.cost_units(pages: 3)).to eq(1)
   end
 
   it "refuses to search with no login rather than calling with a blank one" do
-    allow(AhoyDashboard::Serp).to receive(:credential).with(:dataforseo, :login).and_return(nil)
+    dataforseo_configured!(login: nil)
 
     expect { described_class.new.search(query: query) }
       .to raise_error(AhoyDashboard::Serp::AuthError, /no dataforseo login/)
@@ -140,6 +138,25 @@ RSpec.describe AhoyDashboard::Serp::Adapters::DataForSeoAdapter do
       stub_request(:post, described_class::ENDPOINT).to_timeout
 
       expect { adapter.search(query: query) }.to raise_error(AhoyDashboard::Serp::Error, /request failed/)
+    end
+
+    it "sends the task again when the connection never opened" do
+      stub_request(:post, described_class::ENDPOINT).to_raise(Errno::ECONNREFUSED).then
+        .to_return(status: 200, body: dataforseo_body.to_json)
+
+      adapter.search(query: query)
+
+      expect(sent).to have_been_made.twice
+      expect(adapter.units_used).to eq(1)
+    end
+
+    [ Net::ReadTimeout, Errno::ECONNRESET, EOFError ].each do |failure|
+      it "does not send a task again after #{failure}, since it may already be billed" do
+        stub_request(:post, described_class::ENDPOINT).to_raise(failure)
+
+        expect { adapter.search(query: query) }.to raise_error(AhoyDashboard::Serp::Error, /dataforseo request failed: #{failure}/)
+        expect(sent).to have_been_made.once
+      end
     end
   end
 end

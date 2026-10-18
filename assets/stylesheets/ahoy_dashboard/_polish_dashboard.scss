@@ -1,3 +1,33 @@
+$tm-busy-gradient: linear-gradient(90deg, rgba(94, 106, 210, 0) 0, var(--accent) 50%, rgba(94, 106, 210, 0) 100%);
+
+@mixin tm-busy-bar($top, $z) {
+  position: absolute;
+  top: $top;
+  right: 12px;
+  left: 12px;
+  z-index: $z;
+  height: 2px;
+  border-radius: 2px;
+  background: $tm-busy-gradient no-repeat;
+  background-size: 40% 100%;
+  content: "";
+  animation: dash-progress 1.1s ease-in-out infinite, dash-appear 0.2s ease 0.15s both;
+}
+
+@mixin tm-busy-dim {
+  opacity: 0.55;
+  transition: opacity 0.2s ease 0.15s;
+}
+
+@mixin tm-busy-still {
+  background-size: 100% 100%;
+  opacity: 0.6;
+  animation: none;
+}
+
+$tm-count-widths: (clicks: 56px, impressions: 88px, ctr: 60px, position: 64px);
+$tm-count-widths-narrow: (clicks: 48px, impressions: 72px, position: 52px);
+
 .chart-wrap .empty {
   min-height: 300px;
 }
@@ -66,9 +96,7 @@
 .p-cols .pc-l {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include text-truncate;
 }
 
 .p-cols .pc-n {
@@ -92,37 +120,17 @@
 .data-row .cnt--ctr,
 .data-row .cnt--position {
   flex: none;
-  min-width: 0;
   white-space: nowrap;
   text-align: right;
 }
 
-.p-cols .pc-n--clicks,
-.panel .p-list .data-row .cnt--clicks,
-.data-row .cnt--clicks {
-  width: 56px;
-  min-width: 56px;
-}
-
-.p-cols .pc-n--impressions,
-.panel .p-list .data-row .cnt--impressions,
-.data-row .cnt--impressions {
-  width: 88px;
-  min-width: 88px;
-}
-
-.p-cols .pc-n--ctr,
-.panel .p-list .data-row .cnt--ctr,
-.data-row .cnt--ctr {
-  width: 60px;
-  min-width: 60px;
-}
-
-.p-cols .pc-n--position,
-.panel .p-list .data-row .cnt--position,
-.data-row .cnt--position {
-  width: 64px;
-  min-width: 64px;
+@each $key, $width in $tm-count-widths {
+  .p-cols .pc-n--#{$key},
+  .panel .p-list .data-row .cnt--#{$key},
+  .data-row .cnt--#{$key} {
+    width: $width;
+    min-width: $width;
+  }
 }
 
 @media (max-width: 640px) {
@@ -131,22 +139,12 @@
     display: none;
   }
 
-  .p-cols .pc-n--clicks,
-  .panel .p-list .data-row .cnt--clicks {
-    width: 48px;
-    min-width: 48px;
-  }
-
-  .p-cols .pc-n--impressions,
-  .panel .p-list .data-row .cnt--impressions {
-    width: 72px;
-    min-width: 72px;
-  }
-
-  .p-cols .pc-n--position,
-  .panel .p-list .data-row .cnt--position {
-    width: 52px;
-    min-width: 52px;
+  @each $key, $width in $tm-count-widths-narrow {
+    .p-cols .pc-n--#{$key},
+    .panel .p-list .data-row .cnt--#{$key} {
+      width: $width;
+      min-width: $width;
+    }
   }
 
   .g-head,
@@ -220,23 +218,13 @@
 
   .hd .sb-text,
   .hd .hd-nav-text {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
+    @include visually-hidden;
   }
 }
 
 @media (max-width: 640px) {
   .hd .site-name {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
+    @include visually-hidden;
   }
 
   .tiles {
@@ -282,7 +270,6 @@
   }
 }
 
-// ---------- loading ----------
 .placeholder-glow .placeholder {
   background-color: rgba(255, 255, 255, 0.045);
   background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0) 100%);
@@ -317,22 +304,11 @@ tm-frame[busy] > .card:not([aria-busy]) {
 }
 
 tm-frame[busy] > .card:not([aria-busy])::before {
-  position: absolute;
-  top: -1px;
-  right: 12px;
-  left: 12px;
-  z-index: 2;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, rgba(94, 106, 210, 0) 0, var(--accent) 50%, rgba(94, 106, 210, 0) 100%) no-repeat;
-  background-size: 40% 100%;
-  content: "";
-  animation: dash-progress 1.1s ease-in-out infinite, dash-appear 0.2s ease 0.15s both;
+  @include tm-busy-bar($top: -1px, $z: 2);
 }
 
 tm-frame[busy] > .card:not([aria-busy]) > :not(.card-header) {
-  opacity: 0.55;
-  transition: opacity 0.2s ease 0.15s;
+  @include tm-busy-dim;
 }
 
 @keyframes dash-progress {
@@ -358,9 +334,7 @@ tm-frame[busy] > .card:not([aria-busy]) > :not(.card-header) {
   }
 
   tm-frame[busy] > .card:not([aria-busy])::before {
-    background-size: 100% 100%;
-    opacity: 0.6;
-    animation: none;
+    @include tm-busy-still;
   }
 }
 
@@ -376,27 +350,16 @@ tm-frame[busy] > .card:not([aria-busy]) > :not(.card-header) {
 
 .tm-popover:has(tm-frame[busy])::before,
 .modal-content:has(tm-frame[busy]):not(:has(tm-frame[busy] .placeholder-glow))::before {
-  position: absolute;
-  top: 0;
-  right: 12px;
-  left: 12px;
-  z-index: 3;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, rgba(94, 106, 210, 0) 0, var(--accent) 50%, rgba(94, 106, 210, 0) 100%) no-repeat;
-  background-size: 40% 100%;
-  content: "";
-  animation: dash-progress 1.1s ease-in-out infinite, dash-appear 0.2s ease 0.15s both;
+  @include tm-busy-bar($top: 0, $z: 3);
 }
 
 .tm-popover tm-frame[busy] > *,
 .modal-content tm-frame[busy] > :not(.placeholder-glow):not(.visually-hidden) {
-  opacity: 0.55;
-  transition: opacity 0.2s ease 0.15s;
+  @include tm-busy-dim;
 }
 
 form[data-controller~="dash--filter"] [aria-busy="true"] input[list] {
-  background-image: linear-gradient(90deg, rgba(94, 106, 210, 0) 0, var(--accent) 50%, rgba(94, 106, 210, 0) 100%);
+  background-image: $tm-busy-gradient;
   background-repeat: no-repeat;
   background-position: -30% 100%;
   background-size: 30% 2px;
@@ -412,9 +375,7 @@ form[data-controller~="dash--filter"] [aria-busy="true"] input[list] {
 @media (prefers-reduced-motion: reduce) {
   .tm-popover:has(tm-frame[busy])::before,
   .modal-content:has(tm-frame[busy])::before {
-    background-size: 100% 100%;
-    opacity: 0.6;
-    animation: none;
+    @include tm-busy-still;
   }
 
   form[data-controller~="dash--filter"] [aria-busy="true"] input[list] {
@@ -429,16 +390,6 @@ form[data-controller~="dash--filter"] [aria-busy="true"] input[list] {
   font-size: $font-size-sm;
   line-height: 1.4;
   color: var(--t3);
-}
-
-.jr-why a {
-  color: var(--t2);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.jr-why a:hover {
-  color: var(--t1);
 }
 
 .jr-last-error {

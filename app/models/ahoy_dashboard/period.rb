@@ -1,7 +1,4 @@
 module AhoyDashboard
-  # The period menu. Same registry shape as the content pages (frozen ALL, find
-  # raising RecordNotFound, to_param), plus the range arithmetic, which lives
-  # here so the dashboard, the comparison and the export all cut time the same way.
   class Period
     include ActiveModel::Model
 
@@ -79,10 +76,6 @@ module AhoyDashboard
     INDEX = ALL.index_by(&:key).freeze
 
     class << self
-      def all
-        ALL
-      end
-
       def find(key)
         INDEX.fetch(key.to_s) { raise ActiveRecord::RecordNotFound, "no dashboard period #{key}" }
       end
@@ -248,8 +241,6 @@ module AhoyDashboard
       (earliest || now).in_time_zone(AhoyDashboard.time_zone).beginning_of_day..now.end_of_day
     end
 
-    # This is a URL people edit by hand, so a range that will not parse or reads
-    # backwards falls back to the default rather than raising or querying nothing.
     def custom(now, from, to)
       custom_bounds(from, to) || last_30_days(now)
     end

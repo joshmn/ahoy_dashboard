@@ -1,62 +1,31 @@
-import { Controller } from "../runtime/controllers.js"
+import { CommandDialog, DEBOUNCE_MS } from "../runtime/command_dialog.js"
+import { getFragment } from "../runtime/fetch.js"
+import { modified } from "../runtime/keys.js"
+import { plural } from "../runtime/text.js"
 
-const LOCK = "tm-lock"
-
-// The design draws the palette as display:none and opens it with a class, so
-// the hidden attribute alone cannot show it: a class rule beats the user agent's
-// [hidden]. Both are set. The attribute is what keeps it out of the tab order
-// and out of the accessibility tree while it is shut; the class is what makes it
-// visible.
-const OPEN = "open"
-
-// The design marks the row the arrow keys are on with .act, not .active.
-const MARKED = "act"
-
-const DEBOUNCE_MS = 200
 const MINIMUM_TERM = 2
-const SHAPE = "palette"
 
-export default class extends Controller {
-  static targets = ["panel", "input", "list", "item", "group", "none", "found", "status", "commands", "loading", "failure"]
-
-  // The shortcut is bound here rather than through data-action, because the
-  // runtime dispatches by walking up from the event target and a keystroke
-  // landing on the body never passes through this element.
-  connect() {
-    this.index = -1
-    this.onKey = (event) => this.key(event)
-    document.addEventListener("keydown", this.onKey)
-  }
+export default class extends CommandDialog {
+  static targets = ["panel", "input", "item", "group", "none", "found", "status", "commands", "loading", "failure"]
 
   disconnect() {
+    super.disconnect()
     this.cancel()
     this.commandsRequest?.abort()
-    document.removeEventListener("keydown", this.onKey)
-    document.body.classList.remove(LOCK)
-  }
-
-  get open() {
-    return this.hasPanelTarget && !this.panelTarget.hidden
-  }
-
-  get visible() {
-    return this.itemTargets.filter((item) => !item.hidden)
   }
 
   toggle(event) {
-    if (event && (event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) return
+    if (event && (event.button > 0 || modified(event))) return
 
     event?.preventDefault()
-    this.open ? this.close() : this.show()
+    this.isOpen ? this.close() : this.show()
   }
 
   show() {
     if (!this.hasPanelTarget) return
 
     this.returnTo = document.activeElement
-    this.panelTarget.hidden = false
-    this.panelTarget.classList.add(OPEN)
-    document.body.classList.add(LOCK)
+    this.reveal()
     this.inputTarget.value = ""
     this.filter()
     this.inputTarget.focus()
@@ -73,18 +42,11 @@ export default class extends Controller {
     this.failureTarget.hidden = true
 
     try {
-      const response = await fetch(this.panelTarget.dataset.commandsUrl, {
-        signal: request.signal,
-        credentials: "same-origin",
-        headers: { Accept: "text/html", "Tm-Frame": "tm-palette-commands" },
-      })
-      if (!response.ok || response.redirected) throw new Error("Commands could not be loaded")
-
-      const html = await response.text()
+      const html = await getFragment(this.panelTarget.dataset.commandsUrl, { frame: "tm-palette-commands", signal: request.signal })
       const focused = document.activeElement
       this.commandsTarget.innerHTML = html
       this.commandsLoaded = true
-      if (this.open) {
+      if (this.isOpen) {
         this.filter()
         if (!focused.isConnected) this.inputTarget.focus()
       }
@@ -101,13 +63,10 @@ export default class extends Controller {
 
   close(event) {
     event?.preventDefault()
-    if (!this.open) return
+    if (!this.isOpen) return
 
     this.cancel()
-    this.panelTarget.hidden = true
-    this.panelTarget.classList.remove(OPEN)
-    document.body.classList.remove(LOCK)
-    this.mark(-1)
+    this.conceal()
 
     const target = this.returnTo
     this.returnTo = null
@@ -121,7 +80,6 @@ export default class extends Controller {
       item.hidden = term.length > 0 && !item.dataset.term.includes(term)
     })
 
-    // A heading with nothing under it is a heading for nothing.
     this.groupTargets.forEach((group) => {
       group.hidden = group.querySelectorAll("[data-dash--palette-target~='item']:not([hidden])").length === 0
     })
@@ -161,7 +119,6 @@ export default class extends Controller {
 
     const url = new URL(this.searchUrl, window.location.origin)
     url.searchParams.set("q", term)
-    url.searchParams.set("shape", SHAPE)
 
     let html = ""
 
@@ -169,7 +126,7 @@ export default class extends Controller {
       const response = await fetch(url, {
         signal: request.signal,
         credentials: "same-origin",
-        headers: { Accept: "text/html", "X-Requested-With": "XMLHttpRequest" },
+        headers: { Accept: "text/html" },
       })
       if (response.ok) html = await response.text()
     } catch (error) {
@@ -203,22 +160,13 @@ export default class extends Controller {
     if (this.hasStatusTarget) {
       this.statusTarget.textContent = this.searching || term.length === 0
         ? ""
-        : `${commands} ${commands === 1 ? "command" : "commands"}, ${values} ${values === 1 ? "value" : "values"} to filter by`
+        : `${commands} ${plural(commands, "command")}, ${values} ${plural(values, "value")} to filter by`
     }
 
     this.mark(items.length > 0 ? position : -1)
   }
 
-  mark(position) {
-    const items = this.visible
-    this.index = items.length === 0 ? -1 : Math.max(0, Math.min(position, items.length - 1))
-
-    this.itemTargets.forEach((item) => {
-      item.classList.remove(MARKED)
-      item.setAttribute("aria-selected", "false")
-    })
-
-    const current = items[this.index]
+  marked(current) {
     if (!current) {
       this.inputTarget.removeAttribute("aria-activedescendant")
       return
@@ -226,50 +174,16 @@ export default class extends Controller {
 
     if (!current.id) current.id = `tm-palette-option-${(this.minted = (this.minted || 0) + 1)}`
 
-    current.classList.add(MARKED)
-    current.setAttribute("aria-selected", "true")
     this.inputTarget.setAttribute("aria-activedescendant", current.id)
-    current.scrollIntoView({ block: "nearest" })
-  }
-
-  move(step) {
-    const items = this.visible
-    if (items.length === 0) return
-
-    this.mark((this.index + step + items.length) % items.length)
   }
 
   key(event) {
-    const meta = event.metaKey || event.ctrlKey
-
-    if (meta && event.key.toLowerCase() === "k") {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
       event.preventDefault()
       this.toggle()
       return
     }
 
-    if (!this.open) return
-
-    switch (event.key) {
-      case "Escape":
-        event.preventDefault()
-        this.close()
-        break
-      case "ArrowDown":
-        event.preventDefault()
-        this.move(1)
-        break
-      case "ArrowUp":
-        event.preventDefault()
-        this.move(-1)
-        break
-      case "Enter": {
-        const current = this.visible[this.index]
-        if (!current) return
-        event.preventDefault()
-        current.click()
-        break
-      }
-    }
+    super.key(event)
   }
 }

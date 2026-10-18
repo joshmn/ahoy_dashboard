@@ -1,8 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::SearchConsoleKeywordQuery do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:keyword) { "fci thomson visiting" }
 
   around { |example| travel_to(now) { example.run } }
@@ -150,7 +149,7 @@ RSpec.describe AhoyDashboard::SearchConsoleKeywordQuery do
 end
 
 RSpec.describe AhoyDashboard::SearchConsoleKeywordQuery, "by device and country" do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:keyword) { "fci thomson visiting" }
   let(:day) { Date.new(2026, 8, 12) }
   let(:range) { (now - 30.days)..now }

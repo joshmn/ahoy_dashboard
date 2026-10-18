@@ -1,9 +1,5 @@
 import { Controller } from "../runtime/controllers.js"
 
-// A flash message, shown once and then gone. It is rendered by the server on
-// the page after the action, so nothing has to survive a navigation for it to
-// appear, and a reader with the JavaScript off still gets the text.
-
 const SHOW_MS = 2200
 
 export default class extends Controller {

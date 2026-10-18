@@ -1,10 +1,6 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::GoogleAccount do
-  it "sits on the prefixed table" do
-    expect(described_class.table_name).to eq("ahoy_dashboard_google_accounts")
-  end
-
   describe "tokens" do
     it "round trips through the secret box" do
       account = described_class.create!(access_token: "at-1", refresh_token: "rt-1")
@@ -20,8 +16,6 @@ RSpec.describe AhoyDashboard::GoogleAccount do
       expect(account.reload[:refresh_token]).not_to include("rt-1")
     end
 
-    # Google returns a refresh token on the first authorization only, so a
-    # reconnect that comes back without one must not wipe the one that works.
     it "keeps the stored refresh token when handed a blank one" do
       account = described_class.create!(refresh_token: "rt-1")
 
@@ -43,7 +37,6 @@ RSpec.describe AhoyDashboard::GoogleAccount do
   describe ".current" do
     it "is nil with nothing connected" do
       expect(described_class.current).to be_nil
-      expect(described_class).not_to be_connected
     end
 
     it "is the one row, lowest id first" do
@@ -74,8 +67,6 @@ RSpec.describe AhoyDashboard::GoogleAccount do
       expect(described_class.new).to be_expired
     end
 
-    # Refreshed a minute early, so a long request cannot start valid and finish
-    # expired.
     it "expires a minute before it actually does" do
       now = Time.current
       account = described_class.new(expires_at: now + 30.seconds)

@@ -1,11 +1,9 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe AhoyDashboard::ChartAnnotationsQuery do
-  let(:morning) { AhoyDashboard.time_zone.local(2026, 8, 10, 9) }
+  let(:morning) { dash_time(2026, 8, 10, 9) }
   let(:range) { morning.beginning_of_day..(morning + 1.day).end_of_day }
 
   it "returns the first two notes in each chart bucket in time and id order" do
@@ -31,24 +29,9 @@ RSpec.describe AhoyDashboard::ChartAnnotationsQuery do
     expect(described_class.call(range: range).map(&:id)).to eq([inside.id])
   end
 
-  it "preserves the grouped model API" do
-    note = create(:dash_annotation, happened_at: morning)
-
-    expect(AhoyDashboard::Annotation.for_range(range)).to eq(morning.beginning_of_day => [note])
-  end
-
   it "only instantiates the capped annotations for calendar buckets" do
     create_list(:dash_annotation, 8, happened_at: morning)
-    loaded = []
-    subscriber = lambda do |*, payload|
-      loaded << payload[:record_count] if payload[:class_name] == "AhoyDashboard::Annotation"
-    end
-
-    ActiveSupport::Notifications.subscribed(subscriber, "instantiation.active_record") do
-      described_class.call(range: range)
-    end
-
-    expect(loaded.sum).to eq(2)
+    expect(instantiated(AhoyDashboard::Annotation) { described_class.call(range: range) }).to eq(2)
   end
 
   it "starts weekly buckets on the dashboard's local Sunday" do

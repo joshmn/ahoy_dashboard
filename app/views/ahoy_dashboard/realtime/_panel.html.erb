@@ -4,15 +4,13 @@
   <p class="rt-count">
     <span class="tm-live__number"><%= dash_number(snapshot.visitors) %></span>
     <span class="t-when">
-      <%= snapshot.visitors == 1 ? "visitor" : "visitors" %> in the last <%= minutes %>
+      <%= "visitor".pluralize(snapshot.visitors) %> in the last <%= minutes %>
     </span>
   </p>
 
   <% if snapshot.visitors.zero? %>
-    <%= dash_card do %>
-      <%= dash_empty title: "No one is on the site right now",
-            hint: "New visits show up here as they happen." %>
-    <% end %>
+    <%= dash_empty_card title: "No one is on the site right now",
+          hint: "New visits show up here as they happen." %>
   <% else %>
     <div class="row row-cols-1 row-cols-md-2 g-3">
       <div class="col"><%= render "ahoy_dashboard/realtime/list", title: "Pages", rows: snapshot.pages, chip: nil, mono: true %></div>

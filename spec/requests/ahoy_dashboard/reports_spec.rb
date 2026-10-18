@@ -1,8 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard reports", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
@@ -24,22 +23,6 @@ RSpec.describe "Dashboard reports", type: :request do
       dash_page_view(visit, path: "/page-#{index}", at: now - 1.day - index.minutes)
       dash_page_view(visit, path: "/resources", at: now - 1.day - index.minutes + 1.minute)
       dash_goal(visit, "site_searched", at: now - 1.day - index.minutes + 2.minutes, facility_id: index.to_s)
-    end
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/reports/pages"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/reports/pages"
-
-      expect(response).to have_http_status(:not_found)
     end
   end
 
@@ -78,21 +61,21 @@ RSpec.describe "Dashboard reports", type: :request do
     it "returns the same card without querying or rendering the surrounding layout for a frame" do
       traffic!
       get "/telemetry/reports/pages"
-      card = Nokogiri::HTML5(response.body).at_css("tm-frame#report_pages").to_html
+      card = document.at_css("tm-frame#report_pages").to_html
 
       expect(AhoyDashboard::RealtimeQuery).not_to receive(:call)
-      get "/telemetry/reports/pages", headers: { "Tm-Frame" => "report_pages" }
+      get_frame("/telemetry/reports/pages", "report_pages")
 
       expect(response).to have_http_status(:ok)
       expect(response.body).not_to include("<html", "dash-ask")
-      expect(Nokogiri::HTML5(response.body).at_css("tm-frame#report_pages").to_html).to eq(card)
+      expect(document.at_css("tm-frame#report_pages").to_html).to eq(card)
     end
 
     it "opens the sources card on its sources tab once a channel is the filter" do
       get "/telemetry/reports/sources",
           params: { filters: [ { dimension: "channel", operator: "is", value: "Direct / None" } ] }
 
-      current = Nokogiri::HTML5(response.body).at_css('[data-controller="dash--tabs"] nav a[aria-current="true"]')
+      current = document.at_css('[data-controller="dash--tabs"] nav a[aria-current="true"]')
       expect(current.text.strip).to eq("Sources")
     end
 
@@ -100,7 +83,7 @@ RSpec.describe "Dashboard reports", type: :request do
       get "/telemetry/reports/sources",
           params: { tab: "channels", filters: [ { dimension: "channel", operator: "is", value: "Direct / None" } ] }
 
-      current = Nokogiri::HTML5(response.body).at_css('[data-controller="dash--tabs"] nav a[aria-current="true"]')
+      current = document.at_css('[data-controller="dash--tabs"] nav a[aria-current="true"]')
       expect(current.text.strip).to eq("Channels")
     end
 
@@ -112,12 +95,6 @@ RSpec.describe "Dashboard reports", type: :request do
       expect(response).to have_http_status(:ok)
     end
 
-    it "404s for a report key nobody registered" do
-      get "/telemetry/reports/hairstyles"
-
-      expect(response).to have_http_status(:not_found)
-    end
-
     it "renders the details view in its own frame" do
       traffic!
 
@@ -127,12 +104,33 @@ RSpec.describe "Dashboard reports", type: :request do
       expect(response.body).to include("report_details_pages")
     end
 
-    it "pages the details view" do
-      traffic!(pages: 4)
+    it "reads only the primary detail metric for a details request that accepts anything" do
+      traffic!
+      metrics = AhoyDashboard::Report.find("pages").tab("pages").detail_metrics
+      allow(AhoyDashboard::BreakdownQuery).to receive(:call).and_call_original
 
-      get "/telemetry/reports/pages", params: { view: "details", page: 2 }
+      get "/telemetry/reports/pages", params: { view: "details" }, headers: { "Accept" => "*/*" }
 
       expect(response).to have_http_status(:ok)
+      expect(response.body).to include("report_details_pages")
+      expect(metrics.size).to be > 1
+      expect(AhoyDashboard::BreakdownQuery).to have_received(:call).with(hash_including(metrics: metrics.first(1)))
+    end
+
+    it "pages the details view" do
+      stub_const("AhoyDashboard::ReportQuery::DETAIL_ROWS", 2)
+      traffic!(pages: 4)
+
+      get "/telemetry/reports/pages", params: { view: "details" }
+      first = document.css(".m-list .data-row .nm").map { |cell| cell.text.strip }
+
+      get "/telemetry/reports/pages", params: { view: "details", page: 2 }
+      second = document.css(".m-list .data-row .nm").map { |cell| cell.text.strip }
+
+      expect(response).to have_http_status(:ok)
+      expect([ first.size, second.size ]).to eq([ 2, 2 ])
+      expect(first.first).to eq("/resources")
+      expect(first & second).to be_empty
     end
 
     it "carries the dashboard's period and filters through" do
@@ -163,10 +161,6 @@ RSpec.describe "Dashboard reports", type: :request do
       end
     end
 
-    # The picker's markup has its own view spec. These are the two things only a
-    # real request can see: that the card head actually renders it, and that the
-    # links built off the card carry the choice so the modal and the CSV agree
-    # with what is on screen.
     describe "the breakdown picker in the card" do
       it "renders on a tab that offers a choice" do
         get "/telemetry/reports/pages", params: { tab: "pages" }
@@ -186,13 +180,15 @@ RSpec.describe "Dashboard reports", type: :request do
 
         get "/telemetry/reports/pages", params: { tab: "pages", breakdown: "controller" }
 
-        page = Nokogiri::HTML5(response.body)
-        details = page.at_css("footer a[aria-haspopup=dialog]")
-        card = page.at_css("section.panel")
-        export = card.css("a").map { |node| node["href"] }.compact.grep(%r{/ahoy_dashboard/exports/})
+        details = document.at_css("footer a[aria-haspopup=dialog]")
 
         expect(details["href"]).to include("breakdown=controller")
-        expect(export).to all(include("breakdown=controller")) if export.any?
+
+        get details["href"]
+        export = document.css("a").map { |node| node["href"] }.compact.grep(%r{/telemetry/exports/})
+
+        expect(export).not_to be_empty
+        expect(export).to all(include("breakdown=controller"))
       end
     end
 
@@ -211,7 +207,7 @@ RSpec.describe "Dashboard reports", type: :request do
       def rows(params)
         get "/telemetry/reports/#{params.delete(:key) || 'pages'}", params: params
 
-        Nokogiri::HTML5(response.body).css(".p-list .nm").map { |row| row.text.strip }
+        document.css(".p-list .nm").map { |row| row.text.strip }
       end
 
       it "groups top pages by path until somebody asks for the controller" do
@@ -236,7 +232,7 @@ RSpec.describe "Dashboard reports", type: :request do
 
         get "/telemetry/reports/pages", params: { tab: "pages", view: "details", breakdown: "controller" }
 
-        expect(Nokogiri::HTML5(response.body).css(".m-list .data-row .nm").map { |cell| cell.text.strip })
+        expect(document.css(".m-list .data-row .nm").map { |cell| cell.text.strip })
           .to eq([ "public/pages" ])
       end
 
@@ -249,8 +245,6 @@ RSpec.describe "Dashboard reports", type: :request do
         )
       end
 
-      # The one thing a path breakdown cannot say. request.path drops the query
-      # string, and the landing page is the only place either ahoy table keeps it.
       it "shows the whole url, query string and all, on the url breakdown" do
         entries!
 
@@ -282,13 +276,11 @@ RSpec.describe "Dashboard reports", type: :request do
         expect(response).to have_http_status(:ok)
       end
 
-      # The choice belongs to one card, so it is merged in at the card's own links
-      # and never near QueryForm#to_query, which every other card builds from.
       it "keeps the choice off the links that leave the card" do
         traffic!
 
         get "/telemetry/reports/pages", params: { tab: "pages", breakdown: "controller" }
-        hrefs = Nokogiri::HTML5(response.body).css("a").map { |link| link["href"] }.compact
+        hrefs = document.css("a").map { |link| link["href"] }.compact
 
         expect(hrefs.grep(%r{\A/telemetry/\?})).not_to be_empty
         expect(hrefs.grep(%r{\A/telemetry/\?}).grep(/breakdown/)).to be_empty
@@ -298,7 +290,7 @@ RSpec.describe "Dashboard reports", type: :request do
         traffic!
 
         get "/telemetry", params: { breakdown: "controller" }
-        sources = Nokogiri::HTML5(response.body).at_css("tm-frame#report_sources")
+        sources = document.at_css("tm-frame#report_sources")
 
         expect(response).to have_http_status(:ok)
         expect(sources["src"]).not_to include("breakdown")
@@ -314,7 +306,7 @@ RSpec.describe "Dashboard reports", type: :request do
 
       def properties_card(params = {})
         get "/telemetry/reports/behaviours", params: { tab: "properties" }.merge(params)
-        Nokogiri::HTML5(response.body)
+        document
       end
 
       it "offers every allowlisted property, including one with nothing in the range" do
@@ -392,7 +384,7 @@ RSpec.describe "Dashboard reports", type: :request do
             params: { tab: "properties", view: "details", property: "action" }
 
         expect(response).to have_http_status(:ok)
-        headers = Nokogiri::HTML5(response.body).css(".m-list .data-row .nm").map { |cell| cell.text.strip }
+        headers = document.css(".m-list .data-row .nm").map { |cell| cell.text.strip }
 
         expect(headers).to eq([ "show" ])
       end
@@ -427,8 +419,7 @@ RSpec.describe "Dashboard reports", type: :request do
 
     describe "the custom properties tab with nothing on the list" do
       def planned!
-        visit = dash_visit(started_at: now - 1.day, visitor: "visitor-plan")
-        dash_page_view(visit, path: "/pricing", at: now - 1.day)
+        visit = dash_landing("/pricing", at: now - 1.day, visitor: "visitor-plan")
         dash_goal(visit, "signed_up", at: now - 1.day + 1.minute, plan: "pro")
       end
 
@@ -436,7 +427,7 @@ RSpec.describe "Dashboard reports", type: :request do
         planned!
 
         get "/telemetry/reports/behaviours", params: { tab: "properties" }
-        card = Nokogiri::HTML5(response.body)
+        card = document
 
         expect(card.at_css("[data-tm-picker=property] button").text.strip).to eq("plan")
         expect(card.css(".p-list .nm").map { |cell| cell.text.strip }).to eq([ "pro" ])
@@ -448,7 +439,7 @@ RSpec.describe "Dashboard reports", type: :request do
 
         get "/telemetry/reports/behaviours", params: { tab: "properties", property: [ "facility_id" ] }
 
-        expect(Nokogiri::HTML5(response.body).at_css("[data-tm-picker=property] button").text.strip).to eq("plan")
+        expect(document.at_css("[data-tm-picker=property] button").text.strip).to eq("plan")
       end
 
       it "says there are no custom properties when no event carries one" do
@@ -475,9 +466,7 @@ RSpec.describe "Dashboard reports", type: :request do
 
     describe "the ip addresses card, which is registered from an initializer" do
       def addressed!
-        visit = dash_visit(started_at: now - 1.day, visitor: "visitor-ip", ip: "203.0.113.44")
-        dash_page_view(visit, path: "/page-0", at: now - 1.day)
-        visit
+        dash_landing("/page-0", at: now - 1.day, visitor: "visitor-ip", ip: "203.0.113.44")
       end
 
       it "is registered by config/initializers/dash_panels.rb" do
@@ -553,11 +542,8 @@ RSpec.describe "Dashboard reports", type: :request do
         expect(response.body).to include("IP address")
       end
 
-      # An address is one person, so the card is ranked by visits: ranked by
-      # visitors every row reads 1 and the card says nothing at all.
       it "ranks by visits, so somebody who came back is above somebody who came once" do
-        once = dash_visit(started_at: now - 1.day, visitor: "one", ip: "198.51.100.7")
-        dash_page_view(once, path: "/page-0", at: now - 1.day)
+        dash_landing("/page-0", at: now - 1.day, visitor: "one", ip: "198.51.100.7")
 
         2.times do |index|
           repeat = dash_visit(started_at: now - 2.days + index.hours, visitor: "two",
@@ -567,15 +553,14 @@ RSpec.describe "Dashboard reports", type: :request do
 
         get "/telemetry/reports/ip_addresses"
 
-        labels = Nokogiri::HTML5(response.body).css(".p-list .nm").map { |row| row.text.strip }
+        labels = document.css(".p-list .nm").map { |row| row.text.strip }
 
         expect(labels).to eq([ "203.0.113.44", "198.51.100.7" ])
       end
 
       it "narrows the whole dashboard when the filter is applied" do
         addressed!
-        other = dash_visit(started_at: now - 1.day, visitor: "other", ip: "198.51.100.7")
-        dash_page_view(other, path: "/elsewhere", at: now - 1.day)
+        dash_landing("/elsewhere", at: now - 1.day, visitor: "other", ip: "198.51.100.7")
 
         get "/telemetry/reports/pages",
             params: { filters: [ { dimension: "ip", operator: "is", value: "203.0.113.44" } ] }

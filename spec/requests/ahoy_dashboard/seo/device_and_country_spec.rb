@@ -1,21 +1,14 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard seo device and country", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
   let(:on) { now.to_date - 2 }
   let(:key) { AhoyDashboard::Seo::BrandTerms::KEY }
   let(:query) { "federal prison consultant" }
 
   around { |example| travel_to(now) { example.run } }
-  after { AhoyDashboard::Setting.clear(key) }
 
   before { sign_in create(:user, :admin) }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   def metrics(clicks, impressions, position: 4.0)
     { clicks: clicks, impressions: impressions, ctr: clicks.to_f / impressions, position: position }
@@ -45,24 +38,24 @@ RSpec.describe "Dashboard seo device and country", type: :request do
     node && node.text.squish.delete_prefix(label).strip.split(" ").first
   end
 
-  MENUS = { "Device" => "tm-sc-device", "Country" => "tm-sc-country", "Date range" => "tm-seo-period" }.freeze
-
   def menu_links(section)
-    document.css("##{MENUS.fetch(section)} a")
+    frame = { "Device" => "tm-sc-device", "Country" => "tm-sc-country", "Date range" => "tm-seo-period" }.fetch(section)
+
+    document.css("##{frame} a")
   end
 
   def href_params(href)
     Rack::Utils.parse_query(URI(href).query.to_s)
   end
 
-  REPORTS = {
+  reports = {
     "Opportunities" => "/telemetry/seo/opportunity",
     "Cannibalization" => "/telemetry/seo/cannibalization",
     "Brand vs. non-brand" => "/telemetry/seo/brand_split",
     "Search to conversion" => "/telemetry/seo/conversion"
   }.freeze
 
-  REPORTS.each do |name, path|
+  reports.each do |name, path|
     describe name do
       it "offers every device and every country with rows in the range" do
         stored!

@@ -8,7 +8,7 @@ RSpec.describe "Dashboard SEO overview", type: :request do
   before { sign_in(create(:user, :admin)) }
 
   def rank_title
-    Nokogiri::HTML5(response.body).css(".card-title").find { |node| node.text.include?("Rank tracking") }.text.squish
+    document.css(".card-title").find { |node| node.text.include?("Rank tracking") }.text.squish
   end
 
   it "renders populated rank tracking with the sample-data badge for the fake provider" do

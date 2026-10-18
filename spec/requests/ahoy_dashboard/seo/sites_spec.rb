@@ -1,19 +1,13 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard seo site switcher", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let!(:rival) { create(:dash_serp_site, name: "Bop", domain: "bop.gov") }
   let!(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
   let(:keyword) { create(:dash_serp_keyword, query: "visiting hours") }
 
   around { |example| travel_to(now) { example.run } }
   before { sign_in create(:user, :admin) }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   def reading(site:, position:)
     run = create(:dash_serp_run, keyword: keyword, checked_at: now - 1.day)

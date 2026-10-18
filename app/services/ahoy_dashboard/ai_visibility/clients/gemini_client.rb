@@ -7,10 +7,11 @@ module AhoyDashboard
         def ask(text)
           require_key!
 
-          payload = post_json(format(ENDPOINT, ERB::Util.url_encode(model)),
-                              body: { contents: [ { role: "user", parts: [ { text: text } ] } ],
-                                      tools: [ { google_search: {} } ] },
-                              headers: { "x-goog-api-key" => api_key })
+          payload = asking do
+            transport.post(format(ENDPOINT, ERB::Util.url_encode(model)), headers: { "x-goog-api-key" => api_key },
+                           body: { contents: [ { role: "user", parts: [ { text: text } ] } ],
+                                   tools: [ { google_search: {} } ] })
+          end
           candidate = Array(payload["candidates"]).first || {}
 
           Reply.new(text: Array(candidate.dig("content", "parts")).map { |part| part["text"].to_s }.join,

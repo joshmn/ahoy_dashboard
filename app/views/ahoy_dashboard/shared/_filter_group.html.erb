@@ -2,10 +2,7 @@
 <% carried = local_assigns.fetch(:carried, {}) %>
 <% first = group.to_a.first %>
 <% note_id = "tm-filter-group-note-#{start}" if group.negative_or? %>
-<% adding = query.to_query
-     .merge(dash_carried_params(carried))
-     .merge(destination.present? ? { return: destination } : {})
-     .merge(dimension: first.dimension.key) %>
+<% adding = dash_filter_params(destination: destination, carried: carried).merge(dimension: first.dimension.key) %>
 <% joinable = group.uniform? && first.operator.in?(AhoyDashboard::FilterGroup::JOINING) %>
 
 <span class="<%= class_names("chip-group", "chip-group--or" => !group.single?) %>"

@@ -18,9 +18,5 @@ FactoryBot.define do
     trait :revenue do
       currency { "USD" }
     end
-
-    trait :named do
-      display_name { "The one that matters" }
-    end
   end
 end

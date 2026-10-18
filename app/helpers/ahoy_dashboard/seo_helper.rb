@@ -1,36 +1,24 @@
 module AhoyDashboard
-  # Drawing for the suite's pages. Server side rather than handed to the chart
-  # controller, because these are small read-only plots with no tween, no
-  # annotation flag and nothing to hover, and an SVG the server already wrote
-  # still renders with the JavaScript off.
   module SeoHelper
     PLOT_WIDTH = 640
     PLOT_HEIGHT = 96
     PLOT_INSET = 10
     PLOT_MINIMUM = 3
     READING_COUNTS = { 1 => "One", 2 => "Two" }.freeze
+    OVERVIEW_TITLES = {
+      "Cited" => "The AI overview cited your site",
+      "Shown" => "An AI overview showed without your site in it"
+    }.freeze
 
-    def self.short_date(value, zone: AhoyDashboard.time_zone, today: zone.today)
-      date = local_date(value, zone: zone)
-      return nil if date.nil?
-
-      date.year == today.year ? date.strftime("%b %-d") : date.strftime("%b %-d, %Y")
-    end
-
-    def self.local_date(value, zone: AhoyDashboard.time_zone)
-      return nil if value.nil?
-      return value if value.instance_of?(Date)
-      return value.in_time_zone(zone).to_date if value.respond_to?(:in_time_zone) && !value.is_a?(String)
-
-      value.to_date
-    end
+    Stack = Data.define(:day, :x, :width, :segments)
+    Segment = Data.define(:key, :y, :height)
 
     def self.not_installed_reason(name)
       "#{AhoyDashboard::FeatureState.for(name).label} isn't installed."
     end
 
     def seo_date(value)
-      SeoHelper.short_date(value, zone: (@seo_time_zone ||= AhoyDashboard.time_zone))
+      AhoyDashboard::DateFormat.short(value, zone: (@seo_time_zone ||= AhoyDashboard.time_zone))
     end
 
     def seo_charted?(points)
@@ -62,7 +50,7 @@ module AhoyDashboard
 
     def seo_label(text, path: false)
       value = text.to_s
-      return tag.span("&mdash;".html_safe, class: "nil") if value.blank? || value == "&mdash;"
+      return dash_value(nil) if value.blank? || value == "&mdash;"
 
       tag.span(dash_row_label(value, split: path, mono: path),
                class: class_names("seo-label", "seo-label--path" => path), title: value)
@@ -77,24 +65,12 @@ module AhoyDashboard
       tag.span(tag.span(safe_join(parts), class: "nm"), class: "seo-label", title: value)
     end
 
-    def seo_url_path(url)
-      return nil if url.blank?
-
-      url.to_s.sub(%r{\Ahttps?://[^/]+}, "").presence || "/"
-    end
-
     def seo_referer_path
-      uri = URI.parse(request.referer.to_s)
-      return nil if uri.host.present? && uri.host != request.host
-      return nil unless uri.path.to_s.start_with?("/")
-
-      [ uri.path, uri.query.presence ].compact.join("?")
-    rescue URI::InvalidURIError
-      nil
+      AhoyDashboard::Seo::Referer.local_path(request.referer, host: request.host)
     end
 
-    def seo_page_link(path, stack: false)
-      value = path.to_s
+    def seo_page_link(url, stack: false)
+      value = AhoyDashboard::Seo::Formatting.url_path(url).to_s
       return seo_label(value, path: true) if value.blank? || value == "&mdash;" || !value.start_with?("/")
 
       link_to dashboard_path(query.filter_link_params("page", value)), class: "seo-link min-w-0",
@@ -124,7 +100,9 @@ module AhoyDashboard
 
     def seo_track_path(query, return_to: nil)
       return unless seo_tracking?
-      return rank_keyword_path(keyword: seo_tracked_keyword_id(query)) if seo_tracked?(query)
+
+      tracked = seo_tracked_keyword_id(query)
+      return rank_keyword_path(keyword: tracked) if tracked.present?
 
       new_settings_serp_keyword_path(query: query, return_to: return_to || request.fullpath)
     end
@@ -167,13 +145,14 @@ module AhoyDashboard
                                 tone: button ? :secondary : :link)
       end
 
-      if seo_tracked?(query)
-        dash_button button ? "See rankings" : "Tracked", rank_keyword_path(keyword: seo_tracked_keyword_id(query)),
-                    tone: button ? :secondary : :link, data: { tm_frame: "_top" }
+      label = if seo_tracked?(query)
+        button ? "See rankings" : "Tracked"
       else
-        dash_button button ? "Track keyword" : "Track", new_settings_serp_keyword_path(query: query, return_to: return_to || request.fullpath),
-                    tone: button ? :secondary : :link, data: { tm_frame: "_top" }
+        button ? "Track keyword" : "Track"
       end
+
+      dash_button label, seo_track_path(query, return_to: return_to),
+                  tone: button ? :secondary : :link, data: { tm_frame: "_top" }
     end
 
     def seo_track_form(id, return_to: nil)
@@ -206,9 +185,6 @@ module AhoyDashboard
                 data: { "dash--check-all-target": "master", action: "change->dash--check-all#toggle" })
     end
 
-    # compact is the dense row list on the dashboard card, where the row itself
-    # is already the link to that query's history. A word there would be wider
-    # than the count columns beside it, so a tracked search gets a tick.
     def seo_track_box(query, form:, index:, compact: false)
       return seo_disabled_box("#{form}-#{index}", "Track #{query}") unless seo_tracking?
 
@@ -233,48 +209,53 @@ module AhoyDashboard
                   aria: { label: "Download #{table.label} as CSV" }, data: { tm_frame: "_top" }
     end
 
+    def seo_period_menu(presenter, id:)
+      dash_link_menu(id: id, icon: :cal, label: presenter.range_label, section: "Date range",
+                     items: presenter.period_options)
+    end
+
+    def seo_group_header(presenter, group)
+      title = safe_join([ group.title, dash_badge(group.rows.size, tone: group.tone, class: "seo-count") ], " ")
+
+      dash_card_header(title, title_class: "seo-group-title") do
+        safe_join([ tag.span(group.note, class: "g-hint"), seo_csv(presenter, group.key) ])
+      end
+    end
+
     def seo_link(text, url)
       link_to(url, class: "seo-link min-w-0", data: { tm_frame: "_top" }) { seo_label(text) }
     end
 
-    # Points in, an SVG path out. Straight segments on purpose: the dashboard's
-    # own chart uses monotone cubic because it animates and these do not, and a
-    # curve through eight weekly readings invents shape between them.
-    def seo_plot(values, width: PLOT_WIDTH, height: PLOT_HEIGHT, floor: nil, ceiling: nil)
-      numbers = Array(values).map(&:to_f)
-      return nil if numbers.size < 2
+    def seo_plot(values, width: PLOT_WIDTH, height: PLOT_HEIGHT, floor: nil, ceiling: nil, inset: PLOT_INSET, places: 2)
+      numbers = Array(values).map { |value| value&.to_f }
+      known = numbers.compact
+      return nil if numbers.size < 2 || known.empty?
 
-      low = floor || numbers.min
-      high = ceiling || numbers.max
-      span = (high - low).abs < 1e-9 ? 1.0 : (high - low)
+      low = floor || known.min
+      high = ceiling || known.max
       step = width.to_f / (numbers.size - 1)
+      drawing = false
 
       numbers.each_with_index.map { |value, index|
-        x = (index * step).round(2)
-        y = (height - ((value - low) / span * (height - (PLOT_INSET * 2))) - PLOT_INSET).round(2)
+        next drawing = false if value.nil?
 
-        "#{index.zero? ? "M" : "L"}#{x} #{y}"
-      }.join(" ")
+        x = (index * step).round(places)
+        y = seo_plot_y(value, height: height, floor: low, ceiling: high, inset: inset, places: places)
+        command = drawing ? "L" : "M"
+        drawing = true
+
+        "#{command}#{x} #{y}"
+      }.select { |segment| segment }.join(" ")
     end
 
-    def seo_plot_y(value, height: PLOT_HEIGHT, floor: 0, ceiling: 100)
+    def seo_plot_y(value, height: PLOT_HEIGHT, floor: 0, ceiling: 100, inset: PLOT_INSET, places: 2)
       span = (ceiling - floor).abs < 1e-9 ? 1.0 : (ceiling - floor).to_f
 
-      (height - ((value.to_f - floor) / span * (height - (PLOT_INSET * 2))) - PLOT_INSET).round(2)
+      (height - ((value.to_f - floor) / span * (height - (inset * 2))) - inset).round(places)
     end
 
     def seo_plot_percent(value, height: PLOT_HEIGHT, floor: 0, ceiling: 100)
       (seo_plot_y(value, height: height, floor: floor, ceiling: ceiling) / height * 100).round(2)
-    end
-
-    def seo_area(values, **options)
-      path = seo_plot(values, **options)
-      return nil if path.nil?
-
-      width = options.fetch(:width, PLOT_WIDTH)
-      height = options.fetch(:height, PLOT_HEIGHT)
-
-      "#{path} L#{width} #{height} L0 #{height} Z"
     end
 
     def seo_stacks(days, keys:, width: PLOT_WIDTH, height: PLOT_HEIGHT)
@@ -293,35 +274,32 @@ module AhoyDashboard
           next if size.zero?
 
           floor -= size
-          { key: key, y: floor.round(2), height: size.round(2) }
+          Segment.new(key: key, y: floor.round(2), height: size.round(2))
         end.select { |value| value }
 
-        { day: day, x: (index * step + (step - bar) / 2).round(2), width: bar.round(2), segments: segments }
+        Stack.new(day: day, x: (index * step + (step - bar) / 2).round(2), width: bar.round(2), segments: segments)
       end
     end
 
-    # A proportional bar behind a row, which is the dashboard's own idiom for
-    # "this one is bigger than that one" and costs no chart.
-    def seo_bar(share)
-      { style: "--w: #{(share.to_f.clamp(0, 1) * 100).round(1)}%" }
+    def seo_meter(share, wide: false)
+      tag.span(class: class_names("seo-meter", "seo-meter--wide" => wide),
+               style: "--w: #{(share.to_f.clamp(0, 1) * 100).round(1)}%")
     end
 
-    def seo_badge_for(severity)
-      case severity.to_s
-      when "high", "error" then :danger
-      when "medium", "warning" then :warning
-      when "low", "notice" then :neutral
-      else :success
+    def seo_figure(share, label, wide: false, number: false)
+      tag.div(class: class_names("seo-figure", "seo-figure--start" => wide)) do
+        safe_join([ seo_meter(share, wide: wide), tag.span(label, class: number ? "seo-figure__num" : "seo-figure__pct") ])
       end
     end
 
-    def seo_severity_label(severity)
-      case severity.to_s
-      when "error" then "Error"
-      when "warning" then "Warning"
-      when "notice" then "Notice"
-      else severity.to_s.capitalize
-      end
+    def seo_domain(domain, mine:)
+      safe_join([ seo_label(domain, path: true), (dash_badge("You", tone: :kind) if mine) ].compact)
+    end
+
+    def seo_overview_badge(label, titled: true)
+      return dash_value(nil) if label.nil?
+
+      dash_badge(label, tone: label == "Cited" ? :success : :neutral, title: (OVERVIEW_TITLES[label] if titled))
     end
   end
 end

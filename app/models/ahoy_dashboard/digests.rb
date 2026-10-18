@@ -1,12 +1,4 @@
 module AhoyDashboard
-  # The period arithmetic behind every scheduled email. Alerts and traffic
-  # reports are two different emails with the same shape: a daily, weekly or
-  # monthly window that has ended, cut in the dashboard's own zone, sent once.
-  #
-  # One place rather than two because the window is the part that has to agree.
-  # A week starting Monday in one email and Sunday in the other is the kind of
-  # difference nobody notices until two emails land on the same morning and
-  # disagree about the same days.
   module Digests
     PERIODS = %i[daily weekly monthly].freeze
 
@@ -17,10 +9,6 @@ module AhoyDashboard
         starts_on.in_time_zone(zone)...(ends_on + 1).in_time_zone(zone)
       end
 
-      # What this window is measured against. A month compares to the calendar
-      # month before it rather than to the same number of days, because a report
-      # holding August up against the 31 days ending July 31 is comparing it to
-      # something nobody has a name for.
       def previous
         case period
         when :daily then with(starts_on: starts_on - 1, ends_on: ends_on - 1)

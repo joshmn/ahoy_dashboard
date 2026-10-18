@@ -1,18 +1,11 @@
 module AhoyDashboard
   module LLM
     module OpenAI
-      class Client
-        def initialize(api_base:, api_key:, open_timeout: 10, read_timeout: 180, transport: nil)
-          @api_base = api_base.to_s.chomp("/")
-          @api_key = api_key.to_s
-          @transport = transport || Transport.new(open_timeout: open_timeout, read_timeout: read_timeout)
-        end
-
+      class Client < LLM::Client
         def stream(body, &on_text)
           assembler = Assembler.new
-          headers = { "Authorization" => (@api_key.present? ? "Bearer #{@api_key}" : nil) }
 
-          @transport.stream("#{@api_base}/responses", headers: headers, body: body.merge("stream" => true)) do |event|
+          transport.stream("#{api_base}/responses", headers: bearer, body: body.merge("stream" => true)) do |event|
             assembler.feed(event.data, &on_text)
           end
 
@@ -43,7 +36,7 @@ module AhoyDashboard
           end
 
           def response
-            raise Error, "the stream ended before the response finished" if @response.nil?
+            raise Error, LLM::Client::UNFINISHED if @response.nil?
 
             finished = Array(@response["output"])
             @response.merge("output" => @items.any? ? @items.keys.sort.map { |index| @items[index] } : finished)

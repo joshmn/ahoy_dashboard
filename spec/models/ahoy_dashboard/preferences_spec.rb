@@ -59,6 +59,28 @@ RSpec.describe AhoyDashboard::Preferences do
     expect(described_class.read(:site, :host)).to eq("elsewhere.test")
   end
 
+  it "reads a whole number, and the default for anything else" do
+    key = AhoyDashboard::AiVisibility::CAP_KEY
+
+    { 50 => 50, "25" => 25, " 7 " => 7, "0" => 0, "-3" => -3, "ten" => 200, "2.5" => 200, "" => 200 }.each do |stored, read|
+      AhoyDashboard::Setting.write(key, stored)
+      described_class.forget
+
+      expect(described_class.read(:ai_visibility, :monthly_cap)).to eq(read), "stored #{stored.inspect}"
+    end
+  end
+
+  it "keeps the settings that predate it under the keys they have always had" do
+    described_class.write(:search_console, property: "sc-domain:example.com")
+    described_class.write(:assistant, withheld: %w[city prop:email])
+    described_class.write(:ai_visibility, frequency: "daily", monthly_cap: 40)
+
+    expect(AhoyDashboard::Setting.read(AhoyDashboard::SearchConsole::STORED_PROPERTY_SETTING)).to eq("sc-domain:example.com")
+    expect(AhoyDashboard::Setting.read(AhoyDashboard::Assistant::WITHHELD_KEY)).to eq(%w[city prop:email])
+    expect(AhoyDashboard::Setting.read(AhoyDashboard::AiVisibility::FREQUENCY_KEY)).to eq("daily")
+    expect(AhoyDashboard::Setting.read(AhoyDashboard::AiVisibility::CAP_KEY)).to eq(40)
+  end
+
   it "refuses a setting it does not know" do
     expect { described_class.read(:site, :colour) }.to raise_error(ArgumentError, "no setting named colour for site")
   end

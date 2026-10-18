@@ -61,8 +61,6 @@ RSpec.describe AhoyDashboard::Seo::BrandSplitQuery do
 
     expect(result.terms).to eq([ "halfway house" ])
     expect(result.brand.terms.map(&:query)).to eq([ "halfway house rules" ])
-  ensure
-    AhoyDashboard::Setting.clear(AhoyDashboard::Seo::BrandTerms::KEY)
   end
 
   it "aggregates both day series in one read with unchanged chronology and zero-count days" do
@@ -71,14 +69,9 @@ RSpec.describe AhoyDashboard::Seo::BrandSplitQuery do
     named!("zero", clicks: 0, on: today - 1)
     named!("brand% latest", clicks: 2)
     named!("brand% future", clicks: 99, on: today + 1)
-    sql = []
-    subscriber = ->(_name, _started, _finished, _id, payload) do
-      statement = payload[:sql]
-      sql << statement if statement.include?("GROUP BY \"ahoy_dashboard_search_console_keywords\".\"date\"")
-    end
-
-    result = ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
-      described_class.call(range: range, terms: [ "brand%" ])
+    result = nil
+    sql = captured_sql('GROUP BY "ahoy_dashboard_search_console_keywords"."date"', cached: true) do
+      result = described_class.call(range: range, terms: [ "brand%" ])
     end
 
     expect(result.points.map(&:to_h)).to eq([
@@ -86,6 +79,20 @@ RSpec.describe AhoyDashboard::Seo::BrandSplitQuery do
       { on: today - 1, brand_clicks: 0, other_clicks: 0, brand_impressions: 0, other_impressions: 0 },
       { on: today, brand_clicks: 2, other_clicks: 0, brand_impressions: 20, other_impressions: 0 }
     ])
+    expect(sql.size).to eq(1)
+  end
+
+  it "lists the top fifteen terms on each side in one read, ties broken by the search itself" do
+    17.times { |index| named!("acme #{format("%02d", 16 - index)}", clicks: 5) }
+    named!("acme leader", clicks: 9)
+    16.times { |index| named!("other #{format("%02d", index)}", clicks: index + 1) }
+    result = nil
+    sql = captured_sql('GROUP BY "ahoy_dashboard_search_console_keywords"."query"', cached: true) do
+      result = described_class.call(range: range, terms: [ "acme" ])
+    end
+
+    expect(result.brand.terms.map(&:query)).to eq([ "acme leader", *Array.new(14) { |index| "acme #{format("%02d", index)}" } ])
+    expect(result.other.terms.map(&:query)).to eq(Array.new(15) { |index| "other #{format("%02d", 15 - index)}" })
     expect(sql.size).to eq(1)
   end
 

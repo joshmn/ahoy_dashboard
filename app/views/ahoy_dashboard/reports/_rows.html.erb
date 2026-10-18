@@ -1,13 +1,10 @@
-<%# The empty state is not a list with nothing in it, so it does not carry the
-    list class. Something reading this card for its rows should find none. %>
 <% if presenter.no_properties? %>
   <%= dash_empty "No custom properties in this range", compact: true,
         hint: "None of the events in this range carry a property of their own.",
         action: { label: "Custom properties", url: settings_properties_path, primary: false,
                   data: { tm_frame: "_top" } } %>
 <% elsif presenter.empty? %>
-  <%= dash_empty "Nothing here for this range", compact: true,
-        hint: query.filters.any? ? "Try a wider date range, or drop one of the filters." : "Try a wider date range." %>
+  <%= dash_empty "Nothing here for this range", compact: true, hint: dash_range_hint %>
 <% else %>
   <% chip = dash_chip_kind(tab.resolved_dimension_key) %>
   <% mono = dash_mono_dimension?(tab.resolved_dimension_key) %>
@@ -19,10 +16,7 @@
             title: "Filter by #{row.display_label}",
             data: { tm_frame: "_top" } do %>
         <%= dash_bar_tag(row.share) %>
-        <span class="<%= class_names("rn", "mono" => mono) %>">
-          <%= dash_row_chip(chip, row.label) if chip %>
-          <%= dash_row_label(row.display_label, split: mono) %>
-        </span>
+        <%= dash_row_name row.display_label, chip: chip, chip_label: row.label, mono: mono %>
         <% if row.percent %>
           <span class="pct" title="<%= presenter.percent_title %>"><%= row.percent %></span>
         <% end %>

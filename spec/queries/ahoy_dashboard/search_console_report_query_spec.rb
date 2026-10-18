@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::SearchConsoleReportQuery do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:day) { Date.new(2026, 8, 12) }
   let(:range) { (now - 30.days)..now }
 
@@ -35,6 +35,46 @@ RSpec.describe AhoyDashboard::SearchConsoleReportQuery do
     expect(point.impressions).to eq(500)
     expect(point.ctr).to be_within(0.0001).of(0.09)
     expect(point.position).to be_within(0.0001).of(((2.0 * 100) + (6.0 * 300) + (9.0 * 100)) / 500)
+  end
+
+  describe "the earlier window" do
+    let(:range) { dash_time(2026, 8, 11)..dash_time(2026, 8, 12).end_of_day }
+
+    def total_on!(date, clicks:)
+      AhoyDashboard::SearchConsoleTotal.absorb([
+        { date: date, device: "desktop", country: "usa", clicks: clicks, impressions: 100, ctr: 0.0, position: 3.0 }
+      ])
+    end
+
+    it "compares against the same number of days just before, read off the day totals" do
+      total_on!(Date.new(2026, 8, 9), clicks: 7)
+      total_on!(Date.new(2026, 8, 10), clicks: 4)
+
+      result = described_class.call(range: range)
+
+      expect(result).to be_comparable
+      expect(result.previous_window).to eq(Date.new(2026, 8, 9)..Date.new(2026, 8, 10))
+      expect(result.previous.clicks).to eq(11)
+      expect(result.previous.position).to eq(3.0)
+    end
+
+    it "offers no comparison when the earlier window was only partly pulled" do
+      total_on!(Date.new(2026, 8, 10), clicks: 4)
+
+      result = described_class.call(range: range)
+
+      expect(result).not_to be_comparable
+      expect(result.previous).to have_attributes(clicks: 0, impressions: 0)
+    end
+
+    it "measures the earlier window inside the slice being read" do
+      total_on!(Date.new(2026, 8, 9), clicks: 7)
+      total_on!(Date.new(2026, 8, 10), clicks: 4)
+
+      result = described_class.call(range: range, slice: AhoyDashboard::SearchConsole::Slice.new(device: "mobile"))
+
+      expect(result).not_to be_comparable
+    end
   end
 
   it "reads one device alone and leaves rows without one out" do

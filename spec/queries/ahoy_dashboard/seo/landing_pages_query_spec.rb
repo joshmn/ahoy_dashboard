@@ -1,11 +1,9 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::Seo::LandingPagesQuery do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:range) { (now - 7.days)..now }
-  let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
+  let(:site) { create(:dash_serp_site, :ours) }
   let(:visiting) { create(:dash_serp_keyword, query: "visiting hours", tags: [ "guides" ]) }
   let(:mail) { create(:dash_serp_keyword, query: "mail rules", tags: [ "guides" ]) }
   let(:consult) { create(:dash_serp_keyword, query: "prison consultant", tags: [ "Brand" ]) }
@@ -14,8 +12,7 @@ RSpec.describe AhoyDashboard::Seo::LandingPagesQuery do
   around { |example| travel_to(now) { example.run } }
 
   def reading(keyword, position:, url:, days_ago: 1, location: "us", site: self.site)
-    run = create(:dash_serp_run, keyword: keyword, location: location, checked_at: now - days_ago.days)
-    create(:dash_serp_check, run: run, site: site, position: position, url: url)
+    serp_reading(keyword, site: site, at: now - days_ago.days, position: position, location: location, url: url)
   end
 
   def call(**options)
@@ -72,11 +69,19 @@ RSpec.describe AhoyDashboard::Seo::LandingPagesQuery do
   end
 
   it "counts a search in each place separately" do
+    visiting.update!(locations: %w[us gb])
     reading(visiting, position: 3, url: "https://example.com/visiting", location: "gb")
 
     page = call.pages.first
 
     expect(page.held.map(&:location)).to contain_exactly("us", "us", "gb")
+  end
+
+  it "leaves out a place the keyword no longer searches, the way Rankings does" do
+    reading(visiting, position: 3, url: "https://example.com/visiting", location: "gb")
+
+    expect(call.pages.first.held.map(&:location)).to eq(%w[us us])
+    expect(call.tracked).to eq(4)
   end
 
   it "reads one tag at a time" do

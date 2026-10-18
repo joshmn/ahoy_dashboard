@@ -1,14 +1,10 @@
-require "net/http"
-
 module AhoyDashboard
   module SearchConsole
     class BaseService
       OPEN_TIMEOUT = 5
       READ_TIMEOUT = 30
+      DEFAULT_LIFETIME = 3600
 
-      # Google's OAuth endpoints answer with a bare error string; the API answers
-      # with a nested object. Both shapes have to be read to tell an expired grant
-      # from a used up quota.
       QUOTA_REASONS = %w[quotaExceeded rateLimitExceeded userRateLimitExceeded].freeze
 
       def self.call(**options)
@@ -17,58 +13,41 @@ module AhoyDashboard
 
       private
 
-      def get_json(url, token)
-        uri = URI(url)
-        request = Net::HTTP::Get.new(uri)
-        request["Authorization"] = "Bearer #{token}"
+      def require_configured!
+        raise AuthError, "search console is not configured" unless SearchConsole.enabled?
+      end
 
-        send_request(uri, request)
+      def expires_at(payload)
+        Time.current + (payload["expires_in"].presence&.to_i || DEFAULT_LIFETIME).seconds
+      end
+
+      def http
+        @http ||= HttpClient.new(open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT)
+      end
+
+      def get_json(url, token)
+        send_request { http.get(url, headers: bearer(token)) }
       end
 
       def post_json(url, token, body)
-        uri = URI(url)
-        request = Net::HTTP::Post.new(uri)
-        request["Authorization"] = "Bearer #{token}"
-        request["Content-Type"] = "application/json"
-        request.body = body.to_json
-
-        send_request(uri, request)
+        send_request { http.post_json(url, body: body, headers: bearer(token), idempotent: true) }
       end
 
       def post_form(url, params)
-        uri = URI(url)
-        request = Net::HTTP::Post.new(uri)
-        request.set_form_data(params)
-
-        send_request(uri, request)
+        send_request { http.post_form(url, params: params, idempotent: true) }
       end
 
-      def send_request(uri, request)
-        response = perform(uri, request)
-        payload = parse(response)
-        return payload if response.is_a?(Net::HTTPSuccess)
-
-        raise error_for(response, payload)
+      def bearer(token)
+        { "Authorization" => "Bearer #{token}" }
       end
 
-      def perform(uri, request, attempts_left: 1)
-        Net::HTTP.start(uri.host, uri.port, use_ssl: true,
-                                            open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
-          http.request(request)
-        end
-      rescue Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET, Errno::ECONNREFUSED, SocketError => e
-        raise Error, "search console request failed: #{e.class}: #{e.message}" if attempts_left.zero?
+      def send_request
+        reply = yield
+        return reply.payload if reply.success?
 
-        perform(uri, request, attempts_left: attempts_left - 1)
-      end
-
-      def parse(response)
-        body = response.body.to_s
-        return {} if body.blank?
-
-        JSON.parse(body)
-      rescue JSON::ParserError
-        {}
+        raise error_for(reply.response, reply.payload)
+      rescue HttpClient::Unreachable => e
+        raise Error, "search console request failed: #{e.message}"
       end
 
       def error_for(response, payload)

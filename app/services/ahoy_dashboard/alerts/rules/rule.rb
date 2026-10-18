@@ -48,6 +48,20 @@ module AhoyDashboard
           readings.now
         end
 
+        def this_hour
+          now.beginning_of_hour.utc.iso8601
+        end
+
+        def percent_drop(previous:, current:)
+          return nil if previous.zero?
+
+          ((previous - current) * 100.0 / previous).floor
+        end
+
+        def drop_recovered?(drop)
+          !drop.nil? && drop < threshold / 2.0
+        end
+
         def finding(**attributes)
           Finding.new(**attributes)
         end

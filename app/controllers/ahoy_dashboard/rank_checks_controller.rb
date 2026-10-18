@@ -1,7 +1,4 @@
 module AhoyDashboard
-  # Running the tracking by hand. Enqueued rather than run inline: a sweep is one
-  # request per search per place at a provider that answers in seconds, and the
-  # scheduled job does the identical work.
   class RankChecksController < AhoyDashboard::BaseController
     requires_installed :serp
 

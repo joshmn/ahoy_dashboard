@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsole::IngestCommand, "daily snapshots" do
-  let(:account) { create(:dash_google_account, :with_property, access_token: "good", expires_at: 30.minutes.from_now) }
+  let(:account) { create(:dash_google_account, :with_property) }
   let(:dates) { [Date.new(2026, 8, 8), Date.new(2026, 8, 9)] }
   let(:failed_date) { nil }
   let(:refused_date) { nil }

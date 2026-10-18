@@ -2,7 +2,5 @@
 
 <section class="ex-page">
   <%= dash_page_head title: state.label, lede: "Not installed in this app yet." %>
-  <%= dash_card element: :section, class: "p-3", "aria-label": "How to install #{state.label}" do %>
-    <%= render "ahoy_dashboard/shared/feature_state", state: state %>
-  <% end %>
+  <%= render "ahoy_dashboard/shared/install_card", state: state %>
 </section>

@@ -21,6 +21,10 @@ module AhoyDashboard
         { name: name.to_s.strip, domain: domain.to_s.strip, match_subdomains: match_subdomains }
       end
 
+      def add_duplicate_error
+        errors.add(:domain, "is already on the list")
+      end
+
       private
 
       def domain_is_readable

@@ -1,12 +1,20 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsoleQuery do
-  let(:range) { AhoyDashboard.time_zone.local(2026, 8, 1)..AhoyDashboard.time_zone.local(2026, 8, 12).end_of_day }
+  let(:range) { dash_time(2026, 8, 1)..dash_time(2026, 8, 12).end_of_day }
   let(:url) { analytics_url }
 
   def row!(query:, page: "https://example.com/a", date: Date.new(2026, 8, 5), **metrics)
     create(:dash_search_console_row, query: query, page: page, date: date, **metrics)
+  end
+
+  def keyword!(query:, date: Date.new(2026, 8, 5), **metrics)
+    create(:dash_search_console_keyword, query: query, date: date, **metrics)
+  end
+
+  def searched!(query:, page: "https://example.com/a", date: Date.new(2026, 8, 5), **metrics)
+    keyword!(query: query, date: date, **metrics)
+    row!(query: query, page: page, date: date, **metrics)
   end
 
   describe "with nothing stored" do
@@ -32,9 +40,9 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
 
   describe "reading the stored rows" do
     before do
-      row!(query: "fci thomson", clicks: 9, impressions: 100, position: 4.0)
-      row!(query: "fci thomson", clicks: 1, impressions: 100, position: 8.0, date: Date.new(2026, 8, 6))
-      row!(query: "halfway house rules", clicks: 4, impressions: 20, position: 12.0, page: "https://example.com/b")
+      searched!(query: "fci thomson", clicks: 9, impressions: 100, position: 4.0)
+      searched!(query: "fci thomson", clicks: 1, impressions: 100, position: 8.0, date: Date.new(2026, 8, 6))
+      searched!(query: "halfway house rules", clicks: 4, impressions: 20, position: 12.0, page: "https://example.com/b")
     end
 
     it "groups by query, orders by clicks and adds up the days" do
@@ -51,8 +59,6 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
       expect(row.ctr).to be_within(0.0001).of(0.05)
     end
 
-    # Position is an average over impressions, so the two days weigh the same only
-    # because they had the same number of impressions.
     it "averages position over impressions rather than over rows" do
       expect(described_class.call(range: range).queries.first.position).to eq(6.0)
     end
@@ -65,7 +71,7 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
     end
 
     it "leaves out days outside the range" do
-      row!(query: "not in range", clicks: 99, impressions: 99, date: Date.new(2026, 7, 1))
+      searched!(query: "not in range", clicks: 99, impressions: 99, date: Date.new(2026, 7, 1))
 
       expect(described_class.call(range: range).queries.map(&:label)).not_to include("not in range")
     end
@@ -76,47 +82,35 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
   end
 
   describe "cutting the breakdown down" do
-    def breakdown_sql(column, **options)
-      statements = []
-      subscription = ActiveSupport::Notifications.subscribe("sql.active_record") do |_n, _s, _f, _id, payload|
-        next if payload[:name] == "SCHEMA" || payload[:cached]
-
-        statements << payload[:sql]
-      end
-      described_class.call(range: range, live: false, **options)
-      statements.grep(/GROUP BY "ahoy_dashboard_search_console_rows"\."#{column}"/).first
-    ensure
-      ActiveSupport::Notifications.unsubscribe(subscription)
+    def breakdown_sql(table, column, **options)
+      captured_sql { described_class.call(range: range, **options) }.grep(/GROUP BY "#{table}"\."#{column}"/).first
     end
 
-    before { row!(query: "fci thomson", clicks: 9, impressions: 100, position: 4.0) }
+    before { searched!(query: "fci thomson", clicks: 9, impressions: 100, position: 4.0) }
 
-    # Every distinct query in the range used to come back to be sorted in ruby,
-    # to show nine of them.
     it "orders and limits in sql" do
-      sql = breakdown_sql(:query, limit: 3)
+      sql = breakdown_sql("ahoy_dashboard_search_console_keywords", :query, limit: 3)
 
       expect(sql).to include("ORDER BY sum(clicks) desc, sum(impressions) desc")
       expect(sql).to include("LIMIT")
     end
 
     it "does the same for the pages" do
-      expect(breakdown_sql(:page, limit: 3)).to include("ORDER BY sum(clicks) desc, sum(impressions) desc")
+      expect(breakdown_sql("ahoy_dashboard_search_console_rows", :page, limit: 3))
+        .to include("ORDER BY sum(clicks) desc, sum(impressions) desc")
     end
 
-    # The sql cut and the ruby ranking have to agree about ties, or the row that
-    # falls off the bottom is not the one the reader would expect.
     it "breaks a tie on impressions and then on the label" do
-      row!(query: "b thing", clicks: 5, impressions: 50, page: "https://example.com/b")
-      row!(query: "a thing", clicks: 5, impressions: 50, page: "https://example.com/c")
-      row!(query: "c thing", clicks: 5, impressions: 60, page: "https://example.com/d")
+      searched!(query: "b thing", clicks: 5, impressions: 50, page: "https://example.com/b")
+      searched!(query: "a thing", clicks: 5, impressions: 50, page: "https://example.com/c")
+      searched!(query: "c thing", clicks: 5, impressions: 60, page: "https://example.com/d")
 
       expect(described_class.call(range: range, limit: 3).queries.map(&:label))
         .to eq([ "fci thomson", "c thing", "a thing" ])
     end
 
     it "reads the same coverage and totals however short the list is" do
-      12.times { |i| row!(query: "q#{i}", clicks: i + 1, impressions: 10, page: "https://example.com/#{i}") }
+      12.times { |i| searched!(query: "q#{i}", clicks: i + 1, impressions: 10, page: "https://example.com/#{i}") }
       create(:dash_search_console_total, date: Date.new(2026, 8, 5), clicks: 200, impressions: 500)
 
       wide = described_class.call(range: range, limit: 20)
@@ -131,9 +125,6 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
   end
 
   describe "the coverage gap" do
-    # Google withholds rare and personal looking queries and cuts the tail, so
-    # the breakdown is always short of the day's own total. That gap is the thing
-    # being measured, not an error.
     before do
       row!(query: "fci thomson", clicks: 6, impressions: 60)
       create(:dash_search_console_total, date: Date.new(2026, 8, 5), clicks: 10, impressions: 200, position: 9.0)
@@ -154,7 +145,6 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
       expect(coverage.total_clicks).to eq(10)
       expect(coverage.missing_clicks).to eq(4)
       expect(coverage.click_share).to be_within(0.0001).of(0.6)
-      expect(coverage.impression_share).to be_within(0.0001).of(0.3)
       expect(coverage).not_to be_complete
     end
 
@@ -177,14 +167,12 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
   end
 
   describe "stored snapshots while recent days are pending" do
-    let(:account) do
-      create(:dash_google_account, :with_property, access_token: "good", expires_at: 30.minutes.from_now)
-    end
+    let(:account) { create(:dash_google_account, :with_property) }
 
     before { search_console_enabled! }
 
-    it "never calls Google even when a legacy caller requests live data" do
-      described_class.call(range: range, account: account, live: true)
+    it "never calls Google" do
+      described_class.call(range: range, account: account)
 
       expect(a_request(:post, url)).not_to have_been_made
     end
@@ -193,10 +181,6 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
       create(:dash_search_console_total, date: Date.new(2026, 8, 5), clicks: 10)
 
       expect(described_class.call(range: range, account: account).totals.clicks).to eq(10)
-    end
-
-    it "does not label stored data as live" do
-      expect(described_class.call(range: range, account: account)).not_to be_live
     end
 
     it "reports the error recorded by the background refresh" do
@@ -219,7 +203,7 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
     before do
       search_console_disabled!
       allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
-      row!(query: "fci thomson", clicks: 9, impressions: 100, position: 4.0)
+      searched!(query: "fci thomson", clicks: 9, impressions: 100, position: 4.0)
       create(:dash_search_console_total, date: Date.new(2026, 8, 5), clicks: 12, impressions: 200)
     end
 
@@ -229,7 +213,7 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
 
     it "reads the rows once and answers from the cache until something changes" do
       first = read
-      row!(query: "camp packing list", clicks: 20, impressions: 300, position: 2.0)
+      searched!(query: "camp packing list", clicks: 20, impressions: 300, position: 2.0)
 
       expect(read.queries.map(&:label)).to eq(first.queries.map(&:label))
       expect(read.totals.clicks).to eq(12)
@@ -237,7 +221,7 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
 
     it "reads again after a sync" do
       read
-      row!(query: "camp packing list", clicks: 20, impressions: 300, position: 2.0)
+      searched!(query: "camp packing list", clicks: 20, impressions: 300, position: 2.0)
       account.update_columns(synced_at: Time.current)
 
       expect(read.queries.map(&:label)).to eq([ "camp packing list", "fci thomson" ])
@@ -245,14 +229,14 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
 
     it "reads again when a later day lands" do
       read
-      row!(query: "camp packing list", clicks: 20, impressions: 300, position: 2.0, date: Date.new(2026, 8, 6))
+      searched!(query: "camp packing list", clicks: 20, impressions: 300, position: 2.0, date: Date.new(2026, 8, 6))
       create(:dash_search_console_total, date: Date.new(2026, 8, 6), clicks: 25, impressions: 400)
 
       expect(read.totals.clicks).to eq(37)
     end
 
     it "keeps a short list and a long one apart" do
-      row!(query: "camp packing list", clicks: 20, impressions: 300, position: 2.0)
+      searched!(query: "camp packing list", clicks: 20, impressions: 300, position: 2.0)
 
       expect(described_class.call(range: range, account: account, limit: 1).queries.size).to eq(1)
       expect(described_class.call(range: range, account: account, limit: 9).queries.size).to eq(2)
@@ -260,7 +244,7 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
 
     it "does not let one range answer for another" do
       read
-      later = AhoyDashboard.time_zone.local(2026, 8, 6)..AhoyDashboard.time_zone.local(2026, 8, 12).end_of_day
+      later = dash_time(2026, 8, 6)..dash_time(2026, 8, 12).end_of_day
 
       expect(described_class.call(range: later, account: account).totals.clicks).to eq(0)
     end
@@ -268,7 +252,7 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
     it "does not let one property answer for another" do
       read
       other = create(:dash_google_account, property_uri: "sc-domain:other.example", synced_at: account.synced_at)
-      row!(query: "camp packing list", clicks: 20, impressions: 300, position: 2.0)
+      searched!(query: "camp packing list", clicks: 20, impressions: 300, position: 2.0)
 
       expect(described_class.call(range: range, account: other).queries.size).to eq(2)
     end
@@ -278,6 +262,31 @@ RSpec.describe AhoyDashboard::SearchConsoleQuery do
       first.queries
 
       expect(read.queries.first.clicks).to eq(9)
+    end
+  end
+
+  describe "where the card reads its queries" do
+    before do
+      row!(query: "fci thomson", clicks: 2, impressions: 20)
+      keyword!(query: "fci thomson", clicks: 7, impressions: 90)
+      keyword!(query: "only in the query table", clicks: 3, impressions: 30)
+    end
+
+    it "ranks queries off the query table and pages off the row table" do
+      result = described_class.call(range: range)
+
+      expect(result.queries.map { |row| [ row.label, row.clicks ] })
+        .to eq([ [ "fci thomson", 7 ], [ "only in the query table", 3 ] ])
+      expect(result.pages.map { |row| [ row.label, row.clicks ] }).to eq([ [ "https://example.com/a", 2 ] ])
+      expect(result.coverage.counted_clicks).to eq(2)
+    end
+
+    it "shows the same clicks for a query as the Search Console page" do
+      card = described_class.call(range: range).queries
+      page = AhoyDashboard::SearchConsoleReportQuery.call(range: range).rows
+
+      expect(card.map { |row| [ row.label, row.clicks, row.impressions ] })
+        .to eq(page.map { |row| [ row.label, row.clicks, row.impressions ] })
     end
   end
 

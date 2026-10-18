@@ -46,27 +46,8 @@
     <%= render "ahoy_dashboard/chats/unavailable", class_name: "ask-notice" %>
   <% end %>
 
-  <%= form_with url: ask_path(panel.params), method: :post, class: "chat-ask ask-ask",
-        data: { tm_frame: AhoyDashboard::AsksController::FRAME,
-                "dash--chat-ask-target": "form" } do %>
-    <div class="chat-ask__row">
-      <%= label_tag "ask_content", "Ask about this page", class: "visually-hidden" %>
-      <%= text_area_tag "message[content]", nil, id: "ask_content", rows: 1,
-            class: "chat-ask__inp", placeholder: "Ask about this page",
-            autocomplete: "off", autofocus: panel.available? && local_assigns.fetch(:focus, false),
-            disabled: !panel.available?,
-            data: { "dash--chat-ask-target": "input",
-                    action: "input->dash--chat-ask#grow" },
-            "aria-describedby": "ask_hint" %>
-      <button type="submit" class="chat-send" aria-label="Ask" aria-describedby="ask_hint"
-              <%= "disabled" unless panel.available? %>
-              data-dash--chat-ask-target="send">
-        <%= dash_icon(:up, size: 15) %>
-      </button>
-    </div>
-
-    <p class="chat-ask-hint small text-body-tertiary" id="ask_hint">
-      <%= panel.available? ? "Enter to send, Shift+Enter for a new line." : AhoyDashboard::Settings::Display.assistant_notice %>
-    </p>
-  <% end %>
+  <%= render "ahoy_dashboard/chats/composer", url: ask_path(panel.params), id: "ask_content",
+        label: "Ask about this page", placeholder: "Ask about this page",
+        available: panel.available?, autofocus: panel.available? && local_assigns.fetch(:focus, false),
+        form_class: "ask-ask", frame: AhoyDashboard::AsksController::FRAME %>
 </div>

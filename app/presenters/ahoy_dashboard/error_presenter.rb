@@ -1,12 +1,6 @@
 module AhoyDashboard
   class ErrorPresenter
-    SEO_PREFIXES = %w[
-      ahoy_dashboard/seo
-      ahoy_dashboard/rankings
-      ahoy_dashboard/rank_keywords
-      ahoy_dashboard/search_console_reports
-      ahoy_dashboard/search_console_keywords
-    ].freeze
+    TOP = { tm_frame: "_top" }.freeze
 
     RAIL_KEYS = {
       "ahoy_dashboard/seo" => "seo",
@@ -75,7 +69,7 @@ module AhoyDashboard
     end
 
     def seo?
-      SEO_PREFIXES.any? { |prefix| controller_path.start_with?(prefix) }
+      RAIL_KEYS.keys.any? { |prefix| controller_path.start_with?(prefix) }
     end
 
     def rail_key
@@ -122,6 +116,16 @@ module AhoyDashboard
       seo? && failure? ? :seo_path : :root_path
     end
 
+    def primary_action(back_url)
+      return { label: "Try again", url: retry_path, data: TOP } if retry?
+
+      back_action(back_url)
+    end
+
+    def secondary_action(back_url)
+      back_action(back_url) if retry?
+    end
+
     def details
       [
         (exception.class.name if failure?),
@@ -134,6 +138,10 @@ module AhoyDashboard
 
     def copy
       COPY.fetch(status) { COPY.fetch(500) }
+    end
+
+    def back_action(back_url)
+      { label: back_label, url: back_url, data: TOP }
     end
 
     def surface_title

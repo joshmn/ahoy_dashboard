@@ -1,19 +1,13 @@
 module AhoyDashboard
   module LLM
     module Anthropic
-      class Client
+      class Client < LLM::Client
         VERSION = "2023-06-01".freeze
-
-        def initialize(api_base:, api_key:, open_timeout: 10, read_timeout: 180, transport: nil)
-          @api_base = api_base.to_s.chomp("/")
-          @api_key = api_key.to_s
-          @transport = transport || Transport.new(open_timeout: open_timeout, read_timeout: read_timeout)
-        end
 
         def stream(body, betas: [], &on_text)
           assembler = Assembler.new
 
-          @transport.stream("#{@api_base}/messages", headers: headers(betas), body: body.merge("stream" => true)) do |event|
+          transport.stream("#{api_base}/messages", headers: headers(betas), body: body.merge("stream" => true)) do |event|
             assembler.feed(event.data, &on_text)
           end
 
@@ -24,7 +18,7 @@ module AhoyDashboard
 
         def headers(betas)
           {
-            "x-api-key" => @api_key,
+            "x-api-key" => api_key,
             "anthropic-version" => VERSION,
             "anthropic-beta" => Array(betas).uniq.join(",").presence
           }
@@ -56,9 +50,7 @@ module AhoyDashboard
           end
 
           def message
-            if !@finished || @message["stop_reason"].blank?
-              raise Error, "the stream ended before the response finished"
-            end
+            raise Error, LLM::Client::UNFINISHED if !@finished || @message["stop_reason"].blank?
 
             @message.merge(
               "content" => @blocks.keys.sort.map { |index| @blocks[index] },

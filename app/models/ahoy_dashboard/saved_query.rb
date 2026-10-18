@@ -1,18 +1,7 @@
 module AhoyDashboard
-  # A question saved out of Explore.
-  #
-  # What is stored is the query string, in the shape the URL carries it, so
-  # opening one is the same navigation as editing the address bar. Nothing is
-  # precomputed and nothing is stored per visitor: a question saved today reads
-  # whatever the range holds when it is opened, which is the same thing a segment
-  # does and for the same reason.
-  #
-  # Pinned ones get a card on the dashboard. That is the only thing the flag
-  # does, and the order is the order they sit in there.
   class SavedQuery < AhoyDashboard::Record
-    # The keys a saved question is allowed to carry. Anything else in the params
-    # is dropped on the way in: this is a hash that ends up in url_for, and a
-    # stored :host or :controller would build a link somewhere nobody asked for.
+    include Positioned
+
     PERMITTED = %i[
       period interval metric comparison crawlers internal from to filters
       dimension columns q page
@@ -29,21 +18,18 @@ module AhoyDashboard
     normalizes :name, with: ->(value) { value.to_s.strip.presence }
     normalizes :params, with: ->(value) { clean(value) }
 
-    scope :ordered, -> { order(:position, :id) }
     scope :pinned, -> { where(pinned: true).order(:position, :id) }
 
-    # Guarded against a missing table so the dashboard still boots mid-migration,
-    # the same way Segment.listed is.
     def self.listed
+      return [] unless Installation.table?(table_name)
+
       ordered.to_a
-    rescue ActiveRecord::StatementInvalid
-      []
     end
 
     def self.on_the_dashboard
+      return [] unless Installation.table?(table_name)
+
       pinned.limit(MAX_PINNED).to_a
-    rescue ActiveRecord::StatementInvalid
-      []
     end
 
     def self.clean(value)
@@ -65,8 +51,6 @@ module AhoyDashboard
     end
     private_class_method :clean_filters
 
-    # Straight into a url helper. Symbol keys because that is what url_for wants
-    # and what every other link on the dashboard hands it.
     def to_query
       params.symbolize_keys
     end
@@ -75,9 +59,6 @@ module AhoyDashboard
       pinned
     end
 
-    # What the question says in one line, read back out of the params rather than
-    # stored beside them, so a saved question cannot describe itself as something
-    # it no longer is.
     def sentence
       AhoyDashboard::SavedQuerySentence.call(to_query)
     end

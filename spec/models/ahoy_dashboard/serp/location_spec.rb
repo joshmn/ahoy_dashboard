@@ -49,4 +49,10 @@ RSpec.describe AhoyDashboard::Serp::Location do
   it "compares by value" do
     expect(described_class.new("us")).to eq(described_class.country("US"))
   end
+
+  it "lists countries for a select by name, keeping a picked code the list does not have" do
+    options = described_class.country_options({ "us" => "United States", "ca" => "Canada" }, keep: [ "fr", "", "us" ])
+
+    expect(options).to eq([ [ "Canada", "ca" ], [ "France", "fr" ], [ "United States", "us" ] ])
+  end
 end

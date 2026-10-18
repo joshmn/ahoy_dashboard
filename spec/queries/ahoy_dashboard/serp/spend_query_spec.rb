@@ -49,7 +49,7 @@ RSpec.describe AhoyDashboard::Serp::SpendQuery do
 
     expect(fifth.total).to eq(15)
     expect(fifth.count("keywords")).to eq(1)
-    expect(result.spent_on).to eq(%w[checks keywords backlinks])
+    expect(result.count("checks")).to eq(12)
   end
 
   it "leaves out last month and another provider's spending" do
@@ -67,12 +67,12 @@ RSpec.describe AhoyDashboard::Serp::SpendQuery do
                                                             units_reset_on: Date.new(2026, 9, 1))
     allow(AhoyDashboard::Serp::ForecastQuery).to receive(:call).and_return(
       AhoyDashboard::Serp::ForecastQuery::Result.new(checks: 200, backlinks: 10, searches: 200,
-                                                     through: now.end_of_month, days_left: 11)
+                                                     through: now.end_of_month)
     )
 
     result = call(provider: record)
 
-    expect(result).to have_attributes(projected: 610, over?: true, stopped_at: 500)
+    expect(result).to have_attributes(projected: 610, over?: true)
     expect(result.near?(80)).to be(true)
   end
 

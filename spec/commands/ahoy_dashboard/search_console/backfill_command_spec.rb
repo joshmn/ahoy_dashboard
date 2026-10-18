@@ -1,20 +1,11 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
-  let(:account) do
-    create(:dash_google_account, :with_property, access_token: "good", expires_at: 30.minutes.from_now)
-  end
+  let(:account) { create(:dash_google_account, :with_property) }
   let(:url) { analytics_url }
 
-  # 2026-08-12 minus the three day lag puts the last final day at the 9th, so
-  # the nightly window is the 3rd to the 9th and the walk starts below the 3rd.
   let(:now) { Time.utc(2026, 8, 12, 18, 0) }
   let(:window_start) { Date.new(2026, 8, 3) }
-
-  def stub_days(rows: [])
-    stub_request(:post, url).to_return(status: 200, body: analytics_body(rows).to_json, headers: json_headers)
-  end
 
   def backfill(**options)
     described_class.call(account: account, now: now, **options)
@@ -38,7 +29,7 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
     end
 
     it "starts below the nightly window, because that half is already covered" do
-      stub_days
+      stub_analytics
 
       result = backfill(days: 5)[:ok]
 
@@ -48,7 +39,7 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
 
     it "leaves Last synced and a failed nightly run's error alone, because it did not pull the recent week" do
       account.record_error!(AhoyDashboard::SearchConsole::IngestCommand::UNREACHABLE_MESSAGE)
-      stub_days
+      stub_analytics
 
       expect(backfill(days: 5)).to have_key(:ok)
       expect(account.reload.synced_at).to be_nil
@@ -56,7 +47,7 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
     end
 
     it "records how far it got so the next run carries on from there" do
-      stub_days
+      stub_analytics
 
       backfill(days: 5)
 
@@ -64,7 +55,7 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
     end
 
     it "takes the next slice down on the run after" do
-      stub_days
+      stub_analytics
 
       backfill(days: 5)
       result = backfill(days: 5)[:ok]
@@ -74,7 +65,7 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
     end
 
     it "writes the days it pulled" do
-      stub_days(rows: [ [ [ "thomson" ], 3.0, 40.0, 0.075, 8.4 ] ])
+      stub_analytics([ [ [ "thomson" ], 3.0, 40.0, 0.075, 8.4 ] ])
 
       result = backfill(days: 2)[:ok]
 
@@ -83,11 +74,8 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
         .to eq([ window_start - 2, window_start - 1 ])
     end
 
-    # A day with no search traffic writes no rows anywhere, so the walk cannot
-    # ask the data where it is up to. Without the watermark it would pull the
-    # same empty month every hour forever.
     it "moves past a stretch of days google has nothing for" do
-      stub_days
+      stub_analytics
 
       backfill(days: 5)
 
@@ -98,7 +86,7 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
     it "stops at the oldest day google still serves" do
       floor = AhoyDashboard::SearchConsole.earliest_available_date(now: now)
       account.update!(backfilled_to: floor + 2)
-      stub_days
+      stub_analytics
 
       result = backfill(days: 30)[:ok]
 
@@ -114,34 +102,29 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
     end
 
     it "counts what is left so a caller can see it moving" do
-      stub_days
-      floor = AhoyDashboard::SearchConsole.earliest_available_date(now: now)
+      stub_analytics
 
       result = backfill(days: 10)[:ok]
 
-      expect(result.remaining).to eq((result.dates.first - floor).to_i)
+      expect(result.dates.first).to eq(Date.new(2026, 7, 24))
+      expect(result.remaining).to eq(470)
       expect(result).to be_more
     end
 
-    # A reconnect drops the account row and the watermark with it. Resuming from
-    # the oldest day already asked about beats re-pulling sixteen months it has.
     it "resumes from the oldest day it already has when the watermark is gone" do
       create(:dash_search_console_day, date: Date.new(2026, 6, 1))
       create(:dash_search_console_keyword, date: Date.new(2026, 6, 1))
-      stub_days
+      stub_analytics
 
       result = backfill(days: 3)[:ok]
 
       expect(result.dates.last).to eq(Date.new(2026, 5, 31))
     end
 
-    # The oldest day reached can be one Google had nothing for, which writes no
-    # keyword row. Reading the rows would send the walk back over it and
-    # everything under it again.
     it "counts a day it reached that came back empty as reached" do
       create(:dash_search_console_day, date: Date.new(2026, 6, 1))
       create(:dash_search_console_keyword, date: Date.new(2026, 6, 20))
-      stub_days
+      stub_analytics
 
       result = backfill(days: 3)[:ok]
 
@@ -157,7 +140,7 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
     end
 
     it "passes a quota refusal through rather than inventing its own words for it" do
-      stub_request(:post, url).to_return(status: 429, body: "{}", headers: json_headers)
+      stub_analytics_refusal(429)
 
       expect(backfill(days: 5)).to have_key(:rate_limited)
       expect(account.reload.backfilled_to).to be_nil
@@ -165,7 +148,7 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
 
     describe "a first backfill interrupted after a complete day" do
       before do
-        stub_days
+        stub_analytics
         stub_request(:post, url)
           .with do |request|
             body = JSON.parse(request.body)
@@ -183,14 +166,14 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
 
       it "replays the incomplete window rather than skipping its remaining days" do
         backfill(days: 2)
-        stub_days
+        stub_analytics
 
-        expect(backfill(days: 2).fetch(:ok).dates).to eq([window_start - 2, window_start - 1])
+        expect(backfill(days: 2).fetch(:ok).dates).to eq([ window_start - 2, window_start - 1 ])
       end
 
       it "advances the boundary only after the replay finishes" do
         backfill(days: 2)
-        stub_days
+        stub_analytics
         backfill(days: 2)
 
         expect(account.reload.backfilled_to).to eq(window_start - 2)
@@ -199,7 +182,7 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
 
     describe "an interrupted worker after a complete day" do
       before do
-        stub_days
+        stub_analytics
         stub_request(:post, url)
           .with { |request| JSON.parse(request.body)["startDate"] == (window_start - 1).to_s }
           .to_raise(IOError.new("worker interrupted"))
@@ -207,7 +190,6 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
         begin
           backfill(days: 2)
         rescue IOError
-          # Simulate a worker that stopped without returning an ingest outcome.
         end
       end
 
@@ -216,9 +198,9 @@ RSpec.describe AhoyDashboard::SearchConsole::BackfillCommand do
       end
 
       it "replays the interrupted window after restarting" do
-        stub_days
+        stub_analytics
 
-        expect(backfill(days: 2).fetch(:ok).dates).to eq([window_start - 2, window_start - 1])
+        expect(backfill(days: 2).fetch(:ok).dates).to eq([ window_start - 2, window_start - 1 ])
       end
     end
   end

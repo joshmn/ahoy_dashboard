@@ -28,7 +28,7 @@ module AhoyDashboard
       attr_reader :filters
 
       def build
-        AhoyDashboard::Segment.new(name: free_name, position: next_position)
+        AhoyDashboard::Segment.new(name: free_name, position: AhoyDashboard::Segment.next_position)
       end
 
       def free_name
@@ -36,10 +36,6 @@ module AhoyDashboard
         return NAME unless taken.include?(NAME)
 
         2.step.lazy.map { |number| "#{NAME} #{number}" }.find { |name| taken.exclude?(name) }
-      end
-
-      def next_position
-        (AhoyDashboard::Segment.maximum(:position) || 0) + 1
       end
     end
   end

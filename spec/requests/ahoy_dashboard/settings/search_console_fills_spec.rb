@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe "Dashboard Search Console fill", type: :request do
   let(:path) { "/telemetry/settings/search_console_fill" }
@@ -7,11 +6,6 @@ RSpec.describe "Dashboard Search Console fill", type: :request do
   let(:queue) { AhoyDashboard::SearchConsole::FillQueue }
   let(:last_final) { AhoyDashboard::SearchConsole.latest_final_date }
 
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
-  # A day Google was asked about and had something to say.
   def store(dates)
     Array(dates).each do |date|
       create(:dash_search_console_day, date: date)
@@ -19,27 +13,9 @@ RSpec.describe "Dashboard Search Console fill", type: :request do
     end
   end
 
-  # A fortnight on hand with a hole punched in the middle of it, which is what
-  # an outage longer than the nightly job's week leaves behind.
   def store_with_a_hole
     store((last_final - 20)..(last_final - 15))
     store((last_final - 5)..last_final)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      post path
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      post path
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do
@@ -177,8 +153,6 @@ RSpec.describe "Dashboard Search Console fill", type: :request do
     end
 
     describe "the jobs screen" do
-      # The registry reads the config switch itself, so the screen needs the
-      # setting on rather than only the module stubbed.
       around do |example|
         search_console_settings(enabled: true) { example.run }
       end

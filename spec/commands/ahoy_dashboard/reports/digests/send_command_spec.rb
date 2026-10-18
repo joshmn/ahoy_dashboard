@@ -1,6 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
-require "support/ahoy_dashboard/reports"
 
 RSpec.describe AhoyDashboard::Reports::Digests::SendCommand do
   let(:now) { AhoyDashboard.time_zone.parse("2026-08-11 07:05") }
@@ -29,40 +27,13 @@ RSpec.describe AhoyDashboard::Reports::Digests::SendCommand do
     expect(digest).to have_attributes(status: "sent", visitors_count: 1, ends_on: Date.new(2026, 8, 10))
   end
 
-  it "sends a period once however often it is asked" do
-    send_digest
+  include_examples "a digest send command",
+                   scope: :reports, mailer: TrafficReportMailer, record: AhoyDashboard::ReportDigest, day: Date.new(2026, 8, 10)
 
-    expect(send_digest).to include(:already_done)
-    expect(deliveries.size).to eq(1)
-  end
-
-  # The alert email can be told to hold a quiet period back. This one cannot:
-  # a week with nothing in it is the number, and an email that only arrives when
-  # the news is good is one nobody can read a trend off.
   it "sends a quiet period too" do
     expect { send_digest }.to change(deliveries, :size).by(1)
     expect(sole_item(deliveries).subject).to eq("Traffic for Aug 10: 0 visitors")
     expect(digest).to be_sent
-  end
-
-  it "records a failed send and tries it again on the next run" do
-    allow(TrafficReportMailer).to receive(:with).and_raise(RuntimeError, "smtp is down")
-
-    expect(send_digest[:failed].last.message).to eq("smtp is down")
-    expect(digest).to have_attributes(status: "failed", error: "RuntimeError: smtp is down")
-
-    allow(TrafficReportMailer).to receive(:with).and_call_original
-
-    expect { send_digest }.to change(deliveries, :size).by(1)
-    expect(digest).to have_attributes(status: "sent", error: nil)
-  end
-
-  it "does nothing when nobody is set to get it" do
-    report_settings(recipients: []) do
-      expect(send_digest).to include(:disabled)
-    end
-
-    expect(AhoyDashboard::ReportDigest.count).to eq(0)
   end
 
   it "does nothing while the feature is switched off" do

@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe AhoyDashboard::Seo::HubQuery do
   let(:today) { Date.current }
@@ -17,10 +16,7 @@ RSpec.describe AhoyDashboard::Seo::HubQuery do
 
   it "does not prepare opportunities when the Search Console panel has no daily readings" do
     create(:dash_search_console_keyword, impressions: 1000, clicks: 1, position: 12)
-    statements = []
-    subscriber = ->(*args) { statements << args.last[:sql] if args.last[:sql].include?("AS expected") }
-
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+    statements = captured_sql("AS expected", cached: true) do
       described_class.call(range: range, site: nil)
     end
 

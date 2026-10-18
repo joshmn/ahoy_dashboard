@@ -17,12 +17,6 @@ class CreateAhoyDashboardSearchProviders < ActiveRecord::Migration[6.0]
     add_index :ahoy_dashboard_serp_providers, :active, unique: true, where: "active",
               name: "index_ahoy_dashboard_serp_providers_on_one_active"
 
-    # One row per provider, day and kind of spend. The provider row already
-    # carries a running total for the month, which is what the ceiling is
-    # checked against, but a total cannot say which day went wrong or what the
-    # units went on. This can, and it is keyed by the adapter's name rather than
-    # a provider row because credentials in the initializer spend with no row
-    # saved at all.
     create_table :ahoy_dashboard_serp_spend_days do |t|
       t.string :provider, null: false
       t.date :on, null: false

@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsole::SitesService do
   let(:account) { create(:dash_google_account, access_token: "good", expires_at: 30.minutes.from_now) }
@@ -15,8 +14,6 @@ RSpec.describe AhoyDashboard::SearchConsole::SitesService do
       .with(headers: { "Authorization" => "Bearer good" })).to have_been_made
   end
 
-  # Search Analytics answers 403 for an unverified property, so offering one
-  # would only be an offer to break the nightly pull.
   it "drops properties this account has not verified" do
     stub_sites([
       { "siteUrl" => "sc-domain:example.com", "permissionLevel" => "siteOwner" },
@@ -56,25 +53,21 @@ RSpec.describe AhoyDashboard::SearchConsole::SitesService do
   end
 
   it "is empty when google lists nothing" do
-    stub_request(:get, AhoyDashboard::SearchConsole::SITES_URL)
-      .to_return(status: 200, body: "{}", headers: json_headers)
+    stub_sites(body: {})
 
     expect(described_class.call(account: account)).to eq([])
   end
 
   it "raises an auth error when the token is refused" do
-    stub_request(:get, AhoyDashboard::SearchConsole::SITES_URL)
-      .to_return(status: 401, body: { "error" => { "code" => 401, "message" => "Invalid Credentials" } }.to_json,
-                 headers: json_headers)
+    stub_sites(status: 401, body: { "error" => { "code" => 401, "message" => "Invalid Credentials" } })
 
     expect { described_class.call(account: account) }.to raise_error(AhoyDashboard::SearchConsole::AuthError)
   end
 
   it "raises a quota error rather than a plain failure" do
-    stub_request(:get, AhoyDashboard::SearchConsole::SITES_URL)
-      .to_return(status: 403, headers: json_headers, body: {
-        "error" => { "code" => 403, "message" => "Quota exceeded", "errors" => [ { "reason" => "quotaExceeded" } ] }
-      }.to_json)
+    stub_sites(status: 403, body: {
+      "error" => { "code" => 403, "message" => "Quota exceeded", "errors" => [ { "reason" => "quotaExceeded" } ] }
+    })
 
     expect { described_class.call(account: account) }.to raise_error(AhoyDashboard::SearchConsole::QuotaError)
   end

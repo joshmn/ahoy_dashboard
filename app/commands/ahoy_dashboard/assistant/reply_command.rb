@@ -21,7 +21,7 @@ module AhoyDashboard
 
         answer = ask
         message.update!(status: :complete, content: content_of(answer),
-                        tool_calls: calls, views: views.to_json_ready,
+                        tool_calls: calls, views: views.to_json_ready, reasoning: Reasoning.stored(answer.reasoning),
                         input_tokens: answer.input_tokens, output_tokens: answer.output_tokens)
         log_usage(answer)
 
@@ -47,7 +47,10 @@ module AhoyDashboard
       attr_reader :message, :calls, :buffer, :views
 
       def record_error(text)
-        AhoyDashboard::AssistantProvider.find_or_create_by!(name: Assistant.reader_name).record_error!(text)
+        name = Assistant.reader_name
+        provider = AhoyDashboard::AssistantProvider.for(name) || AhoyDashboard::AssistantProvider.create!(name: name)
+
+        provider.record_error!(text)
       rescue ActiveRecord::ActiveRecordError
         nil
       end
@@ -64,17 +67,14 @@ module AhoyDashboard
         end
       end
 
-      # The stored thread, replayed so the model has the conversation without
-      # this app persisting through the gem's own tables.
       def replay(built)
         history.each do |past|
           built.add_message(role: past.role.to_sym, content: past.content,
-                            tool_calls: past.assistant? ? Array(past.tool_calls) : [])
+                            tool_calls: past.assistant? ? Array(past.tool_calls) : [],
+                            reasoning: Reasoning.replayed(past.reasoning))
         end
       end
 
-      # Everything before the question, and not the question itself: that one
-      # goes through ask. Replaying it as well asks it twice.
       def history
         before = asked ? earlier.take_while { |past| past.id != asked.id } : earlier
 
@@ -92,10 +92,6 @@ module AhoyDashboard
           .reorder(created_at: :desc, id: :desc).limit(Assistant::HISTORY + 2).to_a.reverse
       end
 
-      # Streamed, and the half written answer is pushed to the row as it arrives,
-      # because the page is watching that row. The final content comes off the
-      # returned message rather than off the buffer: the buffer is what the
-      # provider sent in pieces, and the message is what it says it sent.
       def ask
         chat.ask(question) do |chunk|
           text = chunk.try(:content).to_s
@@ -115,9 +111,6 @@ module AhoyDashboard
       def publish
         @flushed_at = Time.current
 
-        # A copy, because the buffer keeps being appended to after this and the
-        # row must hold what the answer said at this moment rather than a handle
-        # on a string that is still growing.
         message.update_columns(content: buffer.dup.presence, tool_calls: calls.deep_dup,
                                updated_at: Time.current)
       end

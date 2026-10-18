@@ -6,9 +6,7 @@
         kicker: "AI visibility", title: @presenter.prompt.text, lede: @presenter.blurb %>
 
   <% if !@presenter.any? %>
-    <%= dash_card do %>
-      <%= dash_empty title: "Not asked yet", hint: "Answers to this prompt show here after the next run." %>
-    <% end %>
+    <%= dash_empty_card title: "Not asked yet", hint: "Answers to this prompt show here after the next run." %>
   <% else %>
     <% @presenter.groups.each do |group| %>
       <%= dash_card class: "mt-3" do %>

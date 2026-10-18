@@ -1,0 +1,11 @@
+<% if form.object.site_options.any? %>
+  <%= form.check_boxes :site_ids, form.object.site_options, ->(site) { site.id.to_s }, :name, label: "Sites to look for",
+        hint: "Every site is read from the same search, so extra sites cost nothing.",
+        detail: ->(site) { site.domain }, id: form.field_id(:site_ids) %>
+<% else %>
+  <% sites_hint = capture do %>
+    <%= empty_hint %>
+    <%= dash_link "Add site", new_settings_serp_site_path, data: { tm_frame: "_top" } %>
+  <% end %>
+  <%= form.fieldset :site_ids, label: "Sites to look for", hint: sites_hint, id: form.field_id(:site_ids) do %><% end %>
+<% end %>

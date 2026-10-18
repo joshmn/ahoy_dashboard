@@ -1,10 +1,5 @@
 module AhoyDashboard
   module Seo
-    # One seed's cached ideas, with our own position joined on where we have one.
-    #
-    # That last column is the point. A bought list of searches is a list of
-    # searches; the same list with "we are eleventh on this one and nowhere on
-    # that one" beside it is a plan.
     class KeywordIdeasQuery
       Row = Data.define(:idea, :query, :volume, :difficulty, :cpc, :intent, :cluster,
                         :position, :impressions) do
@@ -24,8 +19,6 @@ module AhoyDashboard
           idea.worth
         end
 
-        # Nowhere in the results and never even shown for it. The genuinely new
-        # ones, as against the ones we are already in the running for.
         def untouched?
           !tracked? && !seen?
         end
@@ -124,34 +117,27 @@ module AhoyDashboard
         end
       end
 
-      # Where we come for it, if it is being tracked at all. Our own site only:
-      # a rival's position is the gap report's question, not this one's.
       def positions(queries)
         return {} unless AhoyDashboard::Serp.installed?
 
         site = AhoyDashboard::SerpSite.ours
         return {} if site.nil?
 
-        AhoyDashboard::SerpCheck
+        AhoyDashboard::SerpCheck.success
           .joins(:keyword)
-          .where(site_id: site.id, status: AhoyDashboard::SerpCheck.statuses[:success])
+          .where(site_id: site.id)
           .where(ahoy_dashboard_serp_keywords: { query: queries })
           .select("distinct on (ahoy_dashboard_serp_keywords.query) ahoy_dashboard_serp_keywords.query as term, position")
-          .order(Arel.sql("ahoy_dashboard_serp_keywords.query, checked_at desc"))
+          .order(Arel.sql("ahoy_dashboard_serp_keywords.query, checked_at desc, ahoy_dashboard_serp_checks.id desc"))
           .map { |row| [ row.term, row.position ] }.to_h
       end
 
-      # Whether Google has ever put us in front of anybody for it, which is a
-      # softer signal than a position and covers far more of the list.
       def impressions(queries)
         return {} unless AhoyDashboard::SearchConsole.installed?
 
         AhoyDashboard::SearchConsoleKeyword.where(query: queries).group(:query).sum(:impressions)
       end
 
-      # The seed word taken out, and what is left is the topic. Crude, and better
-      # than nothing: the alternative is a bought clustering call per seed, which
-      # is a second bill for a heading.
       def cluster_of(query)
         rest = query.sub(seed.to_s, "").squish
 

@@ -4,14 +4,10 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false %>
 
   <% if !@presenter.any? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.search_console_empty(title: "No competing pages in this range", hint: @presenter.withholding_note) %>
-    <% end %>
+    <%= dash_empty_card **@presenter.search_console_empty(title: "No competing pages in this range", hint: @presenter.withholding_note) %>
   <% else %>
     <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
 
-<%# One card per search rather than one table, so the tick-all box and the boxes
-    it drives sit in different cards. The scope is the whole list under it. %>
     <div data-controller="dash--check-all">
     <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 mt-3">
       <span class="g-hint">Tick the searches you want to follow, then track them together.</span>

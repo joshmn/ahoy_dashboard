@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe AhoyDashboard::AiVisibility::DispatchJob do
   before { switch_on_ahoy_dashboard(:ai_visibility) }

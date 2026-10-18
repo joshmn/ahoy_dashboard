@@ -64,6 +64,10 @@ module AhoyDashboard
         model.present? ? "#{label(name)} (#{model})" : label(name)
       end
 
+      def target_order(name, model)
+        [ NAMES.index(name) || NAMES.size, name, model.to_s ]
+      end
+
       def default_model(name)
         ASSISTANTS.fetch(name.to_s)[:default_model]
       end
@@ -102,7 +106,7 @@ module AhoyDashboard
       end
 
       def frequency
-        stored = Setting.read(FREQUENCY_KEY).to_s
+        stored = Preferences.read(:ai_visibility, :frequency)
 
         FREQUENCIES.key?(stored) ? stored : DEFAULT_FREQUENCY
       end
@@ -112,9 +116,7 @@ module AhoyDashboard
       end
 
       def monthly_cap
-        Integer(Setting.read(CAP_KEY, DEFAULT_CAP))
-      rescue ArgumentError, TypeError
-        DEFAULT_CAP
+        Preferences.read(:ai_visibility, :monthly_cap)
       end
 
       def capped?
@@ -135,12 +137,8 @@ module AhoyDashboard
         [ monthly_cap - used_this_month(now: now), 0 ].max
       end
 
-      def requests_per_run
-        Prompt.count * targets.size
-      end
-
-      def client_for(name, model)
-        ASSISTANTS.fetch(name.to_s)[:client].constantize.new(api_key: api_key(name), model: model)
+      def client_for(name, model, key: api_key(name))
+        ASSISTANTS.fetch(name.to_s)[:client].constantize.new(api_key: key, model: model)
       end
 
       def ready?

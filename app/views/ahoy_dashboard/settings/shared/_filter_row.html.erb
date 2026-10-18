@@ -34,8 +34,7 @@
 
     <%= hidden_field_tag "#{base}[dimension]", row.dimension, id: nil %>
     <label class="visually-hidden" for="<%= id %>_operator">How <%= lower %> is matched</label>
-    <%= select_tag "#{base}[operator]",
-          options_for_select(AhoyDashboard::Filter::OPERATORS.map { |key, text| [ text, key ] }, row.operator),
+    <%= select_tag "#{base}[operator]", options_for_select(row.operator_options, row.operator),
           id: "#{id}_operator", class: "cis fx-op",
           data: { action: "change->dash--filters#changed" } %>
 

@@ -1,19 +1,11 @@
 module AhoyDashboard
   module Settings
     class KeywordPlanPresenter
-      MONTH = 30.days
+      MONTH = SerpKeyword::MONTH
 
       FREQUENCY_LABELS = SerpKeywordDecorator::FREQUENCY_LABELS
 
-      # A row is the two fields the form posts plus, when the gazetteer is on,
-      # the catalogue row behind them. The catalogue is what lets the picker
-      # open where the place already is, and what lets adding another place
-      # start one level up from the last one.
       Row = Data.define(:country, :city, :place) do
-        def picked?
-          country.present?
-        end
-
         def code
           place&.code
         end
@@ -71,12 +63,7 @@ module AhoyDashboard
       end
 
       def countries
-        names = adapter_class.countries || Serp::Location.country_names
-        kept = rows.map(&:country).select(&:present?).reject { |code| names.key?(code) }
-
-        names.merge(kept.index_with { |code| Serp::Location.country(code).country_name })
-          .sort_by { |_code, name| name }
-          .map { |code, name| [ name, code ] }
+        Serp::Location.country_options(adapter_class.countries || Serp::Location.country_names, keep: rows.map(&:country))
       end
 
       def rows
@@ -92,9 +79,6 @@ module AhoyDashboard
         end
       end
 
-      # The picker is on only when there is something to pick from. Off, or
-      # never built, and the forms keep the country select and the typed city,
-      # which is the whole of what this replaces.
       def picker?
         Places.ready?
       end
@@ -122,15 +106,15 @@ module AhoyDashboard
       end
 
       def per_check
-        adapter_class.cost_units(pages: pages) * places.size
+        plan.per_check(adapter_class)
       end
 
       def monthly
-        (per_check * checks_ratio).ceil
+        plan.monthly_units(adapter_class)
       end
 
       def monthly_checks
-        (places.size * pages * checks_ratio).ceil
+        plan.monthly_checks
       end
 
       def batch_size
@@ -184,8 +168,8 @@ module AhoyDashboard
         Serp.record
       end
 
-      def checks_ratio
-        MONTH.to_f / SerpKeyword::DURATIONS.fetch(frequency).to_i
+      def plan
+        @plan ||= Serp::KeywordPlan.new(pages: pages, place_count: places.size, frequency: frequency)
       end
     end
   end

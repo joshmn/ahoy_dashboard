@@ -1,42 +1,19 @@
-<% content_for :title, @presenter.heading %>
+<% content_for :title, @presenter.title %>
 
 <%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "rankings", site: @site } do %>
-  <% actions = capture do %>
-    <% if @presenter.site_options.many? %>
-      <%= dash_link_menu(id: "tm-rankings-site", icon: :globe,
-            label: @presenter.site_label, section: "Site",
-            items: @presenter.site_options) %>
-    <% end %>
-
-    <% if @presenter.tag_menu.show? %>
-      <%= dash_link_menu(id: "tm-rankings-tag", icon: :tag,
-            label: @presenter.tag_menu.label, section: "Tag", items: @presenter.tag_menu.items) %>
-    <% end %>
-
-    <%= dash_link_menu(id: "tm-rankings-period", icon: :cal,
-          label: @presenter.range_label, section: "Date range", items: @presenter.period_options) %>
-
-    <%= dash_button_to "Check now", @presenter.check_now_path,
-          reason: @presenter.check_now_reason,
-          method: :post, confirm: @presenter.check_now_confirm %>
-  <% end %>
-
-  <%= dash_page_head title: @presenter.heading, lede: @presenter.blurb, actions: actions %>
-  <%= render "ahoy_dashboard/seo/shared/sample_notice", presenter: @presenter %>
+  <% check = @presenter.check_now %>
+  <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, id_prefix: "tm-rankings",
+        trailing: dash_button_to("Check now", check.path, reason: check.reason, method: :post, confirm: check.confirm) %>
 
   <% unless @presenter.setup_notice %>
-    <%= dash_unavailable_notice "Check now", @presenter.check_now_notice_reason, fix: @presenter.check_now_fix %>
+    <%= dash_unavailable_notice "Check now", check.notice_reason, fix: check.fix %>
   <% end %>
 
   <% if @presenter.setup_notice %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.setup_notice %>
-    <% end %>
+    <%= dash_empty_card **@presenter.setup_notice %>
   <% elsif !@presenter.any? %>
-    <%= dash_card do %>
-      <%= dash_empty title: "Nothing recorded in this range", action: @presenter.empty_action,
-            hint: @presenter.empty_hint %>
-    <% end %>
+    <%= dash_empty_card title: "Nothing recorded in this range", action: @presenter.empty_action,
+          hint: @presenter.empty_hint %>
   <% else %>
     <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
 
@@ -79,9 +56,7 @@
           <thead>
             <tr>
               <th scope="col">
-                <%= tag.input type: "checkbox", id: "rankings-select-all", form: "rankings-tagging",
-                      "aria-label": "Select every search",
-                      data: { "dash--check-all-target": "master", action: "change->dash--check-all#toggle" } %>
+                <%= seo_track_all_box("rankings-select", nil) %>
               </th>
               <th scope="col">Search</th>
               <% if @presenter.places? %><th scope="col">Place</th><% end %>
@@ -101,29 +76,15 @@
                         aria: { label: "Select #{row.keyword.query}#{", #{row.place.label}" if @presenter.places?}" },
                         data: { "dash--check-all-target": "box", action: "change->dash--check-all#sync" } %>
                 </td>
-                <td>
-                  <div class="t-main">
-                    <%= link_to @presenter.keyword_path(row), class: "seo-link min-w-0" do %>
-                      <%= seo_label(row.keyword.query) %>
-                    <% end %>
-                  </div>
-                </td>
+                <td><div class="t-main"><%= seo_link(row.keyword.query, @presenter.tracked_path(row)) %></div></td>
                 <% if @presenter.places? %>
                   <td><%= seo_label(row.place.label) %></td>
                 <% end %>
                 <td class="num <%= row.ranked? ? "seo-pos" : "nil" %>"><%= @presenter.position_label(row) %></td>
                 <td><%= render "ahoy_dashboard/seo/shared/change", kind: @presenter.change_kind(row), amount: row.change&.abs %></td>
-                <td class="num"><%= row.best || tag.span("&mdash;".html_safe, class: "nil") %></td>
-                <td>
-                  <% if row.cited? %>
-                    <%= dash_badge "Cited", tone: :success, title: "The AI overview cited your site" %>
-                  <% elsif row.overview? %>
-                    <%= dash_badge "Shown", title: "An AI overview showed without your site in it" %>
-                  <% else %>
-                    <span class="nil">&mdash;</span>
-                  <% end %>
-                </td>
-                <td><%= seo_page_link(seo_url_path(row.url)) %></td>
+                <td class="num"><%= dash_value(row.best) %></td>
+                <td><%= seo_overview_badge(@presenter.overview_label(row)) %></td>
+                <td><%= seo_page_link(row.url) %></td>
               </tr>
             <% end %>
           </tbody>
@@ -156,20 +117,12 @@
                 <% @presenter.share.rows.each do |row| %>
                   <tr>
                     <td>
-                      <div class="t-main seo-cell">
-                        <%= seo_label(row.domain, path: true) %>
-                        <% if @presenter.site && row.domain == @presenter.site.domain %>
-                          <%= dash_badge "You", tone: :kind %>
-                        <% end %>
-                      </div>
+                      <div class="t-main seo-cell"><%= seo_domain(row.domain, mine: @presenter.mine?(row.domain)) %></div>
                     </td>
                     <td class="num"><%= row.appearances %></td>
                     <% if @presenter.shares? %>
                       <td>
-                        <div class="seo-figure">
-                          <%= tag.span(class: "seo-meter", **seo_bar(row.share)) %>
-                          <span class="seo-figure__pct"><%= @presenter.percent(row.share) %></span>
-                        </div>
+                        <%= seo_figure(row.share, @presenter.percent(row.share)) %>
                       </td>
                     <% end %>
                     <td class="num"><%= row.best %></td>
@@ -206,20 +159,12 @@
                 <% @presenter.visibility.domains.each do |row| %>
                   <tr>
                     <td>
-                      <div class="t-main seo-cell">
-                        <%= seo_label(row.domain, path: true) %>
-                        <% if @presenter.site && row.domain == @presenter.site.domain %>
-                          <%= dash_badge "You", tone: :kind %>
-                        <% end %>
-                      </div>
+                      <div class="t-main seo-cell"><%= seo_domain(row.domain, mine: @presenter.mine?(row.domain)) %></div>
                     </td>
                     <td class="num"><%= row.citations %></td>
                     <% if @presenter.cited_shares? %>
                       <td>
-                        <div class="seo-figure">
-                          <%= tag.span(class: "seo-meter", **seo_bar(row.share)) %>
-                          <span class="seo-figure__pct"><%= @presenter.percent(row.share) %></span>
-                        </div>
+                        <%= seo_figure(row.share, @presenter.percent(row.share)) %>
                       </td>
                     <% end %>
                   </tr>

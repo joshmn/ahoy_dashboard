@@ -12,7 +12,7 @@ module AhoyDashboard
       end
 
       def call
-        return query.range unless query.period.key == AhoyDashboard::SeoRange::EVERYTHING
+        return query.range unless query.period.key == AhoyDashboard::Seo::Periods::EVERYTHING
 
         earliest = checks.minimum(:checked_at)
 

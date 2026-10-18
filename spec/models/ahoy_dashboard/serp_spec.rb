@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp do
   describe ".adapter_class" do

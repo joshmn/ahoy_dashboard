@@ -13,7 +13,7 @@
         <% else %>
           <div class="chat-turn chat-turn--assistant">
             <p class="chat-who">
-              <span class="chat-who__mark" aria-hidden="true"></span>
+              <span class="mark" aria-hidden="true"></span>
               <span class="chat-who__name">AhoyDashboard</span>
             </p>
 
@@ -30,7 +30,7 @@
                         <%= "hidden" if message.content.present? %>>
                     <span></span><span></span><span></span>
                   </span>
-                  <span data-dash--chat-stream-target="label"><%= dash_chat_work_label(message) %></span>
+                  <span data-dash--chat-stream-target="label"><%= message.work_label %></span>
                 </p>
               </div>
             <% else %>

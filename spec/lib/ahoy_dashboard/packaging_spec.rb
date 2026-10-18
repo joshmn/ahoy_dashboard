@@ -1,18 +1,11 @@
 require "rails_helper"
 require AhoyDashboard::Engine.root.join("lib/ahoy_dashboard/asset_manifest").to_s
 
-# Two bugs that only show up in a host application that does not happen to use
-# the same gems this one does, which is every host except the one it came out
-# of. Both are cheap to assert here and expensive to find in the wild.
 RSpec.describe "AhoyDashboard packaging" do
   let(:root) { AhoyDashboard::Engine.root }
   let(:gemspec) { Gem::Specification.load(root.join("ahoy_dashboard.gemspec").to_s) }
   let(:entrypoint) { root.join("lib/ahoy_dashboard.rb").read }
 
-  # Bundler.require only loads what the host lists in its own Gemfile. A gem's
-  # dependencies are installed but never required for it, so anything referenced
-  # at class definition time has to be required here or the constant is missing
-  # the first time a host autoloads the file that names it.
   it "requires every runtime dependency from its entrypoint" do
     required = entrypoint.scan(/^require "([^"]+)"/).flatten
 
@@ -24,9 +17,6 @@ RSpec.describe "AhoyDashboard packaging" do
     end
   end
 
-  # The front end is deliberately outside app/, so it is outside the {app,...}
-  # glob a gemspec usually ships. Leaving it out builds a gem with no stylesheet
-  # and no javascript, which boots fine and renders a blank page.
   it "ships the front end it serves" do
     packaged = gemspec.files
 
@@ -36,9 +26,6 @@ RSpec.describe "AhoyDashboard packaging" do
     expect(packaged.grep(%r{\Aassets/fonts/.*\.woff2\z})).not_to be_empty
   end
 
-  # The bundle is committed, so a source edit that never got built would ship
-  # last week's javascript and nothing would say so until somebody clicked a
-  # control that no longer exists. Run `rake build` inside the gem.
   it "ships the script compiled from its current sources" do
     expect(AhoyDashboard::AssetManifest.new(root: root).current?(kind: "javascript")).to be(true)
   end

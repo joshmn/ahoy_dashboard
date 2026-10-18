@@ -1,12 +1,9 @@
-require "net/http"
-
 module AhoyDashboard
   module Serp
     module Adapters
       class BaseAdapter
         Request = Data.define(:page, :start, :depth)
 
-        # What a keyword endpoint answers with, whoever sells it.
         Idea = Data.define(:query, :volume, :difficulty, :cpc, :competition, :intent, :trend) do
           def initialize(query:, volume: nil, difficulty: nil, cpc: nil, competition: nil,
                          intent: nil, trend: [])
@@ -16,8 +13,6 @@ module AhoyDashboard
           end
         end
 
-        # And a backlink endpoint. One row per referring domain, not per link: a
-        # site linking four hundred times out of a footer is one relationship.
         Referrer = Data.define(:domain, :authority, :links, :follow, :kind, :top_page, :first_seen_on) do
           def initialize(domain:, authority: nil, links: 0, follow: true, kind: nil,
                          top_page: nil, first_seen_on: nil)
@@ -31,8 +26,6 @@ module AhoyDashboard
 
         OPEN_TIMEOUT = 5
         READ_TIMEOUT = 30
-        RETRYABLE = [ Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET, Errno::ECONNREFUSED,
-                      SocketError ].freeze
 
         class << self
           def adapter_name
@@ -43,19 +36,11 @@ module AhoyDashboard
             adapter_name
           end
 
-          def results_per_request
-            Serp::RESULTS_PER_PAGE
-          end
-
-          def max_pages
-            Serp::MAX_PAGES
-          end
-
           def requests_for(pages: 1)
-            count = pages.to_i.clamp(1, max_pages)
+            count = pages.to_i.clamp(1, Serp::MAX_PAGES)
 
             Array.new(count) do |index|
-              Request.new(page: index + 1, start: index * results_per_request, depth: results_per_request)
+              Request.new(page: index + 1, start: index * Serp::RESULTS_PER_PAGE, depth: Serp::RESULTS_PER_PAGE)
             end
           end
 
@@ -71,6 +56,14 @@ module AhoyDashboard
             1
           end
 
+          def keywords?
+            false
+          end
+
+          def backlinks?
+            false
+          end
+
           def credential_keys
             [].freeze
           end
@@ -80,7 +73,7 @@ module AhoyDashboard
           end
 
           def configured?
-            false
+            credential_keys.any? && credential_keys.all? { |key| Serp.credential(adapter_name.to_sym, key).present? }
           end
 
           def trim(payload)
@@ -90,17 +83,6 @@ module AhoyDashboard
           end
         end
 
-        # What is worth keeping out of a response once the positions have been
-        # read off it. The whole payload is tens of kilobytes of things nobody
-        # asked for; these are the parts that answer a question later.
-        #
-        # Every key here has to leave the payload re-parseable, because
-        # SerpRunPage#result hands what was stored back to parse_payload. A trim
-        # that drops the path the parser reads turns a stored reading into a
-        # blank one.
-        #
-        # On the class rather than inside class << self, or a subclass cannot
-        # override it and self::KEPT_KEYS resolves to nothing at all.
         KEPT_KEYS = %w[
           organic_results ai_overview answer_box knowledge_graph related_questions
           related_searches search_metadata search_parameters results overview search_id
@@ -109,20 +91,30 @@ module AhoyDashboard
 
         def search(query:, location: nil, request: nil, device: Serp::DEFAULT_DEVICE,
                    language: Serp::DEFAULT_LANGUAGE, engine: Serp::DEFAULT_ENGINE)
-          raise NotImplementedError
+          require_credentials!
+
+          request ||= first_request
+          place = Location.parse(location)
+          payload = fetch_payload(query: query, place: place, request: request, device: device,
+                                  language: language, engine: engine)
+
+          parse_payload(payload, query: query, location: place, request: request, device: device,
+                                 language: language, engine: engine)
         end
 
         def parse_payload(payload, query:, location: nil, request: nil, device: Serp::DEFAULT_DEVICE,
                           language: Serp::DEFAULT_LANGUAGE, engine: Serp::DEFAULT_ENGINE)
-          raise NotImplementedError
-        end
+          request ||= first_request
 
-        def search_pages(query:, pages: 1, **options)
-          results = self.class.requests_for(pages: pages).map do |request|
-            search(query: query, request: request, **options)
-          end
-
-          Result.combine(results)
+          Result.new(
+            provider: provider_name, engine: engine, query: query, location: Location.parse(location),
+            device: device, language: language, page: request.page, start: request.start,
+            organic: organic_from(entries(payload), request: request),
+            ai_overview: ai_overview(payload),
+            provider_search_id: search_id(payload),
+            cost_units: self.class.cost_units(pages: 1),
+            raw: payload
+          )
         end
 
         def provider_name
@@ -131,18 +123,6 @@ module AhoyDashboard
 
         def units_used
           @units_used.to_i
-        end
-
-        # Bought data that is not a results page. Both are optional: an adapter
-        # that only fetches positions says so and the screens that want these say
-        # the provider does not sell them, rather than rendering an empty table
-        # that reads as "nobody links to you".
-        def keywords?(*forwarded_arguments, **forwarded_keywords, &forwarded_block)
-          false
-        end
-
-        def backlinks?(*forwarded_arguments, **forwarded_keywords, &forwarded_block)
-          false
         end
 
         def keywords(seed:, location: nil, language: Serp::DEFAULT_LANGUAGE, limit: 100)
@@ -155,57 +135,49 @@ module AhoyDashboard
 
         private
 
+        def require_credentials!
+        end
+
+        def fetch_payload(query:, place:, request:, device:, language:, engine:)
+          raise NotImplementedError
+        end
+
+        def entries(_payload)
+          raise NotImplementedError
+        end
+
+        def ai_overview(_payload)
+          raise NotImplementedError
+        end
+
+        def search_id(_payload)
+          raise NotImplementedError
+        end
+
         def first_request
           self.class.requests_for(pages: 1).first
         end
 
-        def get_json(url, params: {}, headers: {})
-          uri = URI(url)
-          uri.query = URI.encode_www_form(params.compact) if params.present?
-          request = Net::HTTP::Get.new(uri)
-          headers.each { |key, value| request[key] = value }
+        def http
+          @http ||= HttpClient.new(open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT)
+        end
 
-          send_request(uri, request)
+        def get_json(url, params: {}, headers: {})
+          send_request { http.get(url, params: params, headers: headers) }
         end
 
         def post_json(url, body:, headers: {}, basic_auth: nil)
-          uri = URI(url)
-          request = Net::HTTP::Post.new(uri)
-          request["Content-Type"] = "application/json"
-          headers.each { |key, value| request[key] = value }
-          request.basic_auth(*basic_auth) if basic_auth
-          request.body = body.to_json
-
-          send_request(uri, request)
+          send_request { http.post_json(url, body: body, headers: headers, basic_auth: basic_auth) }
         end
 
-        def send_request(uri, request)
-          response = perform(uri, request)
-          payload = parse(response)
-          raise error_for(response, payload) unless acceptable?(response, payload)
+        def send_request
+          reply = yield
+          raise error_for(reply.response, reply.payload) unless acceptable?(reply.response, reply.payload)
 
           @units_used = units_used + 1
-          payload
-        end
-
-        def perform(uri, request, attempts_left: 1)
-          Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
-                                              open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
-            http.request(request)
-          end
-        rescue *RETRYABLE => e
-          raise Error, "#{provider_name} request failed: #{e.class}: #{e.message}" if attempts_left.zero?
-
-          perform(uri, request, attempts_left: attempts_left - 1)
-        end
-
-        def parse(response)
-          body = response.body.to_s
-          return {} if body.blank?
-
-          JSON.parse(body)
-        rescue JSON::ParserError
-          {}
+          reply.payload
+        rescue HttpClient::Unreachable => e
+          raise Error, "#{provider_name} request failed: #{e.message}"
         end
 
         def acceptable?(response, _payload)

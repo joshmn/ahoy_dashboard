@@ -1,4 +1,5 @@
 import { Controller } from "../runtime/controllers.js"
+import { modified, wrap } from "../runtime/keys.js"
 
 const FOCUSABLE = [
   "a[href]",
@@ -19,8 +20,6 @@ export default class extends Controller {
     this.muted = []
     this.dialog = null
 
-    // Bound on the document because a keystroke never passes through a dialog
-    // that is still hidden.
     this.onShortcut = (event) => this.shortcut(event)
     this.onFilterClick = (event) => this.filter(event)
     document.addEventListener("keydown", this.onShortcut)
@@ -43,13 +42,9 @@ export default class extends Controller {
     this.reveal("filter", document.activeElement)
   }
 
-  // Everything that opens the filter dialog is a link to the dialog as a page:
-  // the Filter button, the plus on a chip group, the buttons on a form's rows.
-  // Bound on the document so none of them has to name the dialog, and a
-  // modified click still opens the page in a tab of its own.
   filter(event) {
     if (event.defaultPrevented || event.button !== 0) return
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    if (modified(event)) return
 
     const opener = event.target.closest?.("[data-tm-filter]")
     if (!opener || !this.dialogFor("filter")) return
@@ -58,7 +53,6 @@ export default class extends Controller {
     this.reveal("filter", opener)
   }
 
-  // Opening without an opener to return focus to, which is the shortcut's case.
   reveal(key, opener = null) {
     const dialog = this.dialogFor(key)
     if (!dialog) return
@@ -76,23 +70,8 @@ export default class extends Controller {
     this.focusSearch(dialog)
   }
 
-  // No preventDefault: the opener carries data-tm-frame and the frame runtime is
-  // what loads the details into this dialog's frame.
   open(event) {
-    const dialog = this.dialogFor(event.params.key)
-    if (!dialog) return
-
-    this.release()
-
-    this.opener = event.currentTarget
-    this.dialog = dialog
-
-    dialog.hidden = false
-    dialog.classList.add("show")
-
-    this.mute(dialog)
-    document.addEventListener("keydown", this.onKey)
-    this.focusSearch(dialog)
+    this.reveal(event.params.key, event.currentTarget)
   }
 
   focusSearch(dialog) {
@@ -172,11 +151,6 @@ export default class extends Controller {
     if (event.key === "Tab") this.trap(event)
   }
 
-  // Arrow keys walk the rows without moving focus off the search box, so a term
-  // can still be edited after picking a way down the list. The position is read
-  // off the marked row rather than held as a number, because the filter dialog
-  // swaps its rows out on every keystroke and a held index would point into a
-  // list that is not there any more.
   get rows() {
     if (!this.dialog) return []
 
@@ -188,15 +162,12 @@ export default class extends Controller {
     if (rows.length === 0) return
 
     const at = rows.findIndex((row) => row.classList.contains("act"))
-    const next = at < 0 ? (step < 0 ? rows.length - 1 : 0) : (at + step + rows.length) % rows.length
+    const next = wrap(at, step, rows.length)
 
     rows.forEach((row, index) => row.classList.toggle("act", index === next))
     rows[next]?.scrollIntoView({ block: "nearest" })
   }
 
-  // Slash focuses the find box, the way it does in the app this is modelled on.
-  // Ignored while something is already being typed into, or the shortcut would eat
-  // the slash out of a path somebody is searching for.
   find(event) {
     if (this.typing(event.target)) return
 
@@ -254,10 +225,6 @@ export default class extends Controller {
     this.dialog = null
   }
 
-  // Five dialogs share one controller, so the rest of the page is muted
-  // relative to whichever one is open: every sibling on the way up from the
-  // dialog to the body, which covers the card grid, the other four dialogs and
-  // the top bar without naming any of them.
   mute(dialog) {
     this.muted = []
 

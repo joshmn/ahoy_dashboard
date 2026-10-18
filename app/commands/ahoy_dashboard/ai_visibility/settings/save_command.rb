@@ -42,8 +42,7 @@ module AhoyDashboard
               prompt = by_text[text.downcase] || Prompt.new
               prompt.update!(text: text, position: index)
             end
-            Setting.write(AiVisibility::FREQUENCY_KEY, form.frequency)
-            Setting.write(AiVisibility::CAP_KEY, form.monthly_cap)
+            Preferences.write(:ai_visibility, frequency: form.frequency, monthly_cap: form.monthly_cap)
           end
         end
       end

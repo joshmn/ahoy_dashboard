@@ -53,12 +53,10 @@ RSpec.describe AhoyDashboard::Sql::GoalCompiler do
     expect(described_class.match_case(goals: [])).to be_nil
   end
 
-  it "preserves the revenue expression for numeric and empty values" do
-    goal = build(:dash_goal, event_name: "booked")
-    first = dash_goal(visit, "booked", revenue: "12.5")
-    second = dash_goal(visit, "booked", revenue: "")
+  it "names the events a set of goals can match, page views once" do
+    goals = [ build(:dash_goal, event_name: "booked"), build(:dash_goal, :pageview, path_pattern: "/a"),
+              build(:dash_goal, :pageview, path_pattern: "/b"), build(:dash_goal, event_name: "booked") ]
 
-    expect(AhoyDashboard.event.where(id: [first.id, second.id]).order(:id)
-      .pluck(described_class.new(goal: goal).revenue)).to eq([BigDecimal("12.5"), nil])
+    expect(described_class.event_names(goals)).to eq([ "booked", AhoyDashboard::PAGE_VIEW ])
   end
 end

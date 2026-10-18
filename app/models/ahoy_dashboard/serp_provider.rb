@@ -1,5 +1,9 @@
 module AhoyDashboard
   class SerpProvider < AhoyDashboard::Record
+    include StoredCredentials
+    include LastError
+
+    CREDENTIALS_SALT = SecretBox::SERP_SALT
     NAMES = Serp::ADAPTERS.keys.map(&:to_s).freeze
 
     validates :name, presence: true, inclusion: { in: NAMES }, uniqueness: true
@@ -17,26 +21,6 @@ module AhoyDashboard
 
     def adapter_class
       Serp.adapter_class(name)
-    end
-
-    def credentials
-      SecretBox.read_values(value: self[:credentials], salt: SecretBox::SERP_SALT)
-    end
-
-    def credentials=(values)
-      self[:credentials] = SecretBox.write_values(values: values, salt: SecretBox::SERP_SALT)
-    end
-
-    def credential(key)
-      credentials[key.to_sym]
-    end
-
-    def credential_keys
-      adapter_class.credential_keys
-    end
-
-    def ready?
-      credential_keys.all? { |key| credential(key).present? }
     end
 
     def capped?
@@ -82,16 +66,6 @@ module AhoyDashboard
 
     def settle!(reserved, spent, now: Time.current, used: true)
       record_spend!(spent.to_i - reserved.to_i, now: now, used: used)
-    end
-
-    def record_error!(message)
-      update_columns(last_error: message.to_s.first(255), last_error_at: Time.current)
-    end
-
-    def clear_error!
-      return if last_error.blank?
-
-      update_columns(last_error: nil, last_error_at: nil)
     end
 
     def activate!

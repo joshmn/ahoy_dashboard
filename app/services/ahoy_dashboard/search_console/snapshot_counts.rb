@@ -1,16 +1,8 @@
-# frozen_string_literal: true
-
 module AhoyDashboard
-
   module SearchConsole
-
-    class SnapshotCounts
-      attr_reader :rows, :keywords, :totals
-
+    SnapshotCounts = Data.define(:rows, :keywords, :totals) do
       def initialize(rows: 0, keywords: 0, totals: 0)
-        @rows = rows
-        @keywords = keywords
-        @totals = totals
+        super
       end
     end
   end

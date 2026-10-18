@@ -1,12 +1,3 @@
-// Chips, badges and the live dot. Every small bordered thing that carries a
-// value rather than triggering one.
-
-// The box in front of a row's name is the design's own .lc, so only what the
-// design has no equivalent for lives here: the design fills it with a coloured
-// letter and we fill it with the site's real icon, fetched and served by us.
-// The letter stays underneath, which is what shows while the icon is still
-// coming, if the domain has none, if fetching is switched off, or if the row
-// names something that is not a website at all.
 .lc {
   text-transform: uppercase;
   background: var(--tm-chip-bg);
@@ -33,16 +24,6 @@
   display: block;
 }
 
-@keyframes tm-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-
-// The operator inside a segment's chip is a select, not the design's plain .cis
-// text, because a segment can be built on all four operators and a chip that
-// could only say "is" would quietly narrow what a segment is allowed to be. It
-// is stripped back to read as the text it stands in for; only the caret says it
-// opens.
 select.cis {
   appearance: none;
   -webkit-appearance: none;
@@ -61,7 +42,7 @@ select.cis {
 }
 
 select.cis:focus-visible {
-  outline: 2px solid rgba(94, 106, 210, 0.65);
+  outline: var(--focus-ring);
   outline-offset: 2px;
   border-radius: 4px;
 }

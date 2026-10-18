@@ -1,70 +1,32 @@
 module AhoyDashboard
   module Alerts
     module Digests
-      class SendCommand < AhoyDashboard::Command
-        def initialize(period:, now: Time.current)
-          @period = Digests.period!(period)
-          @now = now
-        end
-
-        def call
-          return broadcast(:disabled) unless Digests.enabled?
-
-          digest = claim
-
-          case start(digest)
-          when :done then broadcast(:already_done, digest)
-          when :busy then broadcast(:busy, digest)
-          else deliver(digest)
-          end
-        end
-
+      class SendCommand < AhoyDashboard::Digests::SendCommand
         private
 
-        attr_reader :period, :now
-
-        # The row lock is held only long enough to put the digest in sending, and
-        # everything expensive happens after it is let go. The query behind the
-        # email runs async, and an async query inside a transaction raises. Handing
-        # the mail to the delivery method inside one would hold the lock open
-        # across a network call too.
-        def start(digest)
-          digest.with_lock do
-            next :done if digest.done?
-            next :busy unless digest.claimable?
-
-            digest.update!(status: :sending, error: nil)
-            :ok
-          end
+        def digests
+          Digests
         end
 
-        def claim
-          window = Digests.last_window(period, now: now)
-
-          begin
-            AhoyDashboard::AlertDigest.find_or_create_by!(period: period, starts_on: window.starts_on) do |digest|
-              digest.ends_on = window.ends_on
-            end
-          rescue ActiveRecord::RecordNotUnique
-            AhoyDashboard::AlertDigest.find_by!(period: period, starts_on: window.starts_on)
-          end
+        def record
+          AhoyDashboard::AlertDigest
         end
 
-        def deliver(digest)
-          result = DigestQuery.call(window: digest.window)
+        def query
+          DigestQuery
+        end
 
-          if result.empty? && !Digests.send_empty?
-            digest.update!(status: :skipped, alerts_count: 0, error: nil)
-            return broadcast(:skipped, digest)
-          end
+        def counts(result)
+          { alerts_count: result.total }
+        end
 
-          Digests.mailer.with(digest: digest, result: result, recipients: Digests.recipients).digest.deliver_now
-          digest.update!(status: :sent, sent_at: Time.current, alerts_count: result.total, error: nil)
-          broadcast(:sent, digest)
-        rescue StandardError => e
-          digest.update_columns(status: AhoyDashboard::AlertDigest.statuses[:failed],
-                                error: "#{e.class}: #{e.message}".first(255), updated_at: Time.current)
-          broadcast(:failed, digest, e)
+        def skip?(result)
+          result.empty? && !Digests.send_empty?
+        end
+
+        def skip(digest)
+          digest.update!(status: :skipped, alerts_count: 0, error: nil)
+          broadcast(:skipped, digest)
         end
       end
     end

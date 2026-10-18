@@ -1,7 +1,3 @@
-<%# Full width under the journey, which is where the design puts it. The row is
-    a grid rather than a flex list because it carries three numbers in fixed
-    columns, and the bar sits inside the name cell rather than behind the whole
-    row so it stops short of them. %>
 <%= dash_card element: :section, class: "goals", "aria-labelledby": "tm-goals-title" do %>
   <%= dash_card_header presenter.title, id: "tm-goals-title", element: :header do %>
     <% if presenter.any_goals? %>
@@ -20,11 +16,8 @@
 
   <% if presenter.empty? %>
     <% if presenter.any_goals? %>
-      <%= dash_empty "No conversions in this range", compact: true,
-            hint: query.filters.any? ? "Try a wider date range, or drop one of the filters." : "Try a wider date range." %>
+      <%= dash_empty "No conversions in this range", compact: true, hint: dash_range_hint %>
     <% else %>
-<%# Nothing is wrong here, there is just nothing named yet, so the empty state is
-    the way to name one rather than a suggestion to widen the range. %>
       <%= dash_empty compact: true, **AhoyDashboard::SetupNotice.call(:goal, url: new_settings_goal_path) %>
     <% end %>
   <% else %>

@@ -1,21 +1,12 @@
-<%# The filter dialog as a page, for the Filter button with the JavaScript off
-    or opened in a tab of its own. Every value here is a link that applies it. %>
 <% content_for :title, @dimension ? "Filter by #{@dimension.filter_label.downcase}" : "Filter" %>
-<% returning = @destination.present? ? { return: @destination } : {} %>
-<% base = query.to_query.merge(dash_carried_params(@carried)).merge(returning) %>
+<% base = dash_filter_params(destination: @destination, carried: @carried) %>
 
 <%= dash_page_head title: (@dimension ? "Filter by #{@dimension.filter_label.downcase}" : "Filter") %>
 
 <%= dash_card padded: true do %>
   <%= form_with url: filter_values_path, method: :get, class: "mb-3" do %>
-    <% base.except(:filters).each do |name, value| %>
-      <%= hidden_field_tag name, value, id: nil %>
-    <% end %>
-    <% query.filters.to_param.each do |entry| %>
-      <% entry.each do |key, value| %>
-        <%= hidden_field_tag "filters[][#{key}]", value, id: nil %>
-      <% end %>
-    <% end %>
+    <%= render "ahoy_dashboard/shared/query_fields" %>
+    <%= dash_hidden_fields dash_filter_params(destination: @destination, carried: @carried, base: {}) %>
     <%= hidden_field_tag :dimension, @dimension.key, id: nil if @dimension %>
     <% searching = @dimension ? "Search #{@dimension.filter_label.downcase.pluralize}" : "Search every value" %>
     <%= dash_input_group size: :md do %>
@@ -27,7 +18,7 @@
 
   <div class="d-md-flex border rounded-3 fm-body fm-body--page">
     <nav class="flex-shrink-0 p-2 fm-rail" aria-label="Dimensions">
-      <%= render "ahoy_dashboard/filter_values/rail", base: base.except(:filters).merge(filters: query.filters.to_param.presence),
+      <%= render "ahoy_dashboard/filter_values/rail", base: base.except(:filters).merge(filters: query.carried_filters),
             destination: @destination, carried: @carried, collect: false, current: @dimension&.key %>
     </nav>
 

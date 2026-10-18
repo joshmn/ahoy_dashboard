@@ -1,8 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard backlinks", type: :request do
-  let(:document) { Nokogiri::HTML5(response.body) }
   let(:today) { Date.current }
 
   before do
@@ -11,9 +9,9 @@ RSpec.describe "Dashboard backlinks", type: :request do
   end
 
   def linker(domain, follow: true, lost_on: nil, first_seen_on: today - 400, provider: "dataforseo", links: 2)
-    AhoyDashboard::BacklinkDomain.create!(domain: domain, authority: 30, links: links, follow: follow,
-                                          first_seen_on: first_seen_on, last_seen_on: today,
-                                          lost_on: lost_on, provider: provider)
+    create(:dash_backlink_domain, domain: domain, authority: 30, links: links, follow: follow,
+           first_seen_on: first_seen_on, last_seen_on: today,
+           lost_on: lost_on, provider: provider)
   end
 
   def tile(label)
@@ -35,7 +33,7 @@ RSpec.describe "Dashboard backlinks", type: :request do
       45.times { |index| linker("site-#{index}.com", follow: index >= 12) }
       18.times { |index| linker("new-#{index}.com", first_seen_on: today - 1) }
       17.times { |index| linker("lost-#{index}.com", lost_on: today - 1) }
-      AhoyDashboard::BacklinkSample.create!(on: today - 1, domains: 63, links: 126, provider: "dataforseo")
+      create(:dash_backlink_sample, on: today - 1, domains: 63, links: 126, provider: "dataforseo")
 
       get "/telemetry/seo/backlink"
 

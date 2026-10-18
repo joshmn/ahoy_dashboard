@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe AhoyDashboard::SearchConsole::PageContextQuery do
   let(:range) { Date.new(2026, 8, 1).beginning_of_day..Date.new(2026, 8, 10).end_of_day }
@@ -33,12 +32,7 @@ RSpec.describe AhoyDashboard::SearchConsole::PageContextQuery do
   end
 
   it "reads historical coverage in one aggregate statement" do
-    statements = []
-    subscriber = lambda do |*, payload|
-      statements << payload[:sql] if payload[:sql].include?("count(*) AS count")
-    end
-
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+    statements = captured_sql("count(*) AS count", cached: true) do
       described_class.call(range: range, history: true)
     end
 

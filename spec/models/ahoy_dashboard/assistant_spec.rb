@@ -1,7 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/assistant"
-require "support/ahoy_dashboard/installation"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe AhoyDashboard::Assistant do
   it "is off in test, and says why" do
@@ -38,10 +35,27 @@ RSpec.describe AhoyDashboard::Assistant do
     expect(described_class.context.provider).to eq(:openai)
     expect(described_class.context.chat(model: "gpt-5-mini")).to be_a(AhoyDashboard::LLM::OpenAI::Chat)
 
-    AhoyDashboard::AssistantProvider.update_all(name: "lmstudio")
+    AhoyDashboard::AssistantProvider.update_all(name: "compatible")
 
     expect(described_class.context.provider).to eq(:compatible)
     expect(described_class.context.chat(model: "qwen")).to be_a(AhoyDashboard::LLM::Compatible::Chat)
+
+    AhoyDashboard::AssistantProvider.update_all(name: "deepseek")
+
+    expect(described_class.context.provider).to eq(:compatible)
+    expect(described_class.context.chat(model: "deepseek-flash")).to be_a(AhoyDashboard::LLM::Compatible::Chat)
+  end
+
+  it "sends the output limit saved on the screen over the reader's own" do
+    create(:dash_assistant_provider, :active, name: "deepseek", max_tokens: 8_000, credentials: { api_key: "sk" })
+    stub_request(:post, "https://api.deepseek.com/chat/completions").to_return(
+      status: 200, body: "data: #{JSON.generate(choices: [ { delta: { content: "ok" }, finish_reason: "stop" } ])}\n\n"
+    )
+
+    described_class.context.chat(model: "deepseek-flash").ask("q")
+
+    expect(WebMock).to have_requested(:post, "https://api.deepseek.com/chat/completions")
+      .with { |request| JSON.parse(request.body)["max_tokens"] == 8_000 }
   end
 
   it "knows a loopback endpoint from one somewhere else" do
@@ -100,11 +114,51 @@ RSpec.describe AhoyDashboard::Assistant do
       expect(described_class.model_name).to eq("claude-sonnet-4-6")
     end
 
-    it "points a local reader at its own endpoint and needs no key" do
-      create(:dash_assistant_provider, :active, name: "lmstudio", model: "qwen")
+    it "points an OpenAI-compatible reader at its own endpoint and needs no key" do
+      create(:dash_assistant_provider, :active, name: "compatible", model: "qwen")
 
       expect(described_class.api_base).to eq("http://localhost:1234/v1")
-      expect(described_class).to be_local
+      expect(described_class).to be_key_optional
+      expect(described_class.key_source).to eq(:not_needed)
+      expect(described_class).to be_provider_ready
+    end
+
+    it "says a key is stored for an OpenAI-compatible reader once one is" do
+      create(:dash_assistant_provider, :active, name: "compatible", model: "some/model",
+                                                 api_base: "https://openrouter.ai/api/v1", credentials: { api_key: "sk-or" })
+
+      expect(described_class.key_source).to eq(:stored)
+      expect(described_class.context.api_key).to eq("sk-or")
+    end
+
+    it "keeps an install whose stored reader is lmstudio on the OpenAI-compatible reader at LM Studio's address" do
+      create(:dash_assistant_provider, :active, name: "lmstudio", model: "qwen")
+
+      expect(described_class.reader).to eq("compatible")
+      expect(described_class.reader_name).to eq("compatible")
+      expect(described_class.settings.label).to eq("OpenAI-compatible")
+      expect(described_class.api_base).to eq("http://localhost:1234/v1")
+      expect(described_class.model_name).to eq("qwen")
+      expect(described_class.key_source).to eq(:not_needed)
+      expect(described_class).to be_provider_ready
+      expect(described_class.context.chat(model: "qwen")).to be_a(AhoyDashboard::LLM::Compatible::Chat)
+      expect(AhoyDashboard::AssistantProvider.for("compatible").name).to eq("lmstudio")
+    end
+
+    it "needs a DeepSeek key, thinks, and runs to the longer output limit thinking needs" do
+      switch_on_ahoy_dashboard(:assistant)
+      create(:dash_assistant_provider, :active, name: "deepseek")
+
+      expect(described_class.api_base).to eq("https://api.deepseek.com")
+      expect(described_class.model_name).to eq("deepseek-flash")
+      expect(described_class.key_source).to eq(:missing)
+      expect(described_class).not_to be_provider_ready
+      expect(described_class.unavailable_reason).to eq("DeepSeek has no key set, so nothing can be asked.")
+      expect(described_class.settings).to be_thinking
+      expect(described_class.settings).to be_replays_reasoning
+      expect(described_class.settings.max_tokens).to eq(65_536)
+      expect(described_class.reader_for("compatible")).not_to be_replays_reasoning
+      expect(described_class.reader_for("compatible")).not_to be_thinking
     end
 
     it "carries the key into the chat's own config rather than the global one" do
@@ -143,13 +197,6 @@ RSpec.describe AhoyDashboard::Assistant do
 
       expect(described_class.tool_label("rankings")).to eq("the rank tracking")
       expect(described_class.tool_label("search_console")).to eq("Search Console")
-    end
-
-    it "answers with an error rather than reading a missing table if one is called anyway" do
-      uninstall_ahoy_dashboard(:serp, :search_console)
-
-      expect(AhoyDashboard::Assistant::Tools::Rankings.new.execute).to include(error: a_string_including("not installed"))
-      expect(AhoyDashboard::Assistant::Tools::SearchConsole.new.execute).to include(error: a_string_including("not installed"))
     end
   end
 

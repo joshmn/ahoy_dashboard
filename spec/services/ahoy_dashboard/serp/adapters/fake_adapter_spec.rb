@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp::Adapters::FakeAdapter do
   subject(:adapter) { described_class.new }
@@ -61,8 +60,20 @@ RSpec.describe AhoyDashboard::Serp::Adapters::FakeAdapter do
   end
 
   it "runs the pages together when asked for more than one" do
-    combined = adapter.search_pages(query: query, pages: 3)
+    pages = described_class.requests_for(pages: 3).map { |request| adapter.search(query: query, request: request) }
+    combined = AhoyDashboard::Serp::Result.combine(pages)
 
     expect(combined.organic.map(&:position)).to eq((1..30).to_a)
+  end
+
+  it "labels itself as sample data" do
+    expect(described_class.label).to eq("Sample data")
+    expect(AhoyDashboard::Settings::Display.serp_label(:fake)).to eq("Sample data")
+    expect(AhoyDashboard::Settings::Display.adapter_label(described_class)).to eq("Sample data")
+  end
+
+  it "sells sample keyword ideas and backlinks without building an adapter" do
+    expect(described_class.keywords?).to be(true)
+    expect(described_class.backlinks?).to be(true)
   end
 end

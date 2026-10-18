@@ -1,11 +1,8 @@
 module AhoyDashboard
   module Seo
-    # What every surface in the suite needs and none of them should write twice:
-    # the range control, the site control, the empty states that point at the
-    # setup page, and the handful of formatters that keep a percentage looking
-    # the same on all of them.
     class BasePresenter
       include AhoyDashboard::Seo::Exportable
+      include AhoyDashboard::Seo::Formatting
 
       Tile = Data.define(:label, :value, :note, :tone, :kind, :url) do
         def initialize(label:, value:, note: nil, tone: nil, kind: :number, url: nil)
@@ -13,15 +10,17 @@ module AhoyDashboard
         end
       end
 
-      DASH = "&mdash;".html_safe
+      Group = Data.define(:key, :title, :note, :rows, :tone)
 
       BOUGHT = %w[serp_ keyword_ideas backlink_].freeze
 
-      TOP = { tm_frame: "_top" }.freeze
+      TOP = AhoyDashboard::SetupNotice::TOP
 
       SLICEABLE = %w[opportunities cannibalization brand_split conversions].freeze
 
-      attr_reader :query, :surface, :site, :sites, :result, :slice, :tag, :totals
+      SHARE_FLOOR = 3
+
+      attr_reader :query, :surface, :site, :sites, :result, :slice, :tag, :tags, :totals
 
       def initialize(query:, surface:, result: nil, site: nil, sites: [], slice: nil, tag: nil, tags: [],
         totals: nil, search_console_context: SearchConsole::PageContext.new)
@@ -64,12 +63,12 @@ module AhoyDashboard
         site.present? && !site.ours?
       end
 
-      def site_label
-        "Site: #{site&.name || "none"}"
+      def mine?(domain)
+        AhoyDashboard::Serp::Domain.matches_site?(domain, site)
       end
 
-      def sample?
-        surface.sample?
+      def site_label
+        "Site: #{site&.name || "none"}"
       end
 
       def bought?
@@ -126,27 +125,21 @@ module AhoyDashboard
       end
 
       def period_options
-        AhoyDashboard::SeoRange.periods.map do |period|
-          {
-            label: period.label,
-            url: surface.path(query.with(period: period.key).to_query.merge(link_param)),
-            active: period.key == query.period.key
-          }
-        end
+        Periods.menu(query) { |period| surface.path(query.with(period: period.key).to_query.merge(link_param)) }
       end
 
       def site_options
         sites.map do |candidate|
           {
             label: "#{candidate.name} (#{candidate.domain})",
-            url: surface.path(query.to_query.merge(slice_param).merge(tag_param).merge(site: candidate.id)),
+            url: surface.path(query.to_query.merge(link_param).merge(site: candidate.id)),
             active: candidate.id == site&.id
           }
         end
       end
 
       def range_label
-        query.period.custom? ? query.range_label : query.period.label
+        query.range_title
       end
 
       def show_sites?
@@ -159,13 +152,9 @@ module AhoyDashboard
 
       def tag_menu
         memo(:tag_menu) do
-          Serp::TagMenu.new(tags: @tags, current: tag,
-                            url: ->(chosen) { surface.path(query.to_query.merge(site_param).merge(tag: chosen).compact) })
+          Serp::TagMenu.new(tags: tags, current: tag,
+                            url: ->(chosen) { surface.path(query.to_query.merge(link_param).merge(tag: chosen).compact) })
         end
-      end
-
-      def hub_path
-        routes.seo_path(query.to_query)
       end
 
       def rankings_path
@@ -178,10 +167,6 @@ module AhoyDashboard
 
       def new_keyword_path
         routes.new_settings_serp_keyword_path
-      end
-
-      def sites_path
-        routes.settings_serp_sites_path
       end
 
       def new_site_path
@@ -214,19 +199,27 @@ module AhoyDashboard
 
       def search_console_empty(title: "No Search Console data in this range",
                                hint: "Google reports two to three days late. Try a longer date range.")
-        return slice_empty(title) if slice.any?
+        return { title: title, hint: slice.empty_hint, action: slice_menus.clear_action(data: TOP) } if slice.any?
 
         SearchConsoleEmptyState.call(query: query, context: search_console_context, routes: routes, title: title, hint: hint,
                                      path: ->(overrides) { surface.path(query.with(overrides).to_query.merge(link_param)) })
       end
 
+      def data_note
+        AhoyDashboard::SearchConsoleReportPresenter.data_note(
+          through: on_label(totals.last_date), slice: slice,
+          sliced: "Days pulled before the dashboard stored device and country are left out. " \
+                  "#{AhoyDashboard::SearchConsoleReportPresenter::ROWS_NOTE}"
+        )
+      end
+
       def narrow?
-        !AhoyDashboard::SeoRange.wide_enough?(query)
+        !Periods.wide_enough?(query)
       end
 
       def widen_action
-        { label: AhoyDashboard::SeoRange.widen_label, data: TOP, primary: true,
-          url: surface.path(AhoyDashboard::SeoRange.widened(query).merge(link_param)) }
+        { label: Periods.widen_label, data: TOP, primary: true,
+          url: surface.path(Periods.widened(query).merge(link_param)) }
       end
 
       def rank_empty(title: "No readings in this range", hint: "Try a longer date range.")
@@ -243,85 +236,9 @@ module AhoyDashboard
         { title: title, hint: hint, action: { label: "Open Rankings", url: rankings_path, data: TOP, primary: false } }
       end
 
-      # Formatting, in one place, because a percentage rounded two ways on two
-      # cards of the same page is the fastest way to make a number look wrong.
-      def percent(value, places: 0)
-        "#{(value.to_f * 100).round(places)}%"
-      end
-
-      def number(value)
-        ActiveSupport::NumberHelper.number_to_delimited(value.to_i)
-      end
-
-      def decimal(value, places: 1)
-        value.nil? ? DASH : value.to_f.round(places).to_s
-      end
-
-      def money(value)
-        ActiveSupport::NumberHelper.number_to_currency(value.to_f)
-      end
-
-      def bytes(value)
-        ActiveSupport::NumberHelper.number_to_human_size(value.to_i)
-      end
-
-      def when_label(time)
-        time.nil? ? "Never" : "#{helpers.time_ago_in_words(time).delete_prefix("about ")} ago"
-      end
-
-      def on_label(date)
-        AhoyDashboard::SeoHelper.short_date(date, zone: time_zone)
-      end
-
-      def local_date(value)
-        AhoyDashboard::SeoHelper.local_date(value, zone: time_zone)
-      end
-
-      def signed(value, places: 0)
-        return DASH if value.nil?
-
-        rounded = places.zero? ? value.to_i : value.to_f.round(places)
-        return "level" if rounded.zero?
-
-        "#{rounded.positive? ? "+" : ""}#{rounded}"
-      end
-
-      def tone_for(value)
-        return nil if value.nil? || value.to_f.zero?
-
-        value.to_f.positive? ? :good : :bad
-      end
-
-      # A position moving down the page is a bad thing whose number went up, so
-      # everything about rank inverts. Kept here rather than remembered on each
-      # page, because getting it backwards once is a page that reads as good news.
-      def rank_tone(change)
-        return nil if change.nil? || change.zero?
-
-        change.positive? ? "up" : "down"
-      end
-
-      def truncate(value, length: 60)
-        value.to_s.truncate(length)
-      end
-
-      def path_of(url)
-        return DASH if url.blank?
-
-        url.sub(%r{\Ahttps?://[^/]+}, "").presence || "/"
-      end
-
-      def pluralize(count, word)
-        helpers.pluralize(count, word)
-      end
-
       private
 
       attr_reader :search_console_context
-
-      def time_zone
-        memo(:time_zone) { AhoyDashboard.time_zone }
-      end
 
       def site_param
         site ? { site: site.id } : {}
@@ -339,11 +256,19 @@ module AhoyDashboard
         site_param.merge(slice_param).merge(tag_param)
       end
 
-      def slice_empty(title)
-        { title: title,
-          hint: slice.empty_hint,
-          action: { label: "Show all devices and countries", data: TOP, primary: true,
-                    url: surface.path(query.to_query.merge(site_param)) } }
+      def movement(change)
+        return :none if change.nil?
+        return :level if change.zero?
+
+        change.positive? ? :up : :down
+      end
+
+      def csv_change(row)
+        case change_kind(row)
+        when :new then "New"
+        when :gone then "Gone"
+        else row.change
+        end
       end
 
       def memo(name)
@@ -351,10 +276,6 @@ module AhoyDashboard
         return @memo[name] if @memo.key?(name)
 
         @memo[name] = yield
-      end
-
-      def helpers
-        ActionController::Base.helpers
       end
 
       def routes

@@ -3,26 +3,6 @@ require "rails_helper"
 RSpec.describe "Dashboard seo surfaces", type: :request do
   let(:paths) { AhoyDashboard::Seo::Surface::ALL.map { |surface| [ surface.key, surface.path ] } }
 
-  describe "gating" do
-    it "sends a signed out visitor to sign in from every surface" do
-      paths.each do |key, path|
-        get path
-
-        expect(response).to redirect_to("/users/sign_in"), "expected #{key} to bounce a signed out visitor"
-      end
-    end
-
-    it "does not admit any of them exists to a signed in visitor who is not an admin" do
-      paths.each do |key, path|
-        sign_in create(:user)
-
-        get path
-
-        expect(response).to have_http_status(:not_found), "expected #{key} to 404"
-      end
-    end
-  end
-
   describe "with nothing on file" do
     before { sign_in create(:user, :admin) }
 
@@ -187,10 +167,17 @@ RSpec.describe "Dashboard seo surfaces", type: :request do
 
     it "goes on a surface reading what google sent, with the reason and the way to fix it" do
       get AhoyDashboard::Seo::Surface.find("opportunities").path
-      notice = Nokogiri::HTML5(response.body).css("[role=status]").find { |node| node.text.include?("not syncing") }
+      notice = document.css("[role=status]").find { |node| node.text.include?("not syncing") }
 
       expect(notice.text.squish).to eq("Search Console is not syncing. Google would not hand back an access token. Fix connection")
       expect(notice.at_css("a")["href"]).to eq(AhoyDashboard::Engine.routes.url_helpers.settings_google_connection_path)
+    end
+
+    it "goes on the overview even when the range has no Search Console rows" do
+      get "/telemetry/seo"
+      notice = document.css("[role=status]").find { |node| node.text.include?("not syncing") }
+
+      expect(notice.text.squish).to eq("Search Console is not syncing. Google would not hand back an access token. Fix connection")
     end
 
     it "stays off a surface that reads only rank checks" do

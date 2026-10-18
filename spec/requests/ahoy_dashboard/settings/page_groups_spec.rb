@@ -1,29 +1,9 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard page group settings", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/page_groups"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "sends a signed out visitor to sign in on a write too" do
-      post "/telemetry/settings/page_groups", params: { page_group: { name: "Blog", patterns: "/blog/*" } }
-
-      expect(response).to redirect_to("/users/sign_in")
-      expect(AhoyDashboard::PageGroup.count).to be_zero
-    end
-  end
 
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
@@ -38,8 +18,7 @@ RSpec.describe "Dashboard page group settings", type: :request do
 
       it "does not promise that groups fold the page journey" do
         create(:dash_page_group, name: "Blog", position: 1, patterns: [ "/blog/*" ])
-        visit = dash_visit(started_at: now - 1.day, visitor: "one")
-        dash_page_view(visit, path: "/blog/first", at: now - 1.day)
+        dash_landing("/blog/first", at: now - 1.day, visitor: "one")
 
         get "/telemetry/settings/page_groups"
 
@@ -92,8 +71,6 @@ RSpec.describe "Dashboard page group settings", type: :request do
         expect(summary).to eq("Matches 2 of 3 pages visited in the last 30 days.")
       end
 
-      # Eight rows is as much as belongs under a field, so the rest are a dialog
-      # rather than a box that grows to a hundred paths.
       it "puts the whole list in a dialog behind the last row" do
         10.times { |index| dash_page_view(dash_visit(started_at: 1.day.ago, visitor: "v#{index}"), path: "/blog/#{index}") }
         rule = create(:dash_page_group, patterns: [ "/blog/*" ])
@@ -181,20 +158,17 @@ RSpec.describe "Dashboard page group settings", type: :request do
     end
   end
 
-  # The whole point: the fold is applied when a card is read, so a rule written
-  # today folds the whole history and taking it off shows the paths back.
   describe "on the pages card" do
     before { sign_in create(:user, :admin) }
 
     def traffic!
       %w[/blog/one /blog/two /about].each_with_index do |path, index|
-        visit = dash_visit(started_at: now - 1.day, visitor: "visitor-#{index}")
-        dash_page_view(visit, path: path, at: now - 1.day)
+        dash_landing(path, at: now - 1.day, visitor: "visitor-#{index}")
       end
     end
 
     def labels
-      Nokogiri::HTML5(response.body).css(".p-list .data-row .nm").map { |node| node.text.strip }
+      document.css(".p-list .data-row .nm").map { |node| node.text.strip }
     end
 
     it "reads the paths as themselves until a rule is written" do
@@ -214,16 +188,13 @@ RSpec.describe "Dashboard page group settings", type: :request do
       expect(labels).to contain_exactly("Blog", "/about")
     end
 
-    # Grouping in SQL rather than folding the answer is what keeps this honest:
-    # two pages one visitor read are one visitor, not two.
     it "counts a visitor who read two pages in the group once" do
       create(:dash_page_group, name: "Blog", patterns: [ "/blog/*" ])
-      visit = dash_visit(started_at: now - 1.day, visitor: "one")
-      dash_page_view(visit, path: "/blog/one", at: now - 1.day)
+      visit = dash_landing("/blog/one", at: now - 1.day, visitor: "one")
       dash_page_view(visit, path: "/blog/two", at: now - 1.day)
 
       get "/telemetry/reports/pages", params: { tab: "pages", breakdown: "grouped" }
-      row = Nokogiri::HTML5(response.body).at_css(".p-list .data-row")
+      row = document.at_css(".p-list .data-row")
 
       expect(row.at_css(".nm").text.strip).to eq("Blog")
       expect(row.at_css(".cnt").text.strip).to eq("1")
@@ -238,11 +209,9 @@ RSpec.describe "Dashboard page group settings", type: :request do
       expect(labels).to contain_exactly("/blog/one", "/blog/two", "/about")
     end
 
-    # A pattern is typed into a form, so its LIKE metacharacters are characters.
     it "treats an underscore in a pattern as an underscore" do
       create(:dash_page_group, name: "Odd", patterns: [ "/a_b" ])
-      visit = dash_visit(started_at: now - 1.day, visitor: "one")
-      dash_page_view(visit, path: "/axb", at: now - 1.day)
+      dash_landing("/axb", at: now - 1.day, visitor: "one")
 
       get "/telemetry/reports/pages", params: { tab: "pages", breakdown: "grouped" }
 

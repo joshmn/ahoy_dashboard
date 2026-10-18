@@ -1,7 +1,7 @@
 module AhoyDashboard
   module Settings
     module Segments
-      class DefaultsController < AhoyDashboard::BaseController
+      class DefaultsController < AhoyDashboard::Settings::BaseController
         before_action :set_segment
 
         def create

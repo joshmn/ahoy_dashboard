@@ -1,16 +1,10 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard seo stored Search Console rows", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 9, 19, 10, 0) }
+  let(:now) { dash_time(2026, 9, 19, 10, 0) }
 
   around { |example| travel_to(now) { example.run } }
   before { sign_in create(:user, :admin) }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   def stored!
     (Date.new(2026, 7, 18)..Date.new(2026, 8, 18)).each do |on|

@@ -10,7 +10,7 @@ module AhoyDashboard
       end
 
       def available?
-        requires.empty? || requires.any? { |feature| Installation.installed?(feature) }
+        requires.empty? || Installation.any_installed?(requires)
       end
 
       def threshold_allowed?(value)

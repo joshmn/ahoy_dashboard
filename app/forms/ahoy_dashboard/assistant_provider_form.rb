@@ -1,6 +1,7 @@
 module AhoyDashboard
   class AssistantProviderForm < AhoyDashboard::Form
-    FIELDS = %i[name model api_base temperature max_tokens active credentials].freeze
+    include SecretFields
+
     MAX_TEMPERATURE = 2
     MAX_OUTPUT = 128_000
 
@@ -10,7 +11,6 @@ module AhoyDashboard
     attribute :temperature, :decimal
     attribute :max_tokens, :integer
     attribute :active, :boolean, default: false
-    attribute :credentials
 
     validates :name, inclusion: { in: AhoyDashboard::AssistantProvider::NAMES,
                                   message: "is not a reader this has" }
@@ -22,33 +22,39 @@ module AhoyDashboard
     validate :a_model_is_named
 
     def self.from_record(provider)
-      new(name: provider.name, model: provider.model, api_base: provider.api_base,
+      new(name: AhoyDashboard::Assistant.reader_key(provider.name), model: provider.model, api_base: provider.api_base,
           temperature: provider.temperature, max_tokens: provider.max_tokens,
-          active: provider.active, credentials: provider.credentials)
+          active: provider.active)
     end
 
     def reader
-      AhoyDashboard::Assistant::READERS.fetch(name.to_s) { {} }
+      AhoyDashboard::Assistant.reader_for(name)
     end
 
-    def local?
-      reader[:local].present?
+    def key_optional?
+      reader.key_optional?
     end
 
     def default_model
-      reader[:default_model]
+      reader.default_model
     end
 
     def suggested_models
-      Array(reader[:models])
+      reader.models
+    end
+
+    def model_options
+      AhoyDashboard::Assistant::ModelOption.listed(suggested_models)
     end
 
     def temperature_hint
-      reader[:temperature_hint]
+      reader.temperature_hint
     end
 
     def default_output
-      case reader[:provider]
+      return reader.max_tokens if reader.max_tokens
+
+      case reader.provider
       when :anthropic then LLM::Anthropic::Models.max_tokens(model.presence || default_model)
       when :openai then LLM::OpenAI::Models::MAX_TOKENS
       else LLM::Compatible::Chat::DEFAULT_MAX_TOKENS
@@ -56,7 +62,11 @@ module AhoyDashboard
     end
 
     def endpoint
-      api_base.to_s.strip.presence || reader[:api_base]
+      api_base.to_s.strip.presence || reader.api_base
+    end
+
+    def endpoint_suffix
+      URI.parse(reader.api_base).path.presence
     end
 
     def on_this_machine?
@@ -64,21 +74,13 @@ module AhoyDashboard
     end
 
     def lede
-      return "The key is encrypted before it is stored." unless local?
+      return "The key is encrypted before it is stored." unless key_optional?
       return "Nothing leaves the machine. Start the local server and load a model first." if on_this_machine?
 
       "Questions and what the tools read go to #{URI.parse(endpoint).host.presence || endpoint}, not this machine. " \
-        "Start that server and load a model first."
+        "A key is optional, and encrypted before it is stored."
     rescue URI::InvalidURIError
-      "Questions and what the tools read go to #{endpoint}. Start that server and load a model first."
-    end
-
-    def credential(key)
-      (credentials || {}).to_h.symbolize_keys[key.to_sym]
-    end
-
-    def submitted_credentials
-      (credentials || {}).to_h.symbolize_keys.slice(:api_key)
+      "Questions and what the tools read go to #{endpoint}. A key is optional, and encrypted before it is stored."
     end
 
     def record_attributes
@@ -87,8 +89,6 @@ module AhoyDashboard
 
     private
 
-    # A local server names whatever model it has loaded, and there is no default
-    # to fall back on, so leaving it blank there is not a setup.
     def a_model_is_named
       return if model.present? || default_model.present?
 

@@ -1,18 +1,11 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Sql::ExcludedTraffic do
-  def exclude(name, *entries)
-    AhoyDashboard::Exclusion.create!(name: name, filters: entries.map { |dimension, operator, value, group|
-      { "dimension" => dimension, "operator" => operator, "value" => value, "group" => group }.compact
-    })
-  end
-
   let(:start) { dash_time(2026, 8, 10) }
 
   def visit(token, **attributes)
     dash_visit(started_at: start + 1.hour, visitor: token, **attributes).tap do |created|
-      dash_page_view(created, path: attributes.delete(:path) || "/", at: created.started_at)
+      dash_page_view(created)
     end
   end
 
@@ -28,7 +21,7 @@ RSpec.describe AhoyDashboard::Sql::ExcludedTraffic do
   end
 
   it "hides a visit a visit rule matches and keeps one with nothing recorded" do
-    exclude("Data centers", [ "asn", "contains", "amazon" ])
+    dash_exclusion("Data centers", [ "asn", "contains", "amazon" ])
     visit("aws", asn: "AMAZON-02")
     visit("unknown", asn: nil)
 
@@ -38,7 +31,7 @@ RSpec.describe AhoyDashboard::Sql::ExcludedTraffic do
   end
 
   it "hides a visit with any event an event rule matches, crawler events included" do
-    exclude("Scanners", [ "page", "contains", "wp-login" ])
+    dash_exclusion("Scanners", [ "page", "contains", "wp-login" ])
     scanner = visit("scanner")
     dash_page_view(scanner, path: "/wp-login.php", crawler: "Bad Bot")
     visit("reader")
@@ -60,7 +53,7 @@ RSpec.describe AhoyDashboard::Sql::ExcludedTraffic do
   end
 
   it "reads the groups inside one exclusion the same way the filter bar does" do
-    exclude("Chrome in the US or CA", [ "country", "is", "US", 0 ], [ "country", "is", "CA", 0 ], [ "browser", "is", "Chrome" ])
+    dash_exclusion("Chrome in the US or CA", [ "country", "is", "US", 0 ], [ "country", "is", "CA", 0 ], [ "browser", "is", "Chrome" ])
     visit("us_chrome", country: "US", browser: "Chrome")
     visit("ca_chrome", country: "CA", browser: "Chrome")
     visit("us_firefox", country: "US", browser: "Firefox")
@@ -70,8 +63,8 @@ RSpec.describe AhoyDashboard::Sql::ExcludedTraffic do
   end
 
   it "hides a visit that matches any one of several exclusions" do
-    exclude("One", [ "country", "is", "US" ])
-    exclude("Two", [ "browser", "is", "Firefox" ])
+    dash_exclusion("One", [ "country", "is", "US" ])
+    dash_exclusion("Two", [ "browser", "is", "Firefox" ])
     visit("us", country: "US")
     visit("firefox", country: "CA", browser: "Firefox")
     visit("left", country: "CA")
@@ -80,7 +73,7 @@ RSpec.describe AhoyDashboard::Sql::ExcludedTraffic do
   end
 
   it "works on events joined to their visits" do
-    exclude("Data centers", [ "asn", "contains", "AMAZON" ])
+    dash_exclusion("Data centers", [ "asn", "contains", "AMAZON" ])
     visit("aws", asn: "AMAZON-02")
     visit("person")
 
@@ -102,13 +95,13 @@ RSpec.describe AhoyDashboard::Sql::ExcludedTraffic do
     visit("aws", asn: "AMAZON-02")
     expect(described_class.exclude(Ahoy::Visit.all).count).to eq(1)
 
-    exclude("Data centers", [ "asn", "contains", "AMAZON" ])
+    dash_exclusion("Data centers", [ "asn", "contains", "AMAZON" ])
 
     expect(described_class.exclude(Ahoy::Visit.all).count).to eq(0)
   end
 
   it "floors the event lookup when given a start" do
-    exclude("Scanners", [ "page", "contains", "wp-login" ])
+    dash_exclusion("Scanners", [ "page", "contains", "wp-login" ])
 
     expect(described_class.condition(floor: start)).to include("ahoy_events.time >=")
     expect(described_class.condition).not_to include("ahoy_events.time >=")

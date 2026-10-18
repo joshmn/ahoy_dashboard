@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Dashboards::SnapshotKeyQuery do
   around { |example| travel_to(Time.utc(2026, 8, 11, 14, 30)) { example.run } }

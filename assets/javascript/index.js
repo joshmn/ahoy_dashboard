@@ -7,7 +7,6 @@ import ChartController from "./controllers/chart_controller.js"
 import ChatAskController from "./controllers/chat_ask_controller.js"
 import ChatStreamController from "./controllers/chat_stream_controller.js"
 import CheckAllController from "./controllers/check_all_controller.js"
-import ClipboardController from "./controllers/clipboard_controller.js"
 import FilterController from "./controllers/filter_controller.js"
 import FilterModalController from "./controllers/filter_modal_controller.js"
 import FiltersController from "./controllers/filters_controller.js"
@@ -27,7 +26,6 @@ import TabsController from "./controllers/tabs_controller.js"
 import TagFieldController from "./controllers/tag_field_controller.js"
 import ToastController from "./controllers/toast_controller.js"
 
-register("clipboard", ClipboardController)
 register("dash--ask", AskController)
 register("dash--chart", ChartController)
 register("dash--chat-ask", ChatAskController)

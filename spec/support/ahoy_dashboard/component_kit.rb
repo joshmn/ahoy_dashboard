@@ -46,6 +46,7 @@ module AhoyDashboardComponentKit
   MAIL_PATHS = %w[
     app/views/ahoy_dashboard/alert_mailer/
     app/views/ahoy_dashboard/report_mailer/
+    app/views/ahoy_dashboard/digest_mail/
     app/views/layouts/ahoy_dashboard/mailer
   ].freeze
 

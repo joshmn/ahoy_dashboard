@@ -12,13 +12,7 @@ module AhoyDashboard
       end
 
       def self.choices
-        properties = begin
-          AhoyDashboard::Property.surfaced.map(&:dimension)
-        rescue ActiveRecord::ActiveRecordError
-          []
-        end
-
-        (AhoyDashboard::Dimension.all + properties).uniq(&:key)
+        AhoyDashboard::Dimension.with_properties
           .map { |dimension| Choice.new(key: dimension.key, label: dimension.label, group: dimension.group) }
       end
 
@@ -34,9 +28,6 @@ module AhoyDashboard
         Array(keys).map(&:to_s).reject(&:blank?).uniq
       end
 
-      # A property that has since been taken off the surfaced list is not
-      # offered, so it cannot be ticked, and a save that dropped it would hand
-      # it back to the assistant without anybody having chosen that.
       def to_store
         offered = choices.map(&:key)
 

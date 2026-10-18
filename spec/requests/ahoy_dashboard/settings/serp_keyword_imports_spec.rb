@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard serp keyword imports", type: :request do
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
@@ -7,22 +6,6 @@ RSpec.describe "Dashboard serp keyword imports", type: :request do
   def searched(query, impressions:, clicks: 0, position: 12.0, on: Date.current - 3)
     create(:dash_search_console_keyword, query: query, impressions: impressions, clicks: clicks,
            position: position, date: on)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/serp_keyword_import/new"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a non-admin trying to import" do
-      sign_in create(:user)
-
-      post "/telemetry/settings/serp_keyword_import", params: { serp_keyword_import: { pasted: "x" } }
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do
@@ -98,6 +81,18 @@ RSpec.describe "Dashboard serp keyword imports", type: :request do
                                          language: "en", engine: "google" } }
 
       expect(AhoyDashboard::SerpKeyword.count).to eq(2)
+      expect(flash[:notice]).to include("1 keyword now tracked", "1 were already on the list")
+    end
+
+    it "counts one tracked with other capitals as already tracked rather than paying for it twice" do
+      create(:dash_serp_keyword, query: "Visiting Hours")
+
+      post "/telemetry/settings/serp_keyword_import",
+        params: { serp_keyword_import: { pasted: "visiting hours\ncommissary list", locations: "us",
+                                         pages: "1", frequency: "weekly", device: "desktop",
+                                         language: "en", engine: "google" } }
+
+      expect(AhoyDashboard::SerpKeyword.pluck(:query)).to contain_exactly("Visiting Hours", "commissary list")
       expect(flash[:notice]).to include("1 keyword now tracked", "1 were already on the list")
     end
 

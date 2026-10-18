@@ -1,16 +1,11 @@
 <% content_for :title, "Edit a keyword" %>
 <% content_for :dash_settings_section, "serp_keywords" %>
 
-<div class="set-main">
-  <section class="sec">
-    <% check = AhoyDashboard::Serp::CheckNowPresenter.new(keyword: @keyword) %>
-    <%= dash_page_head title: "Edit #{@keyword.query}",
-          lede: "Change the keyword, device or language and its history starts over. The old readings are kept on a paused copy of the old search.",
-          actions: dash_button_to("Check now", check.path, reason: check.reason,
-                                  confirm: check.confirm) %>
+<%= dash_page_head title: "Edit #{@keyword.query}",
+      lede: "Change the keyword, device or language and its history starts over. The old readings are kept on a paused copy of the old search.",
+      actions: dash_button_to("Check now", @check.path, reason: @check.reason,
+                              confirm: @check.confirm) %>
 
-    <%= render "ahoy_dashboard/settings/serp_keywords/form",
-          plan: @plan, url: settings_serp_keyword_path(@keyword), method: :patch,
-          submit_label: "Save changes", editing: true %>
-  </section>
-</div>
+<%= render "ahoy_dashboard/settings/serp_keywords/form",
+      plan: @plan, url: settings_serp_keyword_path(@keyword), method: :patch,
+      submit_label: "Save changes", editing: true %>

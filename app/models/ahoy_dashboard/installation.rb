@@ -1,6 +1,10 @@
 module AhoyDashboard
   module Installation
-    Feature = Data.define(:name, :label, :groups, :tables) do
+    Feature = Data.define(:name, :groups, :tables) do
+      def label
+        Features.fetch(name).label
+      end
+
       def installed?
         tables.all? { |table| Installation.table?(table) }
       end
@@ -20,44 +24,48 @@ module AhoyDashboard
         enforce_ahoy_dashboard_goal_and_funnel_constraints restore_ahoy_dashboard_event_statistics
         add_ahoy_dashboard_job_run_leases ensure_ahoy_dashboard_time_indexes
       ],
-      "search_console" => %w[create_ahoy_dashboard_search_console],
+      "search_console" => %w[create_ahoy_dashboard_search_console remove_ahoy_dashboard_search_console_rows_date_index],
       "search_providers" => %w[create_ahoy_dashboard_search_providers],
-      "serp" => %w[create_ahoy_dashboard_serp add_ahoy_dashboard_alert_check_foreign_keys],
+      "serp" => %w[
+        create_ahoy_dashboard_serp add_ahoy_dashboard_alert_check_foreign_keys add_ahoy_dashboard_serp_lookup_indexes
+      ],
       "keywords" => %w[create_ahoy_dashboard_keyword_ideas],
       "backlinks" => %w[create_ahoy_dashboard_backlinks],
       "places" => %w[create_ahoy_dashboard_places],
-      "assistant" => %w[create_ahoy_dashboard_assistant],
+      "assistant" => %w[create_ahoy_dashboard_assistant add_ahoy_dashboard_chat_message_reasoning],
       "ai_visibility" => %w[create_ahoy_dashboard_ai_visibility_tables],
       "alerts" => %w[create_ahoy_dashboard_alert_tables],
       "reports" => %w[create_ahoy_dashboard_report_digests]
     }.freeze
 
     FEATURES = [
-      Feature.new(:search_console, "Search Console", %w[search_console],
+      Feature.new(:search_console, %w[search_console],
                   %w[ahoy_dashboard_google_accounts ahoy_dashboard_search_console_rows
                      ahoy_dashboard_search_console_totals ahoy_dashboard_search_console_keywords
                      ahoy_dashboard_search_console_days]),
-      Feature.new(:serp, "Rank tracking", %w[search_providers serp],
+      Feature.new(:serp, %w[search_providers serp],
                   %w[ahoy_dashboard_serp_providers ahoy_dashboard_serp_spend_days ahoy_dashboard_serp_sites
                      ahoy_dashboard_serp_keywords ahoy_dashboard_serp_keyword_targets ahoy_dashboard_serp_runs
                      ahoy_dashboard_serp_run_pages ahoy_dashboard_serp_checks ahoy_dashboard_serp_ai_citations
                      ahoy_dashboard_serp_results]),
-      Feature.new(:keywords, "Keyword research", %w[search_providers keywords],
+      Feature.new(:keywords, %w[search_providers keywords],
                   %w[ahoy_dashboard_serp_providers ahoy_dashboard_serp_spend_days ahoy_dashboard_keyword_ideas]),
-      Feature.new(:backlinks, "Backlinks", %w[search_providers backlinks],
+      Feature.new(:backlinks, %w[search_providers backlinks],
                   %w[ahoy_dashboard_serp_providers ahoy_dashboard_serp_spend_days ahoy_dashboard_backlink_domains
                      ahoy_dashboard_backlink_samples ahoy_dashboard_backlink_anchors]),
-      Feature.new(:places, "The place list", %w[places], %w[ahoy_dashboard_places]),
-      Feature.new(:assistant, "The assistant", %w[assistant],
+      Feature.new(:places, %w[places], %w[ahoy_dashboard_places]),
+      Feature.new(:assistant, %w[assistant],
                   %w[ahoy_dashboard_chats ahoy_dashboard_chat_messages ahoy_dashboard_assistant_providers]),
-      Feature.new(:ai_visibility, "AI visibility", %w[ai_visibility],
+      Feature.new(:ai_visibility, %w[ai_visibility],
                   %w[ahoy_dashboard_ai_visibility_assistants ahoy_dashboard_ai_visibility_prompts
                      ahoy_dashboard_ai_visibility_runs ahoy_dashboard_ai_visibility_answers
                      ahoy_dashboard_ai_visibility_sources]),
-      Feature.new(:alerts, "Alerts", %w[alerts],
+      Feature.new(:alerts, %w[alerts],
                   %w[ahoy_dashboard_alert_rules ahoy_dashboard_alert_events ahoy_dashboard_alert_digests]),
-      Feature.new(:reports, "Email reports", %w[reports], %w[ahoy_dashboard_report_digests])
+      Feature.new(:reports, %w[reports], %w[ahoy_dashboard_report_digests])
     ].freeze
+
+    PROVIDER_FEATURES = %i[serp keywords backlinks].freeze
 
     def self.names
       FEATURES.map(&:name)
@@ -73,6 +81,10 @@ module AhoyDashboard
 
     def self.installed?(name)
       fetch(name).installed?
+    end
+
+    def self.any_installed?(names)
+      Array(names).any? { |name| installed?(name) }
     end
 
     def self.table?(name)

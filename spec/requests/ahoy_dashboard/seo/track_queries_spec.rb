@@ -1,18 +1,11 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard track queries from search console", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
   let(:on) { now.to_date - 2 }
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
 
   around { |example| travel_to(now) { example.run } }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   def metrics(clicks, impressions, position: 14.0)
     { clicks: clicks, impressions: impressions, ctr: clicks.to_f / impressions, position: position }
@@ -178,6 +171,28 @@ RSpec.describe "Dashboard track queries from search console", type: :request do
       get "/telemetry/settings/serp_keyword_import/new", params: { batch: "1", return_to: "//evil.example" }
 
       expect(response).to redirect_to("/telemetry/settings/serp_keywords")
+    end
+
+    describe "a return_to a browser would read as another host" do
+      let(:hostile) { [ "/\t/evil.example", "/\n/evil.example", "/\r/evil.example", "//evil.example", "/\\evil.example" ] }
+
+      it "is not followed" do
+        hostile.each do |value|
+          get "/telemetry/settings/serp_keyword_import/new", params: { batch: "1", return_to: value }
+
+          expect(response).to redirect_to("/telemetry/settings/serp_keywords"), value.inspect
+        end
+      end
+
+      it "is left off the form, so Cancel stays on the dashboard" do
+        hostile.each do |value|
+          get "/telemetry/settings/serp_keyword_import/new", params: batch_params("visiting hours", return_to: value)
+
+          cancel = document.css("a").find { |link| link.text.strip == "Cancel" }
+          expect(document.at_css("input[name=return_to]")).to be_nil, value.inspect
+          expect(cancel["href"]).to eq("/telemetry/settings/serp_keywords"), value.inspect
+        end
+      end
     end
 
     it "tracks the ticked ones under one set of settings and goes back to the report" do

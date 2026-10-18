@@ -1,13 +1,12 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Report do
   it "lays the cards out in one order" do
-    expect(described_class.card_order).to eq(%w[sources pages locations devices behaviours])
+    expect(described_class::CARD_ORDER).to eq(%w[sources pages locations devices behaviours])
   end
 
   it "registers a report for every card" do
-    expect(described_class::ALL.map(&:key)).to match_array(described_class.card_order)
+    expect(described_class::ALL.map(&:key)).to match_array(described_class::CARD_ORDER)
   end
 
   it "raises for a report nobody registered" do
@@ -95,8 +94,6 @@ RSpec.describe AhoyDashboard::Report do
       end
     end
 
-    # The first option is what the card opens on, so a first option pointing
-    # anywhere else means the card silently grouped by something nobody picked.
     it "opens on the tab's own dimension" do
       described_class::ALL.each do |report|
         report.tabs.each do |tab|
@@ -122,8 +119,6 @@ RSpec.describe AhoyDashboard::Report do
       expect(tab.breakdown_options.map(&:dimension_key)).to eq(%w[entry_page entry_url entry_host])
     end
 
-    # A page view records request.path and no host, so there is no full url on
-    # the event to offer. Exit pages read a path off a derived table, same story.
     it "offers nothing on a tab whose data cannot answer a second question" do
       expect(described_class.find("pages").tab("exit_pages").breakdown_options).to be_empty
       expect(described_class.find("sources").tabs.flat_map(&:breakdown_options)).to be_empty
@@ -164,8 +159,6 @@ RSpec.describe AhoyDashboard::Report do
       end
     end
 
-    # A breakdown belongs to one card. Another card's value reaching this one is
-    # a hand-edited URL, and the answer is the tab as registered.
     it "ignores a breakdown on a tab that offers none" do
       exits = described_class.find("pages").tab("exit_pages")
 
@@ -187,7 +180,7 @@ RSpec.describe AhoyDashboard::Report do
 
     [ "", "  ", "line\nbreak", "a" * 256, [ "results" ], { "key" => "results" } ].each do |value|
       it "falls back to the allowlist's own key for the property value #{value.inspect}" do
-        AhoyDashboard::Property.create!(key: "facility_id")
+        create(:dash_property, key: "facility_id")
 
         expect(properties.resolve(property: value).resolved_dimension_key).to eq("prop:facility_id")
       end
@@ -218,6 +211,46 @@ RSpec.describe AhoyDashboard::Report do
     end
   end
 
+  describe "#drilldown_tab" do
+    def filters(*items)
+      AhoyDashboard::Filters.new(items)
+    end
+
+    def filter(key, operator: "is")
+      AhoyDashboard::Filter.new(dimension: AhoyDashboard::Dimension.find(key), value: "x", operator: operator)
+    end
+
+    let(:locations) { described_class.find("locations") }
+    let(:sources) { described_class.find("sources") }
+
+    it "opens the next tab down under a filter on the card's own dimension" do
+      expect(locations.drilldown_tab(filters(filter("country")))).to eq("regions")
+      expect(sources.drilldown_tab(filters(filter("channel")))).to eq("sources")
+      expect(sources.drilldown_tab(filters(filter("source")))).to eq("referrers")
+    end
+
+    it "takes the deepest step when more than one applies" do
+      expect(locations.drilldown_tab(filters(filter("country"), filter("region")))).to eq("cities")
+    end
+
+    it "does not drill on a filter that does not narrow to one value" do
+      expect(locations.drilldown_tab(filters(filter("country", operator: "is_not")))).to be_nil
+    end
+
+    it "does not drill on a group of countries, which does not narrow to one" do
+      either = AhoyDashboard::FilterGroup.new([ filter("country"), AhoyDashboard::Filter.new(
+        dimension: AhoyDashboard::Dimension.find("country"), value: "y", operator: "is"
+      ) ])
+
+      expect(locations.drilldown_tab(filters(either))).to be_nil
+      expect(locations.drilldown_tab(filters(either, filter("region")))).to eq("cities")
+    end
+
+    it "leaves a card with no steps alone" do
+      expect(described_class.find("pages").drilldown_tab(filters(filter("page")))).to be_nil
+    end
+  end
+
   describe ".register" do
     def tab(key: "ip", label: "IP", dimension_key: "country", metrics: %w[visits],
             detail_metrics: %w[visits visitors], label_column: "Widget", breakdowns: [])
@@ -234,7 +267,6 @@ RSpec.describe AhoyDashboard::Report do
       register
 
       expect(described_class.find("widgets").title).to eq("Widgets")
-      expect(described_class.all.map(&:key)).to include("widgets")
       expect(described_class.cards.map(&:key)).to include("widgets")
       expect(described_class.find_by_key("widgets")).to eq(described_class.find("widgets"))
     end
@@ -244,15 +276,15 @@ RSpec.describe AhoyDashboard::Report do
 
       keys = described_class.cards.map(&:key)
 
-      expect(keys.first(described_class.card_order.size)).to eq(described_class.card_order)
+      expect(keys.first(described_class::CARD_ORDER.size)).to eq(described_class::CARD_ORDER)
       expect(keys.last).to eq("widgets")
     end
 
     it "leaves the built-in registry alone" do
       register
 
-      expect(described_class::ALL.map(&:key)).to match_array(described_class.card_order)
-      expect(described_class.card_order).not_to include("widgets")
+      expect(described_class::ALL.map(&:key)).to match_array(described_class::CARD_ORDER)
+      expect(described_class::CARD_ORDER).not_to include("widgets")
     end
 
     it "overwrites its own entry instead of raising, since to_prepare re-runs it on every reload" do
@@ -285,9 +317,6 @@ RSpec.describe AhoyDashboard::Report do
       expect { register(key: "pages") }.to raise_error(ArgumentError, /already built in/)
     end
 
-    # Every dashboard frame is report_<key> and every dialog is tm-modal-<key>.
-    # The search console card, the value search and the funnels draw into that
-    # same namespace without being reports.
     %w[search_console facet funnel_1 funnel_anything].each do |reserved|
       it "refuses the key #{reserved.inspect}, which collides with something already on the page" do
         expect { register(key: reserved) }.to raise_error(ArgumentError, /reserved/)
@@ -314,9 +343,6 @@ RSpec.describe AhoyDashboard::Report do
       expect { register(tabs: [ tab(label_column: nil) ]) }.to raise_error(ArgumentError, /no label column/)
     end
 
-    # The whole point of checking here rather than leaving it to the dashboard:
-    # a typo in an initializer is a boot failure with the tab named, not a 500
-    # on a card somebody opens next week.
     it "refuses a metric that does not resolve" do
       expect { register(tabs: [ tab(metrics: %w[vibes]) ]) }
         .to raise_error(ArgumentError, %r{widgets/ip asks for the metric "vibes"})
@@ -352,9 +378,6 @@ RSpec.describe AhoyDashboard::Report do
       expect(described_class.cards.map(&:key)).not_to include("widgets")
     end
 
-    # A dimension whose SQL is built out of rows somebody edits has nothing to
-    # check until the card is read, so it is taken on trust rather than resolved
-    # at boot.
     it "takes a callable dimension key on trust" do
       report = register(tabs: [ tab(dimension_key: -> { "country" }) ])
 

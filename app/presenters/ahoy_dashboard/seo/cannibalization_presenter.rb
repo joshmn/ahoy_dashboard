@@ -1,6 +1,8 @@
 module AhoyDashboard
   module Seo
     class CannibalizationPresenter < BasePresenter
+      delegate :rows, to: :result
+
       def tracking_phrases
         rows.map(&:query)
       end
@@ -15,16 +17,8 @@ module AhoyDashboard
         ]
       end
 
-      def rows
-        result.rows
-      end
-
       def severity_tone(severity)
-        case severity
-        when :high then :danger
-        when :medium then :warning
-        else :neutral
-        end
+        AhoyDashboard::SeverityBadge.tone(severity)
       end
 
       def severity_label(severity)
@@ -73,9 +67,6 @@ module AhoyDashboard
         (parts.any? ? parts.join(", and ") : "the top page is taking almost all of the clicks").upcase_first
       end
 
-      # A gap of zero is two pages sitting on the same average position, which is
-      # the strongest version of this and the one sentence that has to not read
-      # as "0.0 places apart".
       def swapping_phrase(row)
         gap = (row.winner.position - row.runner_up.position).abs.round(1)
 

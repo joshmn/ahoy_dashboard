@@ -1,15 +1,5 @@
 module AhoyDashboard
   module Seo
-    # The parts of a results page that are not the ten blue links, read back out
-    # of what was already stored.
-    #
-    # Nothing new is fetched here. Every reading keeps a trimmed copy of the
-    # provider's answer so a question asked later does not cost another search,
-    # and until now nothing asked one. This is that question.
-    #
-    # Two shapes, because the two providers do not agree on anything. SerpApi
-    # answers with named top level keys. DataForSEO answers with one array of
-    # items that each carry a type. Both end up as the same list of features.
     module SerpFeatures
       Feature = Data.define(:key, :label, :owner, :owners, :detail) do
         def initialize(key:, label:, detail:, owner: nil, owners: nil)
@@ -22,8 +12,8 @@ module AhoyDashboard
 
       Question = Data.define(:text, :link, :domain, :snippet)
 
-      # In the order they are worth knowing about rather than alphabetically. The
-      # first two are positions somebody else is holding above everything organic.
+      Reading = Data.define(:features, :questions, :searches)
+
       CATALOGUE = {
         "featured_snippet" => "Featured snippet",
         "ai_overview" => "AI overview",
@@ -37,8 +27,6 @@ module AhoyDashboard
         "related_searches" => "Related searches"
       }.freeze
 
-      # SerpApi's key against ours, and where inside it the domain that owns the
-      # slot is written.
       NAMED = {
         "answer_box" => [ "featured_snippet", "link" ],
         "ai_overview" => [ "ai_overview", nil ],
@@ -53,7 +41,6 @@ module AhoyDashboard
         "related_searches" => [ "related_searches", nil ]
       }.freeze
 
-      # DataForSEO's item types against ours.
       TYPED = {
         "featured_snippet" => "featured_snippet",
         "ai_overview" => "ai_overview",
@@ -73,7 +60,7 @@ module AhoyDashboard
 
       def self.from(payload)
         payload = readable(payload)
-        return [ [], [], [] ] if payload.blank?
+        return Reading.new(features: [], questions: [], searches: []) if payload.blank?
 
         typed?(payload) ? from_items(payload) : from_named(payload)
       end
@@ -98,7 +85,6 @@ module AhoyDashboard
         value.is_a?(String) ? value.strip.presence : nil
       end
 
-      # SerpApi and SearchApi.
       def self.from_named(payload)
         features = NAMED.map do |key, (ours, owner_path)|
           value = payload[key]
@@ -108,10 +94,10 @@ module AhoyDashboard
                       owners: owners_in(value), detail: detail_for(value))
         end.select { |value| value }.uniq(&:key)
 
-        [ features, questions_from(Array(payload["related_questions"])), searches_from(payload["related_searches"]) ]
+        Reading.new(features: features, questions: questions_from(Array(payload["related_questions"])),
+                    searches: searches_from(payload["related_searches"]))
       end
 
-      # DataForSEO.
       def self.from_items(payload)
         task = list(payload["tasks"]).first
         reading = list(task.is_a?(Hash) ? task["result"] : nil).first
@@ -126,7 +112,8 @@ module AhoyDashboard
         asked = items.find { |item| item["type"] == "people_also_ask" }
         related = items.find { |item| item["type"] == "related_searches" }
 
-        [ features, questions_from(asked_in(asked)), searches_from(related && related["items"]) ]
+        Reading.new(features: features, questions: questions_from(asked_in(asked)),
+                    searches: searches_from(related && related["items"]))
       end
 
       def self.asked_in(item)
@@ -187,9 +174,6 @@ module AhoyDashboard
         text(value["title"]) || text(value["snippet"])&.truncate(90)
       end
 
-      # A question and, where the payload says so, who Google chose to answer it.
-      # That second half is the useful part: it is a page one slot with a name on
-      # it, awarded for a question rather than for the search itself.
       def self.questions_from(entries)
         list(entries).map do |entry|
           next unless entry.is_a?(Hash)

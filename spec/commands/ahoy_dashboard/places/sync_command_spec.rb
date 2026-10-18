@@ -1,9 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe AhoyDashboard::Places::SyncCommand do
-  include ActiveSupport::Testing::TimeHelpers
-
   let(:place) { AhoyDashboard::Place }
 
   def source_for(rows, month: Date.new(2026, 9, 1))
@@ -61,9 +58,6 @@ RSpec.describe AhoyDashboard::Places::SyncCommand do
     expect(place.count).to eq(3)
   end
 
-  # A place the provider dropped should go, or the picker offers somewhere the
-  # search will refuse. A keyword that already names it keeps working either
-  # way: it stores the name, not a row in here.
   it "takes out a place the newest list no longer carries" do
     stub_const("#{described_class}::FLOOR", 1)
     stub_const("#{described_class}::KEEP_SHARE", 0.5)
@@ -74,8 +68,6 @@ RSpec.describe AhoyDashboard::Places::SyncCommand do
     expect(place.exists?(code: 55)).to be(false)
   end
 
-  # A truncated download that pruned would empty the table and the picker would
-  # quietly stop working, with nothing anywhere saying why.
   it "refuses to prune off a run too small to be a real list" do
     stub_const("#{described_class}::FLOOR", 10)
     described_class.call(source: source_for(rows))
@@ -85,8 +77,6 @@ RSpec.describe AhoyDashboard::Places::SyncCommand do
     expect(place.count).to eq(3)
   end
 
-  # A file that was cut off mid download parses fine and just ends early, so
-  # the size of the answer is the only thing that gives it away.
   it "refuses to prune off a run that lost most of the list" do
     stub_const("#{described_class}::FLOOR", 1)
     described_class.call(source: source_for(rows))

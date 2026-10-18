@@ -1,10 +1,8 @@
 require "rails_helper"
-require "support/ahoy_dashboard/alerts"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe AhoyDashboard::AlertMailer do
   let(:zone) { AhoyDashboard.time_zone }
-  let(:rule) { create(:dash_alert_rule, key: "off_page_one", name: "Fell off page one", severity: :high) }
+  let(:rule) { create(:dash_alert_rule, key: "off_page_one", severity: :high) }
   let(:digest) do
     AhoyDashboard::AlertDigest.create!(period: :daily, starts_on: Date.new(2026, 9, 18), ends_on: Date.new(2026, 9, 18))
   end
@@ -84,7 +82,7 @@ RSpec.describe AhoyDashboard::AlertMailer do
   end
 
   context "with rank tracking not installed" do
-    let(:rule) { create(:dash_alert_rule, key: "job_failed", name: "A job failed", severity: :high) }
+    let(:rule) { create(:dash_alert_rule, key: "job_failed", severity: :high) }
 
     before do
       create(:dash_alert_event, rule: rule, headline: "Rank checks failed", subject: "Rank checks",
@@ -98,8 +96,8 @@ RSpec.describe AhoyDashboard::AlertMailer do
     end
 
     it "names the rules that are on but could not run, and how to install what they need" do
-      create(:dash_alert_rule, key: "off_page_one", name: "Fell off page one")
-      create(:dash_alert_rule, key: "big_drop", name: "Dropped several places")
+      create(:dash_alert_rule, key: "off_page_one")
+      create(:dash_alert_rule, key: "big_drop")
 
       note = "Dropped several places and Fell off page one are on but did not run, because rank tracking is not installed. " \
              "Run bin/rails generate ahoy_dashboard:install --only serp, then bin/rails db:migrate."
@@ -111,7 +109,7 @@ RSpec.describe AhoyDashboard::AlertMailer do
 
   context "with only rules on that cannot run" do
     before do
-      create(:dash_alert_rule, key: "spend_near_cap", name: "Nearing the monthly cap", threshold: 80)
+      create(:dash_alert_rule, key: "spend_near_cap", threshold: 80)
       uninstall_ahoy_dashboard(:serp, :keywords, :backlinks)
     end
 

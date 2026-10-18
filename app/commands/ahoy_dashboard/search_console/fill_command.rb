@@ -1,15 +1,5 @@
 module AhoyDashboard
   module SearchConsole
-    # One missing day off the queue.
-    #
-    # The pull is IngestCommand with a single date, the same as the nightly run
-    # and the same as the backfill. Nothing about a day in a hole is different
-    # from a day at the top of the record, and a second thing that wrote these
-    # three tables would be a second thing to keep in agreement.
-    #
-    # One day a call rather than the whole list, so the count on the jobs screen
-    # is the truth at every moment and a worker that dies takes one day's work
-    # with it rather than an afternoon's.
     class FillCommand < AhoyDashboard::Command
       Result = Data.define(:date, :rows, :keywords, :totals, :remaining, :filled) do
         def more?
@@ -43,8 +33,6 @@ module AhoyDashboard
         @account ||= GoogleAccount.current
       end
 
-      # The day stays on the queue when the pull did not land, so pressing the
-      # button again picks it up rather than stepping over it.
       def relay(events)
         key = events.keys.first
 

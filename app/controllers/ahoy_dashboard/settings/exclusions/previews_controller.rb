@@ -1,7 +1,7 @@
 module AhoyDashboard
   module Settings
     module Exclusions
-      class PreviewsController < AhoyDashboard::BaseController
+      class PreviewsController < AhoyDashboard::Settings::BaseController
         FRAME = "dash_exclusion_preview".freeze
 
         def show

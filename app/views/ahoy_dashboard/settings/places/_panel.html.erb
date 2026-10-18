@@ -1,9 +1,3 @@
-<%# One step of the place picker.
-
-    Every row is two controls, not one. The name picks the place; the chevron
-    opens what is inside it. A state is both a place you can search from and a
-    list of cities, and a row that only did one of those would make half of them
-    unreachable. %>
 <%= dash_frame_tag AhoyDashboard::Settings::PlacesController::FRAME do %>
   <% if parent %>
     <div class="pop-hd">

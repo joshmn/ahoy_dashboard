@@ -26,23 +26,17 @@ module AhoyDashboard
           AhoyDashboard::Assistant::Tools::BaseTool.window_params(self)
         end
 
-        def execute(query: nil, limit: DEFAULT_LIMIT, **asked)
-          return { error: "search console is not installed, so there is nothing to read" } unless self.class.available?
+        private
 
+        def answer(query: nil, limit: DEFAULT_LIMIT, **asked)
           read = window(**asked)
 
           query.present? ? keyword(read, query) : top(read, limit)
-        rescue Window::UnknownPeriod => e
-          unknown_period(e)
-        rescue Slice::InvalidFilters => e
-          invalid_filters(e)
         end
-
-        private
 
         def top(read, limit)
           result = AhoyDashboard::SearchConsoleQuery.call(
-            range: read.range, limit: limit.to_i.clamp(1, 50)
+            range: read.range, limit: row_limit(limit)
           )
           queries = result.queries.map { |row| row_for(row) }
 

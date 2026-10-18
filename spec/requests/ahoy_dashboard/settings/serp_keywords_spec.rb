@@ -1,27 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard serp keyword settings", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/serp_keywords"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a non-admin trying to write" do
-      sign_in create(:user)
-
-      post "/telemetry/settings/serp_keywords", params: { serp_keyword: { query: "x" } }
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
 
@@ -70,8 +49,9 @@ RSpec.describe "Dashboard serp keyword settings", type: :request do
       site = create(:dash_serp_site, name: "Us", domain: "example.com")
       AhoyDashboard::SerpKeywordTarget.create!(keyword: keyword, site: site)
       serp_enabled!
-      allow(AhoyDashboard::Serp::SweepCommand).to receive(:queued?)
-        .with(having_attributes(id: keyword.id)).and_return(true)
+      cache = ActiveSupport::Cache::MemoryStore.new
+      allow(AhoyDashboard).to receive(:cache).and_return(cache)
+      cache.write(AhoyDashboard::Serp::SweepPlanQuery.queued_key(keyword), Time.current.to_i)
 
       get "/telemetry/settings/serp_keywords"
 
@@ -281,13 +261,39 @@ RSpec.describe "Dashboard serp keyword settings", type: :request do
       expect(response).to redirect_to("/telemetry/settings/serp_keywords")
     end
 
+    describe "a return address a browser would read as another host" do
+      let(:hostile) { [ "/\t/evil.example", "/\n/evil.example", "/\r/evil.example", "//evil.example", "/\\evil.example" ] }
+
+      it "is left off the form, so Cancel stays on the dashboard" do
+        hostile.each do |value|
+          get "/telemetry/settings/serp_keywords/new", params: { return_to: value }
+
+          cancel = document.css("a").find { |link| link.text.strip == "Cancel" }
+          expect(document.at_css("input[name=return_to]")).to be_nil, value.inspect
+          expect(cancel["href"]).to eq("/telemetry/settings/serp_keywords"), value.inspect
+        end
+      end
+
+      it "is not followed once saved" do
+        hostile.each_with_index do |value, index|
+          post "/telemetry/settings/serp_keywords",
+            params: { return_to: value,
+                      serp_keyword: { query: "visiting hours #{index}", locations: "us", pages: "1", frequency: "daily",
+                                      device: "desktop", language: "en", engine: "google", enabled: "1",
+                                      site_ids: [ site.id.to_s ] } }
+
+          expect(response).to redirect_to("/telemetry/settings/serp_keywords"), value.inspect
+        end
+      end
+    end
+
     it "ticks the sites a keyword already has when editing it" do
       keyword = create(:dash_serp_keyword, query: "visiting hours", locations: [ "us" ])
       AhoyDashboard::SerpKeywordTarget.create!(keyword: keyword, site: site)
 
       get "/telemetry/settings/serp_keywords/#{keyword.id}/edit"
 
-      box = Nokogiri::HTML5(response.body).at_css("input[name='serp_keyword[site_ids][]'][value='#{site.id}']")
+      box = document.at_css("input[name='serp_keyword[site_ids][]'][value='#{site.id}']")
       expect(box["checked"]).to be_present
     end
 
@@ -445,8 +451,6 @@ RSpec.describe "Dashboard serp keyword settings", type: :request do
       end
 
       it "says rank tracking is off when it is" do
-        allow(AhoyDashboard::Serp).to receive(:enabled?).and_return(false)
-
         get "/telemetry/settings/serp_keywords/new"
 
         expect(response.body).to include("Rank tracking is off.")

@@ -1,7 +1,7 @@
 module AhoyDashboard
   module Seo
     class KeywordGapPresenter < BasePresenter
-      Group = Data.define(:key, :title, :note, :rows, :tone)
+      delegate :rivals, :presence, to: :result
 
       def tiles
         [
@@ -18,12 +18,8 @@ module AhoyDashboard
         result.count_of(key).positive? ? "#gap-#{key}" : nil
       end
 
-      def rivals
-        result.rivals
-      end
-
       def no_rivals?
-        result.rivals.empty?
+        rivals.empty?
       end
 
       def competitor_notice
@@ -45,22 +41,12 @@ module AhoyDashboard
         ].select { |group| group.rows.any? }
       end
 
-      def presence
-        result.presence
-      end
-
       def position_label(standing)
-        return "Not tracked" if standing.nil? || !standing.tracked?
-        return "Nowhere" unless standing.ranked?
-
-        standing.position.to_s
+        standing_position(standing).to_s
       end
 
       def gap_kind(row)
-        return :none if row.gap.nil?
-        return :level if row.gap.zero?
-
-        row.gap.positive? ? :up : :down
+        movement(row.gap)
       end
 
       def gap_text(row)

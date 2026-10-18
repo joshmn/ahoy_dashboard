@@ -5,10 +5,6 @@ RSpec.describe AhoyDashboard::SearchConsoleTotal do
     { date: Date.new(2026, 8, 10), clicks: 400, impressions: 9_000, ctr: 0.044, position: 11.2 }
   end
 
-  it "sits on the prefixed table" do
-    expect(described_class.table_name).to eq("ahoy_dashboard_search_console_totals")
-  end
-
   describe ".absorb" do
     it "writes nothing for an empty batch" do
       expect(described_class.absorb([])).to eq(0)
@@ -24,9 +20,6 @@ RSpec.describe AhoyDashboard::SearchConsoleTotal do
     end
   end
 
-  # This table is the whole reason a coverage figure can be honest: the per query
-  # rows never add up to it, because Google withholds anonymized queries and
-  # truncates the tail by clicks.
   it "is expected to exceed the sum of the query rows" do
     described_class.absorb([ total ])
     AhoyDashboard::SearchConsoleRow.absorb([

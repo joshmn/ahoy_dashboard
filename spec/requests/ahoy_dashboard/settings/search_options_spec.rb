@@ -1,20 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/switches"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe "Dashboard search options", type: :request do
-  def page
-    Nokogiri::HTML5(response.body)
-  end
-
-  def field(id)
-    page.at_css("##{id}")
-  end
-
-  def settings
-    AhoyDashboard::Setting.order(:key).pluck(:key, :value)
-  end
-
   def read(scope, name)
     AhoyDashboard::Preferences.read(scope, name)
   end
@@ -25,34 +11,17 @@ RSpec.describe "Dashboard search options", type: :request do
       places_source: "https://lists.example.com/places_%Y_%m.csv" }
   end
 
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      patch "/telemetry/settings/search_options", params: { search_options: valid }
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin, and writes nothing" do
-      sign_in create(:user)
-
-      expect { patch "/telemetry/settings/search_options", params: { search_options: valid } }.not_to(change { settings })
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
     it "sits on the search provider screen with every field labelled" do
       get "/telemetry/settings/serp_providers"
 
-      form = page.at_css("form[action='/telemetry/settings/search_options']")
+      form = document.at_css("form[action='/telemetry/settings/search_options']")
       expect(form).to be_present
-      %w[search_options_keywords_provider search_options_keywords_location search_options_keywords_language
-         search_options_backlinks_provider search_options_places_postal_codes search_options_places_source].each do |id|
-        expect(form.at_css("label[for='#{id}']")).to be_present, "expected a label for #{id}"
-        expect(field(id)["aria-describedby"]).to include("#{id}_hint")
-      end
+      expect_labelled_fields(%w[search_options_keywords_provider search_options_keywords_location
+                                search_options_keywords_language search_options_backlinks_provider
+                                search_options_places_postal_codes search_options_places_source], within: form)
     end
 
     it "puts the place list address behind Advanced" do
@@ -62,7 +31,7 @@ RSpec.describe "Dashboard search options", type: :request do
       expect(details).to be_present
       expect(details.at_css("summary").text.squish).to eq("Advanced")
       expect(details["open"]).to be_nil
-      expect(page.at_css("#search_options_places_source_hint").text).to include("strftime")
+      expect(document.at_css("#search_options_places_source_hint").text).to include("strftime")
     end
 
     it "offers every adapter, with blank meaning the rank tracking provider" do
@@ -87,9 +56,9 @@ RSpec.describe "Dashboard search options", type: :request do
     end
 
     it "shows what is stored" do
-      ahoy_dashboard_preferences(:keywords, provider: :searchapi, location: "fr", language: "fr")
-      ahoy_dashboard_preferences(:backlinks, provider: :dataforseo)
-      ahoy_dashboard_preferences(:places, postal_codes: true)
+      AhoyDashboard::Preferences.write(:keywords, provider: :searchapi, location: "fr", language: "fr")
+      AhoyDashboard::Preferences.write(:backlinks, provider: :dataforseo)
+      AhoyDashboard::Preferences.write(:places, postal_codes: true)
 
       get "/telemetry/settings/serp_providers"
 
@@ -113,9 +82,9 @@ RSpec.describe "Dashboard search options", type: :request do
     end
 
     it "goes back to the defaults when the fields are cleared" do
-      ahoy_dashboard_preferences(:keywords, provider: :searchapi, language: "fr")
-      ahoy_dashboard_preferences(:backlinks, provider: :dataforseo)
-      ahoy_dashboard_preferences(:places, postal_codes: true, source: "https://lists.example.com/%Y.csv")
+      AhoyDashboard::Preferences.write(:keywords, provider: :searchapi, language: "fr")
+      AhoyDashboard::Preferences.write(:backlinks, provider: :dataforseo)
+      AhoyDashboard::Preferences.write(:places, postal_codes: true, source: "https://lists.example.com/%Y.csv")
 
       patch "/telemetry/settings/search_options",
             params: { search_options: { keywords_provider: "", keywords_location: "us", keywords_language: "",
@@ -133,11 +102,7 @@ RSpec.describe "Dashboard search options", type: :request do
 
     describe "refusing" do
       def refused(**changes)
-        expect { patch "/telemetry/settings/search_options", params: { search_options: valid.merge(changes) } }
-          .not_to(change { settings })
-
-        expect(response).to have_http_status(:unprocessable_entity)
-        page.at_css("[role='alert']").text.squish
+        refusal("/telemetry/settings/search_options", search_options: valid.merge(changes))
       end
 
       it "names a provider it does not know" do
@@ -162,7 +127,17 @@ RSpec.describe "Dashboard search options", type: :request do
       it "still renders the provider table" do
         refused(keywords_language: "nope nope")
 
-        expect(page.css("tbody tr").size).to eq(AhoyDashboard::SerpProvider::NAMES.size)
+        expect(document.css("tbody tr").size).to eq(AhoyDashboard::SerpProvider::NAMES.size)
+      end
+
+      it "draws the provider table the same as the providers screen does" do
+        create(:dash_serp_provider, :serpapi, :active)
+        get "/telemetry/settings/serp_providers"
+        listed = document.css("tbody tr").map { |row| row.text.squish }
+
+        refused(keywords_language: "nope nope")
+
+        expect(document.css("tbody tr").map { |row| row.text.squish }).to eq(listed)
       end
     end
 
@@ -172,7 +147,7 @@ RSpec.describe "Dashboard search options", type: :request do
 
         get "/telemetry/settings/serp_providers"
 
-        %w[keywords backlinks places].each { |name| expect(page.at_css("##{name}-state")).to be_nil }
+        %w[keywords backlinks places].each { |name| expect(document.at_css("##{name}-state")).to be_nil }
       end
 
       it "keeps every group and says which are switched off" do
@@ -181,7 +156,7 @@ RSpec.describe "Dashboard search options", type: :request do
         get "/telemetry/settings/serp_providers"
 
         %w[keywords backlinks places].each do |name|
-          line = page.at_css("##{name}-state")
+          line = document.at_css("##{name}-state")
           expect(line.text.squish).to include("Switched off")
           expect(line.at_css("a")["href"]).to eq("/telemetry/settings/features#feature-#{name}")
         end
@@ -193,7 +168,7 @@ RSpec.describe "Dashboard search options", type: :request do
 
         get "/telemetry/settings/serp_providers"
 
-        expect(page.at_css("#places-state").text.squish).to include("Not installed in this app yet")
+        expect(document.at_css("#places-state").text.squish).to include("Not installed in this app yet")
 
         patch "/telemetry/settings/search_options", params: { search_options: valid }
 

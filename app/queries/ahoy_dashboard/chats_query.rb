@@ -1,5 +1,5 @@
 module AhoyDashboard
-  class ChatsQuery
+  class ChatsQuery < AhoyDashboard::Query
     PER_PAGE = 50
 
     Result = Data.define(:chats, :page, :pages, :total) do
@@ -10,10 +10,6 @@ module AhoyDashboard
       def previous?
         page > 1
       end
-    end
-
-    def self.call(**options)
-      new(**options).call
     end
 
     def initialize(page: 1, per_page: PER_PAGE)

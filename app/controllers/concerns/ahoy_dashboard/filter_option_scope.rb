@@ -11,9 +11,6 @@ module AhoyDashboard
       @edited_index = index.match?(INDEX) && query.filters[index.to_i] ? index.to_i : nil
     end
 
-    # The same filter dialog feeding a form rather than the dashboard. A
-    # parameter rather than a resource of its own, because it is the same values
-    # and only what a pick does with the answer changes.
     def collect?
       params[:collect].present?
     end
@@ -29,9 +26,6 @@ module AhoyDashboard
       query.scope
     end
 
-    # A dimension's values read with every filter but its own. Values picked in
-    # one dimension join as alternatives, so listing Country under a filter that
-    # already says Country is US would offer US and nothing it could be joined to.
     def dimension_scope(dimension)
       return collect_scope if collect?
       return query.scope if dimension.nil?

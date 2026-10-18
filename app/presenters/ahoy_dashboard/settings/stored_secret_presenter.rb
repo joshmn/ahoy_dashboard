@@ -10,9 +10,12 @@ module AhoyDashboard
       class << self
         def assistant(name)
           record = AssistantProvider.for(name)
-          provider = Assistant::READERS.fetch(name.to_s)[:label]
+          reader = Assistant.reader_for(name)
+          provider = reader.label
 
-          consequence = if record&.active?
+          consequence = if record&.active? && reader.key_optional?
+            "The assistant asks without a key from then on, which only works if the server needs none."
+          elsif record&.active?
             "The assistant stops answering until a key is saved again."
           else
             "Nothing uses it while #{provider} is not the active provider."
@@ -61,7 +64,7 @@ module AhoyDashboard
             "Google cannot be connected until one is saved again."
           end
 
-          new(key: key.to_sym, label: label, stored: SearchConsole.credential&.value(key).present?,
+          new(key: key.to_sym, label: label, stored: SearchConsole.credential&.credential(key).present?,
               consequence: consequence)
         end
 
@@ -90,6 +93,10 @@ module AhoyDashboard
 
       def stored?
         @stored
+      end
+
+      def removing?(param)
+        stored? && param == key.to_s
       end
 
       def hint(stored: STORED_HINT)

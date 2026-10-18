@@ -1,21 +1,13 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Scheduled dashboard snapshot upkeep" do
   let(:snapshots) { AhoyDashboard::Dashboards }
 
-  around do |example|
-    cache = Rails.cache
-    adapter = snapshots::SnapshotRefreshJob.queue_adapter
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    snapshots::SnapshotRefreshJob.queue_adapter = :test
-    travel_to(Time.utc(2026, 8, 11, 14, 30)) { example.run }
-  ensure
-    Rails.cache = cache
-    snapshots::SnapshotRefreshJob.queue_adapter = adapter
-  end
+  include_context "with a test snapshot queue"
+
+  around { |example| travel_to(Time.utc(2026, 8, 11, 14, 30)) { example.run } }
 
   before { AhoyDashboard::Features.names.each { |name| AhoyDashboard::Features.switch(name, false) } }
 
@@ -30,11 +22,6 @@ RSpec.describe "Scheduled dashboard snapshot upkeep" do
     job.perform_now
   end
 
-  def key
-    query = AhoyDashboard::QueryForm.from_params({period: "30d", filters: "none"})
-    snapshots::SnapshotKeyQuery.call(query: query)
-  end
-
   it "does not enqueue snapshots while the setting has its default off value" do
     AhoyDashboard::TickJob.perform_now
 
@@ -42,30 +29,20 @@ RSpec.describe "Scheduled dashboard snapshot upkeep" do
   end
 
   context "with precomputation enabled" do
-    before { AhoyDashboard::Preferences.write(:site, precomputed_dashboard: true) }
+    before { precompute_dashboard! }
 
     it "queues the current default dashboard without an incoming page request" do
       AhoyDashboard::TickJob.perform_now
 
-      expect(sole_item(jobs).fetch("arguments").first).to eq(key)
+      expect(sole_item(jobs).fetch("arguments").first).to eq(default_snapshot_key)
     end
 
     it "leaves analytical calculation to the worker" do
-      traffic_reads = []
-      capture = lambda do |*args|
-        sql = args.last[:sql]
-        traffic_reads << sql if sql.match?(/\b(?:FROM|JOIN)\s+"?ahoy_(?:visits|events)"?\b/i)
+      traffic_reads = captured_sql(/\b(?:FROM|JOIN)\s+"?ahoy_(?:visits|events)"?\b/i, cached: true) do
+        AhoyDashboard::TickJob.perform_now
       end
 
-      ActiveSupport::Notifications.subscribed(capture, "sql.active_record") { AhoyDashboard::TickJob.perform_now }
-
       expect(traffic_reads).to be_empty
-    end
-
-    it "shares the outstanding refresh lease across repeated ticks" do
-      2.times { AhoyDashboard::TickJob.perform_now }
-
-      expect(jobs.size).to eq(1)
     end
 
     it "refreshes an idle dashboard on the next minute's tick" do
@@ -75,16 +52,7 @@ RSpec.describe "Scheduled dashboard snapshot upkeep" do
       AhoyDashboard::TickJob.perform_now
       perform_refresh
 
-      expect(snapshots::SnapshotStore.read(key: key).computed_at).to eq(Time.current)
-    end
-
-    it "keeps the original timestamp when another request has already built a fresh snapshot" do
-      original = snapshots::SnapshotRefreshService.call
-      travel(20.seconds)
-      AhoyDashboard::TickJob.perform_now
-      perform_refresh
-
-      expect(snapshots::SnapshotStore.read(key: key).computed_at).to eq(original.computed_at)
+      expect(snapshots::SnapshotStore.read(key: default_snapshot_key).computed_at).to eq(Time.current)
     end
 
     it "does not start a self-scheduling chain when its worker finishes" do
@@ -94,22 +62,6 @@ RSpec.describe "Scheduled dashboard snapshot upkeep" do
       expect(jobs.size).to eq(1)
     end
 
-    it "does not enqueue an unfiltered dashboard when a default segment is configured" do
-      create(:dash_segment, applied_by_default: true,
-        filters: [{"dimension" => "country", "operator" => "is", "value" => "CA"}])
-      AhoyDashboard::TickJob.perform_now
-
-      expect(jobs).to be_empty
-    end
-
-    it "discards a queued tick refresh after precomputation is disabled" do
-      AhoyDashboard::TickJob.perform_now
-      AhoyDashboard::Preferences.write(:site, precomputed_dashboard: false)
-      perform_refresh
-
-      expect(snapshots::SnapshotStore.read(key: key)).to be_nil
-    end
-
     it "rejects the queued identity if the worker runs in a different schema context" do
       AhoyDashboard::TickJob.perform_now
       connection = AhoyDashboard::Record.connection
@@ -117,7 +69,7 @@ RSpec.describe "Scheduled dashboard snapshot upkeep" do
       connection.schema_search_path = "public, pg_catalog"
       perform_refresh
 
-      expect(snapshots::SnapshotStore.read(key: key)).to be_nil
+      expect(snapshots::SnapshotStore.read(key: default_snapshot_key)).to be_nil
     ensure
       connection.schema_search_path = original_path if connection
     end

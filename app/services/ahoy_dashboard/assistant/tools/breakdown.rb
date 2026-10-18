@@ -18,7 +18,9 @@ module AhoyDashboard
           AhoyDashboard::Assistant::Tools::BaseTool.window_params(self)
         end
 
-        def execute(dimension: nil, limit: DEFAULT_LIMIT, **asked)
+        private
+
+        def answer(dimension: nil, limit: DEFAULT_LIMIT, **asked)
           return { dimensions: available } if dimension.blank?
 
           found = AhoyDashboard::Dimension.find_by_key(dimension.to_s)
@@ -29,7 +31,7 @@ module AhoyDashboard
 
           read = window(**asked)
           result = AhoyDashboard::BreakdownQuery.call(
-            scope: read.scope, dimension: found, limit: limit.to_i.clamp(1, 50)
+            scope: read.scope, dimension: found, limit: row_limit(limit)
           )
           rows = result.rows.map { |row| { name: row.label, visitors: row.metrics["visitors"] } }
 
@@ -37,13 +39,7 @@ module AhoyDashboard
 
           read.to_h.merge(dimension: found.key, label: found.label, **drawn,
                           rows: rows, more: result.more)
-        rescue Window::UnknownPeriod => e
-          unknown_period(e)
-        rescue Slice::InvalidFilters => e
-          invalid_filters(e)
         end
-
-        private
 
         def draw(read, dimension, rows)
           show(
@@ -60,15 +56,9 @@ module AhoyDashboard
         end
 
         def available
-          (AhoyDashboard::Dimension.all + properties).uniq(&:key)
+          AhoyDashboard::Dimension.with_properties
             .reject { |dimension| Assistant.withheld?(dimension.key) }
             .map { |dimension| { key: dimension.key, label: dimension.label } }
-        end
-
-        def properties
-          AhoyDashboard::Property.surfaced.map(&:dimension)
-        rescue ActiveRecord::ActiveRecordError
-          []
         end
       end
     end

@@ -1,14 +1,10 @@
 <% content_for :title, "New annotation" %>
 <% content_for :dash_settings_section, "annotations" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "New annotation",
-          lede: "A note on the chart, so you can tell later what caused a change." %>
+<%= dash_page_head title: "New annotation",
+      lede: "A note on the chart, so you can tell later what caused a change." %>
 
-    <%= dash_card do %>
-      <%= render "ahoy_dashboard/settings/annotations/form",
-            url: settings_annotations_path, method: :post, submit_label: "Create annotation" %>
-    <% end %>
-  </section>
-</div>
+<%= dash_card do %>
+  <%= render "ahoy_dashboard/settings/annotations/form",
+        url: settings_annotations_path, method: :post, submit_label: "Create annotation" %>
+<% end %>

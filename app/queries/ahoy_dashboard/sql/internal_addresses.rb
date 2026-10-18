@@ -52,23 +52,8 @@ module AhoyDashboard
           SQL
         end
 
-        def exclude(relation)
-          sql = condition
-
-          sql.nil? ? relation : relation.where(Arel.sql("not #{sql}"))
-        end
-
-        def only(relation)
-          sql = condition
-
-          sql.nil? ? relation.none : relation.where(Arel.sql(sql))
-        end
-
         private
 
-        # Reject impossible networks before validating the whole address. These
-        # prefixes are only a necessary condition: the original validation and
-        # inet comparison still decide membership, including malformed input.
         def family_condition(connection, addresses, ipv6:)
           return "false" if addresses.empty?
 
@@ -91,9 +76,6 @@ module AhoyDashboard
           "case when #{candidate} then (#{membership}) else false end"
         end
 
-        # The first hextet can omit leading zeroes or be compressed altogether.
-        # Include every spelling that could overlap a configured network; false
-        # positives are harmless because family_condition validates and compares.
         def ipv6_initials(addresses)
           addresses.flat_map do |address|
             first = address.to_range.begin.to_i >> 112

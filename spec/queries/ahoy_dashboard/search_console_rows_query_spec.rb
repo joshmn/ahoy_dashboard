@@ -9,11 +9,9 @@ RSpec.describe AhoyDashboard::SearchConsoleRowsQuery do
     last = create(:dash_search_console_row, date: day + 2, clicks: 5, impressions: 50)
     create(:dash_search_console_total, date: day - 1, clicks: 10, impressions: 100)
     create(:dash_search_console_total, date: day, clicks: 20, impressions: 200)
-    sql = []
-    subscriber = ->(_name, _started, _finished, _id, payload) { sql << payload[:sql] if payload[:sql].match?(/\ASELECT/) }
-
-    result = ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
-      described_class.call(per_page: 2).tap { |found| found.rows.load }
+    result = nil
+    sql = captured_sql(/\ASELECT/, cached: true) do
+      result = described_class.call(per_page: 2).tap { |found| found.rows.load }
     end
 
     expect(result).to have_attributes(total_rows: 3, pages: 2, range: day..(day + 2), rows: [ first, last ])
@@ -26,11 +24,9 @@ RSpec.describe AhoyDashboard::SearchConsoleRowsQuery do
     create(:dash_search_console_row, date: day, query: "100% match", clicks: 2)
     create(:dash_search_console_row, date: day + 1, query: "another", clicks: 9)
     create(:dash_search_console_row, date: day + 2, query: "100% match again", clicks: 3)
-    sql = []
-    subscriber = ->(_name, _started, _finished, _id, payload) { sql << payload[:sql] if payload[:sql].match?(/\ASELECT/) }
-
-    result = ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
-      described_class.call(term: "%", page: 2, per_page: 1).tap { |found| found.rows.load }
+    result = nil
+    sql = captured_sql(/\ASELECT/, cached: true) do
+      result = described_class.call(term: "%", page: 2, per_page: 1).tap { |found| found.rows.load }
     end
 
     expect(result).to have_attributes(total_rows: 2, pages: 2, range: day..(day + 2))

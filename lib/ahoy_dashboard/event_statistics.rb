@@ -13,9 +13,6 @@ module AhoyDashboard
       "ahoy_dashboard_events_controller" => "(properties ->> 'controller')",
       "ahoy_dashboard_events_name_path" => "name, (properties ->> 'path')"
     }.freeze
-    FORMER = %w[events_path events_name_path dash_events_crawler dash_events_format dash_events_controller
-                telemetry_events_crawler telemetry_events_path telemetry_events_format
-                telemetry_events_controller telemetry_events_name_path].freeze
 
     class << self
       def apply!(analyze: true)
@@ -44,11 +41,6 @@ module AhoyDashboard
 
       def present
         catalog.select { |row| ALL[row["stxname"]] && matching?(row, ALL[row["stxname"]]) }.map { |row| row["stxname"] }
-      end
-
-      def former
-        catalog.select { |row| FORMER.include?(row["stxname"]) && row["table_oid"].to_i == table.fetch("oid").to_i }
-          .map { |row| row["stxname"] }
       end
 
       def missing

@@ -1,13 +1,6 @@
 import { Controller } from "../runtime/controllers.js"
 import { smoothPath } from "../runtime/path.js"
 
-// The line on a pinned question's card.
-//
-// Drawn here rather than on the server because it is the same curve the chart
-// draws and the same code draws it: a monotone cubic through the points, which
-// never overshoots, so a thumbnail of a line and the line cannot disagree about
-// a shape.
-
 const TOP = 5
 const FOOT = 3
 const HEADROOM = 1.15

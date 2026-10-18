@@ -9,6 +9,10 @@ module AhoyDashboard
         def call(expected_key: nil, force: false, token: nil)
           new(expected_key: expected_key, force: force, token: token).call
         end
+
+        def default_query
+          QueryForm.from_params({ period: "30d", filters: "none" })
+        end
       end
 
       def initialize(expected_key:, force:, token:)
@@ -18,7 +22,7 @@ module AhoyDashboard
       end
 
       def call
-        query = default_query
+        query = self.class.default_query
         return unless SnapshotQuery.eligible?(query: query, cards: true)
 
         key = SnapshotKeyQuery.call(query: query)
@@ -40,16 +44,12 @@ module AhoyDashboard
 
       attr_reader :expected_key, :force, :token
 
-      def default_query
-        QueryForm.from_params({period: "30d", filters: "none"})
-      end
-
       def build(query:, key:)
         computed_at = Time.current
         reading = ShowQuery.call(query: query, cards: true)
         snapshot = Snapshot.new(payload: SnapshotPayload.dump(reading: reading), computed_at: computed_at)
-        return unless SnapshotQuery.eligible?(query: default_query, cards: true)
-        return unless SnapshotKeyQuery.call(query: default_query) == key
+        return unless SnapshotQuery.eligible?(query: self.class.default_query, cards: true)
+        return unless SnapshotKeyQuery.call(query: self.class.default_query) == key
         return unless snapshot.usable?
 
         SnapshotStore.write(key: key, snapshot: snapshot)

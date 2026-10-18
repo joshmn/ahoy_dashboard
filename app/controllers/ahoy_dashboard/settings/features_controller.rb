@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class FeaturesController < AhoyDashboard::BaseController
+    class FeaturesController < AhoyDashboard::Settings::BaseController
       def index
         @features = AhoyDashboard::Features.all
       end

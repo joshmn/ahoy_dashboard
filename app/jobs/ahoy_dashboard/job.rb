@@ -1,14 +1,10 @@
 module AhoyDashboard
   class Job < ActiveJob::Base
-    # Names the row in ahoy_dashboard_job_runs this job reports into. Set on the
-    # five jobs the schedule knows about and nil on everything else, so a job
-    # fanned out per keyword or per question does not each write a row.
-    #
-    # It records wherever the job was started from: the tick, the button on the
-    # feature's own screen, or a console. That is the point. "Last run" that only
-    # counted the scheduled path would call a feature stale the moment somebody
-    # ran it by hand.
+    class Failed < StandardError; end
+
     class_attribute :schedule_key, instance_writer: false, default: nil
+
+    self.return_false_on_aborted_enqueue = true if ActiveJob.gem_version < Gem::Version.new("6.1")
 
     attr_accessor :dashboard_due_at
 

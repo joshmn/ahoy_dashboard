@@ -5,51 +5,15 @@ RSpec.describe "Dashboard funnel settings", type: :request do
   let(:asked) { create(:dash_goal, event_name: "consult_requested") }
   let(:booked) { create(:dash_goal, event_name: "consult_booked") }
 
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/funnels"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "sends a signed out visitor to sign in on a write too" do
-      post "/telemetry/settings/funnels", params: { funnel: { name: "Consults" } }
-
-      expect(response).to redirect_to("/users/sign_in")
-      expect(AhoyDashboard::Funnel.count).to be_zero
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/settings/funnels"
-
-      expect(response).to have_http_status(:not_found)
-    end
-
-    it "is a 404 for a non-admin trying to write" do
-      sign_in create(:user)
-
-      post "/telemetry/settings/funnels", params: { funnel: { name: "Consults" } }
-
-      expect(response).to have_http_status(:not_found)
-      expect(AhoyDashboard::Funnel.count).to be_zero
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
+    include_examples "a settings record nobody created",
+                     path: "/telemetry/settings/funnels", noun: "a funnel", changes: { funnel: { name: "x" } }
+
     describe "index" do
-      it "renders an empty list" do
-        get "/telemetry/settings/funnels"
+      include_examples "an empty settings list", path: "/telemetry/settings/funnels", text: "No funnels yet"
 
-        expect(response).to have_http_status(:ok)
-        expect(response.body).to include("No funnels yet")
-      end
-
-      # A chip per step, numbered, because the order is what a funnel is. A
-      # sentence with "then" in it says the same thing and is harder to count.
       it "renders every funnel in position order with a numbered chip per step" do
         create(:dash_funnel, name: "Later", position: 2, goals: [ landed, asked ])
         create(:dash_funnel, name: "Sooner", position: 1, goals: [ asked, booked ])
@@ -98,7 +62,7 @@ RSpec.describe "Dashboard funnel settings", type: :request do
 
       it "links to the complete list of funnel cards" do
         get "/telemetry/settings/funnels"
-        link = Nokogiri::HTML5(response.body).css(".page-head-actions a").find { |item| item.text.strip == "View all funnels" }
+        link = document.css(".page-head-actions a").find { |item| item.text.strip == "View all funnels" }
 
         expect(URI.parse(link["href"]).path).to eq("/telemetry/funnels")
       end
@@ -141,15 +105,10 @@ RSpec.describe "Dashboard funnel settings", type: :request do
         expect(sole_item(AhoyDashboard::Funnel).step_names).to eq([ "/federal-prison-consultant", "consult_requested" ])
       end
 
-      it "puts a new funnel at the end of the list" do
-        create(:dash_funnel, position: 7)
+      let(:addition) { { funnel: { name: "Later", goal_ids: [ landed.id, asked.id ] } } }
 
-        post "/telemetry/settings/funnels", params: {
-          funnel: { name: "Later", goal_ids: [ landed.id, asked.id ] }
-        }
-
-        expect(AhoyDashboard::Funnel.find_by(name: "Later").position).to eq(8)
-      end
+      include_examples "a settings list that adds at the end",
+                       factory: :dash_funnel, path: "/telemetry/settings/funnels", noun: "funnel", created: { name: "Later" }
 
       it "refuses a funnel with one step" do
         post "/telemetry/settings/funnels", params: {
@@ -239,27 +198,13 @@ RSpec.describe "Dashboard funnel settings", type: :request do
         ]
 
         actions.each do |action|
-          statements = []
-          subscriber = lambda do |*, payload|
-            next if payload[:name] == "SCHEMA" || payload[:cached]
-            next unless payload[:sql].include?(%(FROM "ahoy_dashboard_goals"))
-
-            statements << payload[:sql]
-          end
-
-          ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { action.call }
+          statements = captured_sql(%(FROM "ahoy_dashboard_goals")) { action.call }
 
           expect(response).to have_http_status(:ok)
-          expect(statements.size).to eq(2) # The displayed steps, then the form's full goal list.
-          names = Nokogiri::HTML5(response.body).css("tbody tr td b").map(&:text)
+          expect(statements.size).to eq(2)
+          names = document.css("tbody tr td b").map(&:text)
           expect(names).to eq(selected.map(&:name))
         end
-      end
-
-      it "404s for a funnel nobody created" do
-        get "/telemetry/settings/funnels/9999/edit"
-
-        expect(response).to have_http_status(:not_found)
       end
     end
 
@@ -330,8 +275,6 @@ RSpec.describe "Dashboard funnel settings", type: :request do
         expect(funnel.reload.funnel_steps.size).to eq(2)
       end
 
-      # The old steps are deleted before the new ones are known to be good, so a
-      # refusal has to put them back.
       it "keeps the steps it already had when the save is refused" do
         create(:dash_funnel, name: "Taken")
         funnel = create(:dash_funnel, name: "Consults", goals: [ landed, asked ])
@@ -344,63 +287,10 @@ RSpec.describe "Dashboard funnel settings", type: :request do
         expect(funnel.reload.name).to eq("Consults")
         expect(funnel.step_names).to eq([ "/federal-prison-consultant", "consult_requested" ])
       end
-
-      it "404s for a funnel nobody created" do
-        patch "/telemetry/settings/funnels/9999", params: { funnel: { name: "x" } }
-
-        expect(response).to have_http_status(:not_found)
-      end
     end
 
     describe "update as a nudge" do
-      it "moves a funnel up the list" do
-        first = create(:dash_funnel, position: 1)
-        second = create(:dash_funnel, position: 2)
-
-        patch "/telemetry/settings/funnels/#{second.id}", params: { funnel: { nudge: "up" } }
-
-        expect(response).to redirect_to("/telemetry/settings/funnels")
-        expect(AhoyDashboard::Funnel.ordered.pluck(:id)).to eq([ second.id, first.id ])
-      end
-
-      it "moves a funnel down the list" do
-        first = create(:dash_funnel, position: 1)
-        second = create(:dash_funnel, position: 2)
-
-        patch "/telemetry/settings/funnels/#{first.id}", params: { funnel: { nudge: "down" } }
-
-        expect(AhoyDashboard::Funnel.ordered.pluck(:id)).to eq([ second.id, first.id ])
-      end
-
-      it "numbers a list nobody has ordered yet rather than swapping two zeroes" do
-        first = create(:dash_funnel, position: 0)
-        second = create(:dash_funnel, position: 0)
-
-        patch "/telemetry/settings/funnels/#{second.id}", params: { funnel: { nudge: "up" } }
-
-        expect(AhoyDashboard::Funnel.ordered.pluck(:position)).to eq([ 1, 2 ])
-        expect(AhoyDashboard::Funnel.ordered.pluck(:id)).to eq([ second.id, first.id ])
-      end
-
-      it "does nothing at the top of the list" do
-        funnel = create(:dash_funnel, position: 1)
-        create(:dash_funnel, position: 2)
-
-        patch "/telemetry/settings/funnels/#{funnel.id}", params: { funnel: { nudge: "up" } }
-
-        expect(response).to redirect_to("/telemetry/settings/funnels")
-        expect(funnel.reload.position).to eq(1)
-      end
-
-      it "does nothing for a direction nobody offered" do
-        funnel = create(:dash_funnel, position: 1)
-        create(:dash_funnel, position: 2)
-
-        patch "/telemetry/settings/funnels/#{funnel.id}", params: { funnel: { nudge: "sideways" } }
-
-        expect(response).to redirect_to("/telemetry/settings/funnels")
-        expect(funnel.reload.position).to eq(1)
-      end
+      include_examples "a nudgeable settings list", factory: :dash_funnel, path: "/telemetry/settings/funnels", param: :funnel, noun: "funnel"
     end
 
     describe "update as a step nudge" do
@@ -477,16 +367,8 @@ RSpec.describe "Dashboard funnel settings", type: :request do
         expect(AhoyDashboard::FunnelStep.count).to be_zero
         expect(AhoyDashboard::Goal.count).to eq(2)
       end
-
-      it "404s for a funnel nobody created" do
-        delete "/telemetry/settings/funnels/9999"
-
-        expect(response).to have_http_status(:not_found)
-      end
     end
 
-    # Removing redraws rather than saving, so taking one of two steps out shows the
-    # step gone instead of answering with the minimum-steps error.
     describe "taking a step out" do
       it "drops the slot and redraws without saving" do
         goals = Array.new(3) { |n| create(:dash_goal, event_name: "step_#{n}") }
@@ -499,7 +381,7 @@ RSpec.describe "Dashboard funnel settings", type: :request do
         expect(response).to have_http_status(:ok)
         expect(funnel.reload.funnel_steps.count).to eq(3)
 
-        selected = Nokogiri::HTML5(response.body).css("option[selected]").map { |o| o["value"].to_i }
+        selected = document.css("option[selected]").map { |o| o["value"].to_i }
         expect(selected).to eq([ goals.first.id, goals.last.id ])
       end
 
@@ -565,7 +447,7 @@ RSpec.describe "Dashboard funnel settings", type: :request do
         expect(response).to have_http_status(:ok)
         expect(AhoyDashboard::Funnel.count).to be_zero
 
-        selected = Nokogiri::HTML5(response.body).css("option[selected]").map { |o| o["value"].to_i }
+        selected = document.css("option[selected]").map { |o| o["value"].to_i }
         expect(selected).to eq(goals.first(2).map(&:id))
       end
     end

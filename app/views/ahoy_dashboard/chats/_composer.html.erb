@@ -1,0 +1,23 @@
+<% hint_id = "#{id}_hint" %>
+
+<%= form_with url: url, method: :post, class: class_names("chat-ask", local_assigns[:form_class]),
+      data: { tm_frame: local_assigns[:frame], "dash--chat-ask-target": "form" }.compact do %>
+  <div class="chat-ask__row">
+    <%= label_tag id, label, class: "visually-hidden" %>
+    <%= text_area_tag "message[content]", nil, id: id, rows: 1,
+          class: "chat-ask__inp", placeholder: placeholder,
+          autocomplete: "off", autofocus: autofocus, disabled: !available,
+          data: { "dash--chat-ask-target": "input",
+                  action: "input->dash--chat-ask#grow" },
+          "aria-describedby": hint_id %>
+    <button type="submit" class="chat-send" aria-label="Ask" aria-describedby="<%= hint_id %>"
+            <%= "disabled" unless available %>
+            data-dash--chat-ask-target="send">
+      <%= dash_icon(:up, size: 15) %>
+    </button>
+  </div>
+
+  <p class="chat-ask-hint small text-body-tertiary" id="<%= hint_id %>">
+    <%= available ? "Enter to send, Shift+Enter for a new line." : AhoyDashboard::Settings::Display.assistant_notice %>
+  </p>
+<% end %>

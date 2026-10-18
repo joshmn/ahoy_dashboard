@@ -1,17 +1,11 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard seo sparse data", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
 
   around { |example| travel_to(now) { example.run } }
   before { sign_in create(:user, :admin) }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   def reading(keyword:, position:, at:, domains: [], overview: nil, cited: nil)
     run = create(:dash_serp_run, keyword: keyword, checked_at: at)
@@ -54,8 +48,8 @@ RSpec.describe "Dashboard seo sparse data", type: :request do
 
     it "prints the readings on Backlinks after two syncs" do
       allow(AhoyDashboard::Backlinks).to receive(:enabled?).and_return(true)
-      AhoyDashboard::BacklinkSample.create!(on: now.to_date - 2, domains: 12, links: 40, provider: "fake")
-      AhoyDashboard::BacklinkSample.create!(on: now.to_date - 1, domains: 14, links: 44, provider: "fake")
+      create(:dash_backlink_sample, on: now.to_date - 2, domains: 12, links: 40, provider: "fake")
+      create(:dash_backlink_sample, on: now.to_date - 1, domains: 14, links: 44, provider: "fake")
 
       get "/telemetry/seo/backlink"
 

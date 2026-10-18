@@ -3,12 +3,8 @@
 module AhoyDashboard
 
   class SearchConsoleStoredQuery
-    CACHE_PREFIX = "ahoy_dashboard/search_console/stored/v2".freeze
+    CACHE_PREFIX = "ahoy_dashboard/search_console/stored/v3".freeze
     CACHE_TTL = 1.hour
-    SUM_CLICKS = Arel.sql("sum(clicks)").freeze
-    SUM_IMPRESSIONS = Arel.sql("sum(impressions)").freeze
-    SUM_POSITION = Arel.sql("sum(position * impressions)").freeze
-    RANKING = [Arel.sql("sum(clicks) desc"), Arel.sql("sum(impressions) desc")].freeze
 
     def initialize(range:, limit:, account:)
       @range = range
@@ -18,9 +14,9 @@ module AhoyDashboard
 
     def call
       AhoyDashboard.cache.fetch(cache_key, expires_in: CACHE_TTL) do
-        {top: {query: rows(:query), page: rows(:page)},
-         totals: sums(SearchConsoleTotal.in_range(range)),
-         counted: sums(SearchConsoleRow.in_range(range))}
+        { top: { query: rows(SearchConsoleKeyword, :query), page: rows(SearchConsoleRow, :page) },
+          totals: SearchConsole::Sums.pick(SearchConsoleTotal.in_range(range)),
+          counted: SearchConsole::Sums.pick(SearchConsoleRow.in_range(range)) }
       end
     end
 
@@ -34,15 +30,10 @@ module AhoyDashboard
 
     attr_reader :range, :limit, :account
 
-    def rows(column)
-      SearchConsoleRow.in_range(range).group(column).order(*RANKING, column).limit(limit)
-        .pluck(column, SUM_CLICKS, SUM_IMPRESSIONS, SUM_POSITION)
+    def rows(model, column)
+      model.in_range(range).group(column).order(SearchConsole::Sums::RANKING, column).limit(limit)
+        .pluck(column, *SearchConsole::Sums::ALL)
         .map { |label, clicks, impressions, weight| [label, [clicks.to_i, impressions.to_i, weight.to_f]] }
-    end
-
-    def sums(relation)
-      clicks, impressions, weight = relation.pick(SUM_CLICKS, SUM_IMPRESSIONS, SUM_POSITION)
-      [clicks.to_i, impressions.to_i, weight.to_f]
     end
 
     def cache_key

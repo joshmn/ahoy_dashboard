@@ -45,9 +45,5 @@ module AhoyDashboard
     def stuck?(now = Time.current)
       running? && started_at < now - JobRun::STUCK_AFTER
     end
-
-    def entry
-      Schedule.find(key)
-    end
   end
 end

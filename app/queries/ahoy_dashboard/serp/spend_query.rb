@@ -1,19 +1,9 @@
 module AhoyDashboard
   module Serp
-    # Everything the spend card reads: where the month stands against the
-    # ceiling, what each day of it went on, and what is still to come.
     class SpendQuery
       KINDS = SerpSpendDay::KINDS.keys.map(&:to_s).freeze
 
-      Day = Data.define(:date, :counts) do
-        def count(key)
-          counts.fetch(key.to_s, 0)
-        end
-
-        def total
-          counts.values.sum
-        end
-      end
+      Day = DayCounts
 
       Result = Data.define(:name, :provider, :cap, :used, :days, :totals, :forecast, :starts_on, :today) do
         def capped?
@@ -40,16 +30,8 @@ module AhoyDashboard
           used + forecast.total
         end
 
-        def projected_percent
-          capped? ? (projected * 100.0 / cap).floor : 0
-        end
-
         def over?
           capped? && projected > cap
-        end
-
-        def stopped_at
-          capped? ? [ projected, cap ].min : projected
         end
 
         def near?(threshold)
@@ -58,10 +40,6 @@ module AhoyDashboard
 
         def count(kind)
           totals.fetch(kind.to_s, 0)
-        end
-
-        def spent_on
-          KINDS.select { |kind| count(kind).positive? }
         end
       end
 
@@ -108,10 +86,6 @@ module AhoyDashboard
         value.is_a?(String) ? value : SerpSpendDay.kinds.key(value.to_i).to_s
       end
 
-      # The provider row's own counter is what the ceiling is checked against,
-      # so it is what the card reports. The ledger is only ever the breakdown.
-      # With no provider saved there is no counter and no ceiling, and the
-      # ledger is all there is.
       def used(rows)
         return provider.spent_this_month(now: now) if provider
 

@@ -4,13 +4,12 @@
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false %>
 
   <% if !@presenter.any? %>
-    <%= dash_card do %>
-      <%= dash_empty **@presenter.search_console_empty(title: "Nothing to split in this range") %>
-    <% end %>
+    <%= dash_empty_card **@presenter.search_console_empty(title: "Nothing to split in this range") %>
   <% else %>
-    <%= form_with url: @presenter.terms_form_path, method: :patch, scope: :brand_terms, class: "seo-inline-form" do |form| %>
+    <%= dash_form_with url: @presenter.terms_form_path, method: :patch, scope: :brand_terms, stack: false,
+          class: "seo-inline-form" do |form| %>
       <%= form.label :terms, "Brand words", class: "seo-inline-form__label" %>
-      <%= form.text_field :terms, value: @presenter.terms_text, class: "form-control form-control-sm flex-grow-1",
+      <%= form.text_field :terms, value: @presenter.terms_text, class: "form-control-sm flex-grow-1",
             placeholder: "your brand, yourbrand", autocomplete: "off", "aria-describedby": "brand-words-hint" %>
       <%= form.submit "Save", class: dash_button_class, name: nil %>
       <span class="seo-inline-form__hint" id="brand-words-hint">Separate them with commas. A search containing any one of them counts as brand, with or without spaces. Saved for next time.</span>
@@ -77,7 +76,7 @@
           Google named the search behind every click in this range, so the two lists are the whole total.
         <% end %>
       </p>
-      <%= render "ahoy_dashboard/seo/shared/data_note", last_date: @presenter.last_date, slice: @presenter.slice %>
+      <%= dash_card_footer class: "sc-data-note" do %><%= @presenter.data_note %><% end %>
     <% end %>
   <% end %>
 <% end %>

@@ -7,14 +7,13 @@ module AhoyDashboard
     class SnapshotReportPayload
       class << self
         def dump(reading:)
-          tab = reading.fetch(:tab)
-          breakdown = tab.active_breakdown
+          breakdown = reading.tab.active_breakdown
           {
-            "report" => reading.fetch(:report).key, "tab" => tab.key,
-            "dimension" => reading.fetch(:dimension).key, "breakdown" => breakdown && breakdown.key,
-            "details" => reading.fetch(:details), "page" => reading.fetch(:page),
-            "property_keys" => reading.fetch(:property_keys), "per_page" => reading.fetch(:per_page),
-            "result" => dump_result(result: reading.fetch(:result))
+            "report" => reading.report.key, "tab" => reading.tab.key,
+            "dimension" => reading.dimension.key, "breakdown" => breakdown && breakdown.key,
+            "details" => reading.details, "page" => reading.page,
+            "property_keys" => reading.property_keys, "per_page" => reading.per_page,
+            "result" => dump_result(result: reading.result)
           }
         end
 
@@ -27,9 +26,10 @@ module AhoyDashboard
           raise SnapshotPayload::MissingDefinition, "Missing report tab or dimension" unless tab && dimension
 
           tab = tab.for_breakdown(payload.fetch("breakdown")).with(dimension_key: dimension.key)
-          { report: report, tab: tab, dimension: dimension, result: load_result(payload: payload.fetch("result")),
-            details: payload.fetch("details"), page: payload.fetch("page"),
-            property_keys: payload.fetch("property_keys"), per_page: payload.fetch("per_page") }
+          ReportQuery::Reading.new(report: report, tab: tab, dimension: dimension,
+            result: load_result(payload: payload.fetch("result")), details: payload.fetch("details"),
+            page: payload.fetch("page"), property_keys: payload.fetch("property_keys"),
+            per_page: payload.fetch("per_page"))
         end
 
         def dump_result(result:)

@@ -1,17 +1,7 @@
 module AhoyDashboard
   module Serp
     class RankDistributionQuery
-      Reading = Data.define(:at, :position)
-
-      Day = Data.define(:date, :counts) do
-        def count(key)
-          counts.fetch(key, 0)
-        end
-
-        def total
-          counts.values.sum
-        end
-      end
+      Day = DayCounts
 
       Result = Data.define(:days) do
         def any?
@@ -75,11 +65,11 @@ module AhoyDashboard
 
         series.each do |key, list|
           index = cursors.fetch(key)
-          index += 1 while index + 1 < list.size && list[index + 1].at <= cutoff
+          index += 1 while index + 1 < list.size && list[index + 1].first <= cutoff
           cursors[key] = index
           next if index.negative?
 
-          counts[RankBand.for(list[index].position).key] += 1
+          counts[RankBand.for(list[index].last).key] += 1
         end
 
         counts
@@ -90,25 +80,27 @@ module AhoyDashboard
           .pluck(:keyword_id, :location, :checked_at, :position))
         return inside if inside.empty?
 
-        before = group(seeds(inside.keys.map(&:first).uniq))
+        before = group(seeds)
 
         inside.map { |key, list| [ key, Array(before[key]) + list ] }.to_h
       end
 
       def scope
-        checks = SerpCheck.where(site_id: site.id, status: SerpCheck.statuses[:success]).at_current_places
-        tag ? checks.where(keyword_id: SerpKeyword.tagged(tag).select(:id)) : checks
+        SerpCheck.success.where(site_id: site.id).at_current_places.for_tag(tag)
       end
 
-      def seeds(keyword_ids)
-        scope.where(keyword_id: keyword_ids).where(SerpCheck.arel_table[:checked_at].lt(range.begin))
-          .order(:keyword_id, :location, checked_at: :desc, id: :desc)
-          .pluck(Arel.sql("distinct on (keyword_id, location) keyword_id"), :location, :checked_at, :position)
+      def seeds
+        table = SerpCheck.table_name
+        searches = scope.where(checked_at: range).distinct.select(:target_id, :location)
+
+        RecentChecksQuery.call(searches: searches, before: range.begin)
+          .pluck(Arel.sql("#{table}.keyword_id"), Arel.sql("#{table}.location"), Arel.sql("#{table}.checked_at"),
+                 Arel.sql("#{table}.position"))
       end
 
       def group(rows)
         rows.each_with_object({}) do |(keyword_id, location, at, position), grouped|
-          (grouped[[ keyword_id, location ]] ||= []) << Reading.new(at: at, position: position)
+          (grouped[[ keyword_id, location ]] ||= []) << [ at, position ]
         end
       end
     end

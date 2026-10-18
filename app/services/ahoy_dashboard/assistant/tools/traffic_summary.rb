@@ -15,38 +15,22 @@ module AhoyDashboard
           AhoyDashboard::Assistant::Tools::BaseTool.window_params(self)
         end
 
-        def execute(compare: nil, **asked)
-          read = window(**asked)
-          against = comparison_scope(read, compare)
-          stats = AhoyDashboard::TopStatsQuery.call(scope: read.scope, comparison_scope: against)
+        private
+
+        def answer(compare: nil, **asked)
+          read = window(compare: compare, **asked)
+          stats = AhoyDashboard::TopStatsQuery.call(scope: read.scope, comparison_scope: read.form.comparison_scope)
 
           drawn = draw(read, stats)
 
           read.to_h.merge(
             **drawn,
-            compared_to: against && read.period.comparison_range(read.range, compare.to_sym),
+            compared_to: read.form.comparison_range,
             figures: stats.map do |stat|
               [ stat.metric.key,
                 { value: stat.value, reads_as: stat.metric.format(stat.value), change: stat.change } ]
             end.to_h
           )
-        rescue Window::UnknownPeriod => e
-          unknown_period(e)
-        rescue Slice::InvalidFilters => e
-          invalid_filters(e)
-        end
-
-        private
-
-        def comparison_scope(read, compare)
-          return nil unless AhoyDashboard::QueryForm::COMPARISONS.include?(compare.to_s)
-
-          against = read.period.comparison_range(read.range, compare.to_sym)
-          return nil if against.nil?
-
-          AhoyDashboard::ScopeQuery.call(range: against, filters: read.form.filters,
-                                         include_crawlers: read.form.include_crawlers?,
-                                         include_internal: read.form.include_internal?)
         end
 
         def draw(read, stats)
@@ -56,7 +40,7 @@ module AhoyDashboard
               subtitle: subtitle(read.form.include_crawlers? ? "Crawlers included" : "Crawlers excluded", read: read),
               figures: stats.map do |stat|
                 { label: stat.metric.short, value: stat.metric.format(stat.value),
-                  change: stat.change&.round }
+                  change: stat.change&.round, metric_key: stat.metric.key }
               end,
               path: dashboard_path(read),
               path_label: "Open on the dashboard"

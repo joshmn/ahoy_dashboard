@@ -1,10 +1,6 @@
 module AhoyDashboard
   module SearchConsole
-    # The one-time swap of the code Google put in the callback URL for a pair of
-    # tokens. Returns them and saves nothing; the command decides what to keep.
     class ExchangeCodeService < BaseService
-      DEFAULT_LIFETIME = 3600
-
       Tokens = Data.define(:access_token, :refresh_token, :expires_at, :scope)
 
       def initialize(code:)
@@ -12,7 +8,7 @@ module AhoyDashboard
       end
 
       def call
-        raise AuthError, "search console is not configured" unless SearchConsole.enabled?
+        require_configured!
         raise AuthError, "google sent no authorization code" if code.blank?
 
         payload = post_form(SearchConsole::TOKEN_URL, {
@@ -28,7 +24,7 @@ module AhoyDashboard
         Tokens.new(
           access_token: payload["access_token"],
           refresh_token: payload["refresh_token"],
-          expires_at: Time.current + lifetime(payload).seconds,
+          expires_at: expires_at(payload),
           scope: payload["scope"]
         )
       end
@@ -36,10 +32,6 @@ module AhoyDashboard
       private
 
       attr_reader :code
-
-      def lifetime(payload)
-        payload["expires_in"].presence&.to_i || DEFAULT_LIFETIME
-      end
     end
   end
 end

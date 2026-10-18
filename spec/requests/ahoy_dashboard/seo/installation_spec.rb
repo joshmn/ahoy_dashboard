@@ -1,11 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe "Dashboard seo pages with a feature not installed", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:document) { Nokogiri::HTML5(response.body) }
-
   before { sign_in create(:user, :admin) }
 
   def rail_links
@@ -30,13 +25,7 @@ RSpec.describe "Dashboard seo pages with a feature not installed", type: :reques
 
   def missing_tables_read(*features)
     tables = AhoyDashboardInstallation.tables_for(features)
-    sql = []
-    subscriber = ->(_name, _started, _finished, _id, payload) do
-      statement = payload[:sql].to_s
-      sql << statement unless payload[:name] == "SCHEMA" || statement.include?("pg_class")
-    end
-
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { yield }
+    sql = captured_sql(cached: true) { yield }.reject { |statement| statement.include?("pg_class") }
 
     tables.select { |table| sql.any? { |statement| statement.include?(table) } }
   end
@@ -108,7 +97,7 @@ RSpec.describe "Dashboard seo pages with a feature not installed", type: :reques
     end
 
     it "shows the overview with every install step when nothing in the suite is installed" do
-      uninstall_ahoy_dashboard(*AhoyDashboard::Installation.names)
+      uninstall_every_ahoy_dashboard_feature
 
       get "/telemetry/seo"
 
@@ -197,7 +186,7 @@ RSpec.describe "Dashboard seo pages with a feature not installed", type: :reques
   end
 
   describe "tracking a query from Search Console without serp" do
-    let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+    let(:now) { dash_time(2026, 8, 11, 14, 30) }
     let(:reason) { "Rank tracking isn't installed." }
 
     around { |example| travel_to(now) { example.run } }
@@ -253,8 +242,8 @@ RSpec.describe "Dashboard seo pages with a feature not installed", type: :reques
   describe "keyword research without serp or Search Console" do
     it "lists saved ideas with the track link disabled, reading neither" do
       allow(AhoyDashboard::Keywords).to receive(:enabled?).and_return(true)
-      AhoyDashboard::KeywordIdea.create!(seed: "visiting", query: "visiting hours", location: "us", language: "en",
-                                         volume: 100, provider: "fake", fetched_at: 1.day.ago)
+      create(:dash_keyword_idea, seed: "visiting", query: "visiting hours", location: "us", language: "en",
+             volume: 100, provider: "fake", fetched_at: 1.day.ago)
       uninstall_ahoy_dashboard(:serp, :search_console)
 
       read = missing_tables_read(:serp, :search_console) do
@@ -294,8 +283,6 @@ RSpec.describe "Dashboard seo pages with a feature not installed", type: :reques
 
   describe "alerts switched off" do
     it "keeps the tiles and the recent alerts list, saying why nothing fires" do
-      allow(AhoyDashboard::Alerts).to receive(:enabled?).and_return(false)
-
       get "/telemetry/seo/alert"
 
       expect(response).to have_http_status(:ok)

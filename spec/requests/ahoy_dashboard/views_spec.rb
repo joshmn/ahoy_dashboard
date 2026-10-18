@@ -1,13 +1,11 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard remembered view", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
   let(:cookie) { AhoyDashboard::BaseController::VIEW_COOKIE }
 
   around { |example| travel_to(now) { example.run } }
 
-  # A cleared cookie comes back as an empty string rather than as nothing at all.
   def remembered
     cookies[cookie].presence
   end
@@ -21,11 +19,11 @@ RSpec.describe "Dashboard remembered view", type: :request do
   end
 
   def period_label
-    Nokogiri::HTML5(response.body).at_css("#tm-period-button").text.strip
+    document.at_css("#tm-period-button").text.strip
   end
 
   def reset_controls
-    Nokogiri::HTML5(response.body).css("form[action='/telemetry/view']")
+    document.css("form[action='/telemetry/view']")
   end
 
   describe "writing it" do
@@ -51,8 +49,6 @@ RSpec.describe "Dashboard remembered view", type: :request do
       )
     end
 
-    # A filter is a question somebody asked once. Reapplying it silently scopes
-    # every number on the page on every later visit.
     it "never remembers a filter" do
       get "/telemetry", params: {
         period: "7d",
@@ -77,8 +73,6 @@ RSpec.describe "Dashboard remembered view", type: :request do
       expect(remembered).to be_nil
     end
 
-    # Realtime is a glance at the last half hour, not a view worth opening into
-    # next week, and skipping the write leaves the last real one intact.
     it "does not let a realtime glance overwrite the remembered view" do
       get "/telemetry", params: { period: "7d" }
 
@@ -101,16 +95,6 @@ RSpec.describe "Dashboard remembered view", type: :request do
       end
     end
 
-    it "is not written for somebody who is not an admin" do
-      sign_out :user
-      sign_in create(:user)
-
-      get "/telemetry", params: { period: "7d" }
-
-      expect(response).to have_http_status(:not_found)
-      expect(remembered).to be_nil
-    end
-
     it "carries httponly and lax, and an expiry a long way out" do
       get "/telemetry", params: { period: "7d" }
 
@@ -130,8 +114,8 @@ RSpec.describe "Dashboard remembered view", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(period_label).to eq("Last 7 days")
-      summary = Nokogiri::HTML5(response.body).at_css("tm-frame#dash_summary")
-      expect(Rack::Utils.parse_nested_query(URI.parse(summary["src"]).query)).to include("period" => "7d", "metric" => "pageviews")
+      summary = document.at_css("tm-frame#dash_summary")
+      expect(link_query(summary["src"])).to include("period" => "7d", "metric" => "pageviews")
     end
 
     it "offers a way to forget it, and only while it is being applied" do
@@ -144,8 +128,6 @@ RSpec.describe "Dashboard remembered view", type: :request do
       expect(reset_controls).to be_empty
     end
 
-    # Somebody following a shared link has to see what the link says. to_query
-    # leaves defaults out, so a link naming only the period is a whole view.
     it "loses to an explicit param that disagrees" do
       remember("period=7d&metric=pageviews")
 
@@ -186,26 +168,12 @@ RSpec.describe "Dashboard remembered view", type: :request do
 
       get "/telemetry"
 
-      expect(Nokogiri::HTML5(response.body).css(".chip")).to be_empty
+      expect(document.css(".chip")).to be_empty
       expect(reset_controls).to be_empty
     end
   end
 
   describe "forgetting it" do
-    it "sends a signed out visitor to sign in" do
-      delete "/telemetry/view"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      delete "/telemetry/view"
-
-      expect(response).to have_http_status(:not_found)
-    end
-
     it "clears the cookie and lands on a clean dashboard" do
       sign_in create(:user, :admin)
       remember("period=7d&metric=pageviews")

@@ -1,109 +1,93 @@
 <% content_for :title, "Segments" %>
 <% content_for :dash_settings_section, "segments" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Segments",
-          lede: "Saved sets of filters you can pick from the filter dialog. One of them can be the default, which the dashboard opens with.",
-          actions: capture {
-            dash_button "New segment", new_settings_segment_path, tone: :primary, icon: :plus
-          } %>
+<%= dash_page_head title: "Segments",
+      lede: "Saved sets of filters you can pick from the filter dialog. One of them can be the default, which the dashboard opens with.",
+      actions: dash_button("New segment", new_settings_segment_path, tone: :primary, icon: :plus) %>
 
-    <%= dash_card do %>
-      <% if @segments.any? %>
-        <%= dash_card_header "#{@segments.size} #{"segment".pluralize(@segments.size)}" %>
+<%= dash_card do %>
+  <% if @segments.any? %>
+    <%= dash_card_header "#{@segments.size} #{"segment".pluralize(@segments.size)}" %>
 
-        <%= dash_table label: "Segments", cols: "minmax(0, .85fr) minmax(0, 1.5fr) 84px 118px 56px 92px" do %>
-          <thead>
+    <%= dash_table label: "Segments", cols: "minmax(0, .85fr) minmax(0, 1.5fr) 84px 118px 56px 92px" do %>
+      <thead>
+        <tr>
+          <th scope="col">Segment</th>
+          <th scope="col">Filters</th>
+          <th scope="col">State</th>
+          <th scope="col">Updated</th>
+          <th scope="col"><span class="visually-hidden">Order</span></th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @segments.each_with_index do |segment, index| %>
+          <% if confirming?(segment) %>
+            <%= dash_delete_confirm segment.name, "Only the saved filters go.",
+                  url: settings_segment_path(segment), cancel: settings_segments_path, span: 6 %>
+          <% else %>
             <tr>
-              <th scope="col">Segment</th>
-              <th scope="col">Filters</th>
-              <th scope="col">State</th>
-              <th scope="col">Updated</th>
-              <th scope="col"><span class="visually-hidden">Order</span></th>
-              <th scope="col"><span class="visually-hidden">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @segments.each_with_index do |segment, index| %>
-              <% if @confirming == segment.id.to_s %>
-                <% message = capture do %>Delete <b><%= segment.name %></b>? Only the saved filters go.<% end %>
-                <%= dash_table_confirm message, span: 6, cancel: settings_segments_path do %>
-                  <%= dash_button_to "Delete", settings_segment_path(segment), method: :delete, tone: :danger %>
-                <% end %>
-              <% else %>
-                <tr>
-                  <td>
-                    <span class="t-main">
-                      <%= dash_icon(:tag, size: 13, class_name: "gi") %>
-                      <b><%= segment.name %></b>
-                      <% if segment.applied_by_default? %>
-                        <%= dash_badge "Default", tone: :kind %>
-                      <% end %>
-                    </span>
-                  </td>
+              <td>
+                <span class="t-main">
+                  <%= dash_icon(:tag, size: 13, class_name: "gi") %>
+                  <b><%= segment.name %></b>
+                  <% if segment.applied_by_default? %>
+                    <%= dash_badge "Default", tone: :kind %>
+                  <% end %>
+                </span>
+              </td>
 
-                  <td>
-                    <span class="mchips">
-                      <% if segment.readable? %>
-                        <% segment.to_filters.each do |filter| %>
-                          <span class="mchip">
-                            <%= dash_icon(dash_dimension_icon(filter.dimension), size: 11, class_name: "ci") %>
-                            <span class="md"><%= filter.dimension.filter_label %></span>
-                            <span class="mis"><%= filter.operator_label %></span>
-                            <span class="<%= class_names("mv", "mono-cv" => dash_mono_dimension?(filter.dimension.key)) %>">
-                              <%= filter.value %>
-                            </span>
-                          </span>
-                        <% end %>
-                      <% else %>
-                        <span class="t-when"><%= segment.unreadable_note %></span>
-                      <% end %>
-                    </span>
-                  </td>
-
-                  <td>
-                    <%= dash_badge segment.readable? ? segment.count_label : "Not being applied", tone: segment.readable? ? :success : :danger %>
-                  </td>
-
-                  <td class="t-when"><%= segment.dates %></td>
-
-                  <td class="row-actions">
-                    <%= dash_icon_button_to :chevron_up, settings_segment_path(segment),
-                          label: "Move #{segment.name} up the list",
-                          method: :patch, params: { segment: { nudge: "up" } },
-                          disabled: index.zero? %>
-                    <%= dash_icon_button_to :chevron_down, settings_segment_path(segment),
-                          label: "Move #{segment.name} down the list",
-                          method: :patch, params: { segment: { nudge: "down" } },
-                          disabled: index == @segments.size - 1 %>
-                  </td>
-
-                  <td class="row-actions">
-                    <% if segment.applied_by_default? %>
-                      <%= dash_icon_button_to :bookmark, settings_segment_default_path(segment),
-                            label: "Stop opening the dashboard with #{segment.name}",
-                            method: :delete, tone: :primary, title: "Stop using as the default" %>
-                    <% elsif segment.readable? %>
-                      <%= dash_icon_button_to :bookmark, settings_segment_default_path(segment),
-                            label: "Open the dashboard with #{segment.name}",
-                            method: :post, title: "Make this the default" %>
+              <td>
+                <span class="mchips">
+                  <% if segment.readable? %>
+                    <% segment.to_filters.each do |filter| %>
+                      <span class="mchip">
+                        <%= dash_icon(dash_dimension_icon(filter.dimension), size: 11, class_name: "ci") %>
+                        <span class="md"><%= filter.dimension.filter_label %></span>
+                        <span class="mis"><%= filter.operator_label %></span>
+                        <span class="<%= class_names("mv", "mono-cv" => dash_mono_dimension?(filter.dimension.key)) %>">
+                          <%= filter.value %>
+                        </span>
+                      </span>
                     <% end %>
-                    <%= dash_icon_button :gear, label: "Edit #{segment.name}",
-                          url: edit_settings_segment_path(segment), title: "Edit" %>
-                    <%= dash_icon_button :close, label: "Delete #{segment.name}",
-                          url: settings_segments_path(confirm: segment.id), tone: :danger, title: "Delete" %>
-                  </td>
-                </tr>
-              <% end %>
-            <% end %>
-          </tbody>
+                  <% else %>
+                    <span class="t-when"><%= segment.unreadable_note %></span>
+                  <% end %>
+                </span>
+              </td>
+
+              <td>
+                <%= dash_badge segment.readable? ? segment.count_label : "Not being applied", tone: segment.readable? ? :success : :danger %>
+              </td>
+
+              <td class="t-when"><%= segment.dates %></td>
+
+              <td class="row-actions">
+                <%= dash_move_buttons settings_segment_path(segment), name: segment.name, param: :segment,
+                      index: index, count: @segments.size %>
+              </td>
+
+              <td class="row-actions">
+                <% if segment.applied_by_default? %>
+                  <%= dash_icon_button_to :bookmark, settings_segment_default_path(segment),
+                        label: "Stop opening the dashboard with #{segment.name}",
+                        method: :delete, tone: :primary, title: "Stop using as the default" %>
+                <% elsif segment.readable? %>
+                  <%= dash_icon_button_to :bookmark, settings_segment_default_path(segment),
+                        label: "Open the dashboard with #{segment.name}",
+                        method: :post, title: "Make this the default" %>
+                <% end %>
+                <%= dash_edit_button segment.name, edit_settings_segment_path(segment) %>
+                <%= dash_delete_button segment.name, settings_segments_path(confirm: segment.id) %>
+              </td>
+            </tr>
+          <% end %>
         <% end %>
-      <% else %>
-        <%= dash_empty title: "No segments yet",
-              hint: "Save filters here, or from the filter dialog on the dashboard.",
-              action: { label: "New segment", url: new_settings_segment_path } %>
-      <% end %>
+      </tbody>
     <% end %>
-  </section>
-</div>
+  <% else %>
+    <%= dash_empty title: "No segments yet",
+          hint: "Save filters here, or from the filter dialog on the dashboard.",
+          action: { label: "New segment", url: new_settings_segment_path } %>
+  <% end %>
+<% end %>

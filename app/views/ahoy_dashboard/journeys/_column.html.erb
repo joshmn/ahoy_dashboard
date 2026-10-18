@@ -1,6 +1,3 @@
-<%# One column: what people did next, given everything picked to its left. The
-    row of them scrolls sideways rather than folding, so a six step journey is
-    read by scrolling rather than by columns disappearing behind a rail. %>
 <section class="j-col" aria-labelledby="<%= column.id %>">
   <div class="j-col-hd">
     <div class="j-step" id="<%= column.id %>"><%= column.step_label %></div>
@@ -13,10 +10,6 @@
     </div>
   </div>
 
-<%# A plain GET, so the search works with the JavaScript off and the result is a
-    URL somebody can keep. The other columns' terms ride along as hidden fields in
-    index order: the terms travel as one list, and a gap would shift every term
-    after it into the wrong column. %>
   <%= form_with url: presenter.form_path, method: :get, class: "tm-journey__find" do %>
     <%= render "ahoy_dashboard/shared/query_fields" %>
 
@@ -26,16 +19,8 @@
 
     <% presenter.search_slots(column.index).each do |slot, term| %>
       <% if slot == column.index %>
-        <label class="visually-hidden" for="<%= column.search_id %>">
-          Find in step <%= column.index + 1 %>
-        </label>
-        <input class="form-control form-control-sm"
-               id="<%= column.search_id %>"
-               type="search"
-               name="<%= AhoyDashboard::JourneyPresenter::SEARCH_NAME %>"
-               value="<%= term %>"
-               placeholder="Find a page"
-               autocomplete="off">
+        <%= dash_search_field AhoyDashboard::JourneyPresenter::SEARCH_NAME, term, label: "Find in step #{column.index + 1}",
+              id: column.search_id, placeholder: "Find a page" %>
       <% else %>
         <%= hidden_field_tag AhoyDashboard::JourneyPresenter::SEARCH_NAME, term, id: nil %>
       <% end %>

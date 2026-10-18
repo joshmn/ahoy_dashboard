@@ -1,0 +1,17 @@
+<div class="seo-dist__plot">
+  <svg viewBox="0 0 <%= AhoyDashboard::SeoHelper::PLOT_WIDTH %> <%= AhoyDashboard::SeoHelper::PLOT_HEIGHT %>"
+       preserveAspectRatio="none" role="img" aria-label="<%= label %>">
+    <% stacks.each do |stack| %>
+      <g>
+        <title><%= source.day_title(stack.day) %></title>
+        <% stack.segments.each do |segment| %>
+          <rect class="seo-dist__seg <%= band %>--<%= segment.key %>" x="<%= stack.x %>" y="<%= segment.y %>"
+                width="<%= stack.width %>" height="<%= segment.height %>"></rect>
+        <% end %>
+      </g>
+    <% end %>
+  </svg>
+  <div class="seo-plot__dates">
+    <% dates.each do |date| %><span><%= date %></span><% end %>
+  </div>
+</div>

@@ -2,9 +2,6 @@ module AhoyDashboard
   class FilterGroup
     include Enumerable
 
-    # The operators whose values join as alternatives. "Country is US or CA" is
-    # a question with an answer; "is not US or is not CA" matches nearly every
-    # visit, so the negative ones stand as filters of their own instead.
     JOINING = %w[is contains].freeze
 
     attr_reader :to_a
@@ -13,17 +10,7 @@ module AhoyDashboard
       @to_a = Array(filters).uniq(&:to_param).freeze
     end
 
-    def each(&block)
-      to_a.each(&block)
-    end
-
-    def size
-      to_a.size
-    end
-
-    def empty?
-      to_a.empty?
-    end
+    delegate :each, :size, :empty?, to: :to_a
 
     def single?
       size == 1

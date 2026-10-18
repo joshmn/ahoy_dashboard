@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class PropertiesController < AhoyDashboard::BaseController
+    class PropertiesController < AhoyDashboard::Settings::BaseController
       def index
         @form = AhoyDashboard::PropertyForm.new
         load_list
@@ -9,15 +9,12 @@ module AhoyDashboard
       def create
         @form = AhoyDashboard::PropertyForm.new(property_params)
 
-        AhoyDashboard::Properties::CreateCommand.call(form: @form) do
+        AhoyDashboard::Records::SaveCommand.call(record: AhoyDashboard::Property.new, form: @form, append: true) do
           on(:ok) { |property| redirect_to settings_properties_path, notice: "Added #{property.key}." }
           on(:invalid) { |form| rejected(form) }
-          on(:duplicate) { |form| rejected(form) }
         end
       end
 
-      # A nudge and a show/hide are both this property's own attributes, so they
-      # are the same update rather than two more resources.
       def update
         property = find_property
 
@@ -31,7 +28,7 @@ module AhoyDashboard
       def destroy
         property = find_property
 
-        AhoyDashboard::Properties::DestroyCommand.call(property: property) do
+        AhoyDashboard::Records::DestroyCommand.call(record: property) do
           on(:ok) { |removed| redirect_to settings_properties_path, notice: "Took #{removed.key} off the list." }
         end
       end
@@ -43,10 +40,8 @@ module AhoyDashboard
       end
 
       def move(property)
-        AhoyDashboard::Properties::MoveCommand.call(property: property, direction: nudge) do
-          on(:ok) { redirect_to settings_properties_path }
-          on(:nothing_to_do) { redirect_to settings_properties_path }
-        end
+        AhoyDashboard::Records::MoveCommand.call(record: property, direction: nudge)
+        redirect_to settings_properties_path
       end
 
       def nudge
@@ -57,10 +52,9 @@ module AhoyDashboard
         property.enabled? ? "Showing #{property.key} again." : "Hid #{property.key}."
       end
 
-      def rejected(form)
-        @form = form
+      def rejected(form, template = :index)
         load_list
-        render :index, status: :unprocessable_entity
+        super
       end
 
       def load_list

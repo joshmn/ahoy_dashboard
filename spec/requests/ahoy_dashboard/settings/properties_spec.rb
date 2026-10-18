@@ -1,47 +1,13 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard custom property settings", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
   def traffic!
-    visit = dash_visit(started_at: now - 1.day, visitor: "visitor-1")
-    dash_page_view(visit, path: "/resources", at: now - 1.day)
+    visit = dash_landing("/resources", at: now - 1.day, visitor: "visitor-1")
     dash_goal(visit, "site_searched", at: now - 1.day + 1.minute, facility_id: "12", query: "camp")
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/properties"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "sends a signed out visitor to sign in on a write too" do
-      post "/telemetry/settings/properties", params: { property: { key: "facility_id" } }
-
-      expect(response).to redirect_to("/users/sign_in")
-      expect(AhoyDashboard::Property.count).to be_zero
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/settings/properties"
-
-      expect(response).to have_http_status(:not_found)
-    end
-
-    it "is a 404 for a non-admin trying to write" do
-      sign_in create(:user)
-
-      post "/telemetry/settings/properties", params: { property: { key: "facility_id" } }
-
-      expect(response).to have_http_status(:not_found)
-      expect(AhoyDashboard::Property.count).to be_zero
-    end
   end
 
   describe "as an admin" do
@@ -112,13 +78,10 @@ RSpec.describe "Dashboard custom property settings", type: :request do
         expect(property).to be_enabled
       end
 
-      it "puts a new key at the end of the list" do
-        create(:dash_property, position: 4)
+      let(:addition) { { property: { key: "facility_id" } } }
 
-        post "/telemetry/settings/properties", params: { property: { key: "facility_id" } }
-
-        expect(AhoyDashboard::Property.find_by(key: "facility_id").position).to eq(5)
-      end
+      include_examples "a settings list that adds at the end",
+                       factory: :dash_property, path: "/telemetry/settings/properties", noun: "key", created: { key: "facility_id" }
 
       it "trims what was typed and keeps its capitals" do
         post "/telemetry/settings/properties", params: { property: { key: "  facilityId  " } }
@@ -152,7 +115,7 @@ RSpec.describe "Dashboard custom property settings", type: :request do
           expect(property.reload).not_to be_enabled
 
           get "/telemetry/settings/properties"
-          button = Nokogiri::HTML5(response.body).at_css("button[aria-label='Delete #{key}']")
+          button = document.at_css("button[aria-label='Delete #{key}']")
           action = button.ancestors("form").first["action"]
 
           delete action
@@ -231,58 +194,9 @@ RSpec.describe "Dashboard custom property settings", type: :request do
         expect(AhoyDashboard::Dimension.filterable.map(&:key)).not_to include("prop:facility_id")
       end
 
-      it "moves a property up the list" do
-        create(:dash_property, key: "first", position: 1)
-        create(:dash_property, key: "second", position: 2)
+      include_examples "a nudgeable settings list",
+                       factory: :dash_property, path: "/telemetry/settings/properties", param: :property, noun: "property"
 
-        patch "/telemetry/settings/properties/second", params: { property: { nudge: "up" } }
-
-        expect(response).to redirect_to("/telemetry/settings/properties")
-        expect(AhoyDashboard::Property.ordered.pluck(:key)).to eq(%w[second first])
-      end
-
-      it "moves a property down the list" do
-        create(:dash_property, key: "first", position: 1)
-        create(:dash_property, key: "second", position: 2)
-
-        patch "/telemetry/settings/properties/first", params: { property: { nudge: "down" } }
-
-        expect(AhoyDashboard::Property.ordered.pluck(:key)).to eq(%w[second first])
-      end
-
-      # Every property starts at zero until somebody orders the list, so a move
-      # that only swapped two position values would be a no-op here.
-      it "renumbers an unordered list rather than swapping two zeroes" do
-        create(:dash_property, key: "a", position: 0)
-        create(:dash_property, key: "b", position: 0)
-
-        patch "/telemetry/settings/properties/b", params: { property: { nudge: "up" } }
-
-        expect(AhoyDashboard::Property.ordered.pluck(:key)).to eq(%w[b a])
-        expect(AhoyDashboard::Property.ordered.pluck(:position)).to eq([ 1, 2 ])
-      end
-
-      it "does nothing at the top of the list" do
-        create(:dash_property, key: "first", position: 1)
-        create(:dash_property, key: "second", position: 2)
-
-        patch "/telemetry/settings/properties/first", params: { property: { nudge: "up" } }
-
-        expect(response).to redirect_to("/telemetry/settings/properties")
-        expect(AhoyDashboard::Property.ordered.pluck(:key)).to eq(%w[first second])
-      end
-
-      it "ignores a direction it does not know" do
-        create(:dash_property, key: "first", position: 1)
-        create(:dash_property, key: "second", position: 2)
-
-        patch "/telemetry/settings/properties/first", params: { property: { nudge: "sideways" } }
-
-        expect(AhoyDashboard::Property.ordered.pluck(:key)).to eq(%w[first second])
-      end
-
-      # The first property is what the properties card opens on, so ordering is
-      # the operator's lever over that.
       it "changes which property the card opens on" do
         create(:dash_property, key: "campaign", position: 1)
         create(:dash_property, key: "facility_id", position: 2)

@@ -1,7 +1,5 @@
 module AhoyDashboard
   module SearchConsole
-    # Every property this account can actually read, which is what the picker
-    # lists.
     class SitesService < BaseService
       UNVERIFIED = "siteUnverifiedUser".freeze
 
@@ -19,9 +17,6 @@ module AhoyDashboard
         @account = account || GoogleAccount.current
       end
 
-      # Unverified properties are dropped rather than shown greyed out: Search
-      # Analytics answers 403 for them, so listing one would only be an offer to
-      # break the sync.
       def call
         payload = get_json(SearchConsole::SITES_URL, AccessTokenService.call(account: account))
 

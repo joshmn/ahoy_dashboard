@@ -2,7 +2,6 @@ module AhoyDashboard
   module Assistant
     class Slice
       KEY = "slice".freeze
-      GROUP_LIMIT = 1_000_000
       NONE = AhoyDashboard::QueryForm::NO_FILTERS
 
       class InvalidFilters < StandardError
@@ -35,14 +34,14 @@ module AhoyDashboard
             source: :conversation, dropped: dropped.map { |entry| describe(entry) })
       end
 
-      def self.problem(entry)
-        return "#{entry.inspect} is not a filter" unless entry.respond_to?(:key?)
+      def self.problem(raw)
+        entry = AhoyDashboard::FilterEntry.read(raw)
+        return "#{raw.inspect} is not a filter" if entry.nil?
 
-        key = entry["dimension"] || entry[:dimension]
-        operator = (entry["operator"] || entry[:operator]).presence
-        value = entry["value"] || entry[:value]
-        group = entry.key?("group") ? entry["group"] : entry[:group]
-        dimension = AhoyDashboard::Dimension.find_by_key(key.to_s)
+        key = entry.field(:dimension)
+        operator = entry.field(:operator).presence
+        value = entry.field(:value)
+        dimension = entry.dimension
 
         return "no dimension called #{key.inspect}" if dimension.nil?
         return "#{dimension.key} is kept out of the assistant by the site's owner" if AhoyDashboard::Assistant.withheld?(dimension.key)
@@ -50,26 +49,21 @@ module AhoyDashboard
         return "no operator called #{operator.inspect}" if operator && !AhoyDashboard::Filter::OPERATORS.key?(operator.to_s)
         return "#{dimension.key} has no value" if value.to_s.blank?
 
-        "group #{group.inspect} is not a whole number from 0 up" unless group.nil? || group?(group)
+        "group #{entry.raw_group.inspect} is not a whole number from 0 up" unless entry.group_ok?
       end
 
-      def self.group?(group)
-        return group >= 0 && group < GROUP_LIMIT if group.is_a?(Integer)
+      def self.describe(raw)
+        entry = AhoyDashboard::FilterEntry.read(raw)
+        return raw.inspect if entry.nil?
 
-        group.is_a?(String) && group.match?(/\A\d{1,6}\z/)
-      end
-
-      def self.describe(entry)
-        return entry.inspect unless entry.respond_to?(:key?)
-
-        key = (entry["dimension"] || entry[:dimension]).to_s
+        key = entry.dimension_key
         return "a filter on #{key}, kept out of the assistant by the site's owner" if AhoyDashboard::Assistant.withheld?(key)
 
-        [ entry["dimension"] || entry[:dimension], entry["operator"] || entry[:operator] || AhoyDashboard::Filter::DEFAULT_OPERATOR,
-          entry["value"] || entry[:value] ].join(" ")
+        [ entry.field(:dimension), entry.field(:operator) || AhoyDashboard::Filter::DEFAULT_OPERATOR,
+          entry.field(:value) ].join(" ")
       end
 
-      private_class_method :describe, :group?
+      private_class_method :describe
 
       def initialize(filters: nil, crawlers: false, internal: false, source: :default, dropped: [])
         @filters = filters
@@ -86,7 +80,7 @@ module AhoyDashboard
         problems = entries.map { |entry| self.class.problem(entry) }.select { |value| value }
         raise InvalidFilters, problems if problems.any?
 
-        self.class.new(filters: entries.map { |entry| normalize(entry) }, crawlers: crawlers?,
+        self.class.new(filters: entries.map { |entry| normalize(AhoyDashboard::FilterEntry.read(entry)) }, crawlers: crawlers?,
                        internal: internal?, source: :asked)
       end
 
@@ -121,13 +115,11 @@ module AhoyDashboard
       private
 
       def normalize(entry)
-        group = entry.key?("group") ? entry["group"] : entry[:group]
-
         {
-          "dimension" => (entry["dimension"] || entry[:dimension]).to_s,
-          "operator" => (entry["operator"] || entry[:operator]).presence&.to_s || AhoyDashboard::Filter::DEFAULT_OPERATOR,
-          "value" => (entry["value"] || entry[:value]).to_s,
-          "group" => (group.to_s.to_i unless group.nil?)
+          "dimension" => entry.dimension_key,
+          "operator" => entry.operator || AhoyDashboard::Filter::DEFAULT_OPERATOR,
+          "value" => entry.value,
+          "group" => entry.group
         }.compact
       end
     end

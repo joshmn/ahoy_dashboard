@@ -2,22 +2,24 @@ require "rails_helper"
 
 RSpec.describe AhoyDashboard::Seo::SerpFeatures do
   describe ".from" do
+    let(:empty) { described_class::Reading.new(features: [], questions: [], searches: []) }
+
     it "answers three empty lists for nothing stored" do
-      expect(described_class.from(nil)).to eq([ [], [], [] ])
-      expect(described_class.from({})).to eq([ [], [], [] ])
+      expect(described_class.from(nil)).to eq(empty)
+      expect(described_class.from({})).to eq(empty)
     end
 
     it "answers three empty lists for a payload that is not a hash" do
-      expect(described_class.from("plain text")).to eq([ [], [], [] ])
-      expect(described_class.from([ 1, 2 ])).to eq([ [], [], [] ])
-      expect(described_class.from(4)).to eq([ [], [], [] ])
+      expect(described_class.from("plain text")).to eq(empty)
+      expect(described_class.from([ 1, 2 ])).to eq(empty)
+      expect(described_class.from(4)).to eq(empty)
     end
 
     it "reads a payload handed over as a json string" do
-      features, _questions, searches = described_class.from({ "related_searches" => [ { "query" => "fsa credits" } ] }.to_json)
+      reading = described_class.from({ "related_searches" => [ { "query" => "fsa credits" } ] }.to_json)
 
-      expect(features.map(&:key)).to eq([ "related_searches" ])
-      expect(searches).to eq([ "fsa credits" ])
+      expect(reading.features.map(&:key)).to eq([ "related_searches" ])
+      expect(reading.searches).to eq([ "fsa credits" ])
     end
 
     context "with a dataforseo payload" do
@@ -30,13 +32,13 @@ RSpec.describe AhoyDashboard::Seo::SerpFeatures do
       end
 
       it "reads who answers a question out of the expanded element list" do
-        _features, questions, _searches = described_class.from(payload(asked(
+        questions = described_class.from(payload(asked(
           { "type" => "people_also_ask_element", "title" => "Is FCI Thomson a max?", "seed_question" => nil,
             "expanded_element" => [
               { "type" => "people_also_ask_expanded_element", "url" => "https://www.bop.gov/locations/institutions/tom/",
                 "domain" => "www.bop.gov", "title" => "FCI Thomson", "description" => "A medium security prison." }
             ] }
-        )))
+        ))).questions
 
         question = sole_item(questions)
         expect(question.text).to eq("Is FCI Thomson a max?")
@@ -46,7 +48,7 @@ RSpec.describe AhoyDashboard::Seo::SerpFeatures do
       end
 
       it "keeps a question answered by an ai overview with nobody holding it" do
-        _features, questions, _searches = described_class.from(payload(asked(
+        questions = described_class.from(payload(asked(
           { "type" => "people_also_ask_element", "title" => "How far is Thomson from Chicago?",
             "expanded_element" => [
               { "type" => "people_also_ask_ai_overview_expanded_element", "items" => [
@@ -54,7 +56,7 @@ RSpec.describe AhoyDashboard::Seo::SerpFeatures do
                   "references" => [ { "url" => "https://example.com/thomson", "domain" => "example.com" } ] }
               ] }
             ] }
-        )))
+        ))).questions
 
         question = sole_item(questions)
         expect(question.text).to eq("How far is Thomson from Chicago?")
@@ -63,16 +65,16 @@ RSpec.describe AhoyDashboard::Seo::SerpFeatures do
       end
 
       it "keeps a question whose answer was never expanded" do
-        _features, questions, _searches = described_class.from(payload(asked(
+        questions = described_class.from(payload(asked(
           { "type" => "people_also_ask_element", "title" => "Can you visit on weekends?", "expanded_element" => nil }
-        )))
+        ))).questions
 
         expect(questions.map(&:text)).to eq([ "Can you visit on weekends?" ])
         expect(sole_item(questions).domain).to be_nil
       end
 
       it "lists the features on the page once each, with related searches as plain strings" do
-        features, _questions, searches = described_class.from(payload(
+        reading = described_class.from(payload(
           { "type" => "featured_snippet", "url" => "https://www.bop.gov/a", "domain" => "www.bop.gov", "title" => "Visiting" },
           { "type" => "organic", "url" => "https://example.com/b" },
           { "type" => "local_pack", "title" => "One", "domain" => "one.example" },
@@ -81,36 +83,36 @@ RSpec.describe AhoyDashboard::Seo::SerpFeatures do
           { "type" => "related_searches", "items" => [ "fci thomson visiting", "fci thomson address" ] }
         ))
 
-        expect(features.map(&:key)).to eq(%w[featured_snippet local_pack people_also_ask related_searches])
-        expect(features.first.owner).to eq("bop.gov")
-        expect(searches).to eq([ "fci thomson visiting", "fci thomson address" ])
+        expect(reading.features.map(&:key)).to eq(%w[featured_snippet local_pack people_also_ask related_searches])
+        expect(reading.features.first.owner).to eq("bop.gov")
+        expect(reading.searches).to eq([ "fci thomson visiting", "fci thomson address" ])
       end
     end
 
     context "with a named payload" do
       it "reads the link a question carries" do
-        _features, questions, _searches = described_class.from(
+        questions = described_class.from(
           "related_questions" => [ { "question" => "What is FCI Thomson?", "link" => "https://www.bop.gov/tom",
                                      "snippet" => "A prison." } ]
-        )
+        ).questions
 
         expect(sole_item(questions).domain).to eq("bop.gov")
         expect(sole_item(questions).snippet).to eq("A prison.")
       end
 
       it "reads the link out of a source block" do
-        _features, questions, _searches = described_class.from(
+        questions = described_class.from(
           "related_questions" => [ { "question" => "What is FCI Thomson?",
                                      "source" => { "link" => "https://example.com/tom" } } ]
-        )
+        ).questions
 
         expect(sole_item(questions).domain).to eq("example.com")
       end
 
       it "does not trip over a source written as a name or an entry that is not a record" do
-        _features, questions, _searches = described_class.from(
+        questions = described_class.from(
           "related_questions" => [ { "question" => "What is FCI Thomson?", "source" => "Wikipedia" }, "stray" ]
-        )
+        ).questions
 
         expect(questions.map(&:text)).to eq([ "What is FCI Thomson?" ])
         expect(sole_item(questions).link).to be_nil
@@ -119,7 +121,7 @@ RSpec.describe AhoyDashboard::Seo::SerpFeatures do
 
     context "with an ai overview" do
       def overview(payload)
-        described_class.from(payload).first.find { |feature| feature.key == "ai_overview" }
+        described_class.from(payload).features.find { |feature| feature.key == "ai_overview" }
       end
 
       it "reads a serpapi overview and every site it cites" do
@@ -154,7 +156,7 @@ RSpec.describe AhoyDashboard::Seo::SerpFeatures do
 
     context "with the other features on a named payload" do
       def features(payload)
-        described_class.from(payload).first.index_by(&:key)
+        described_class.from(payload).features.index_by(&:key)
       end
 
       it "names who holds a local pack, top stories, videos, images and forums" do

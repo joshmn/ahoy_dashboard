@@ -18,7 +18,7 @@ module AhoyDashboard
 
       def call
         clicks, impressions, last_date = slice.apply(AhoyDashboard::SearchConsoleTotal.in_range(range))
-          .pick(Arel.sql("coalesce(sum(clicks), 0)"), Arel.sql("coalesce(sum(impressions), 0)"), Arel.sql("max(date)"))
+          .pick(SearchConsole::Sums::CLICKS, SearchConsole::Sums::IMPRESSIONS, Arel.sql("max(date)"))
 
         Result.new(clicks: clicks.to_i, impressions: impressions.to_i, last_date: last_date)
       end

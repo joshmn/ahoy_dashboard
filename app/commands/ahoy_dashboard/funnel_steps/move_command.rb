@@ -13,18 +13,15 @@ module AhoyDashboard
 
       def call
         step = nil
-        funnel.with_lock do
-          steps = funnel.funnel_steps.reload.to_a
-          step = steps.find { |candidate| candidate.id.to_s == step_id.to_s }
-          return broadcast(:nothing_to_do) unless step
+        moved = funnel.with_lock do
+          step = funnel.funnel_steps.reload.to_a.find { |candidate| candidate.id.to_s == step_id.to_s }
+          next unless step
 
-          moved = AhoyDashboard::ReorderService.call(records: steps, moved: step, direction: direction)
-          return broadcast(:nothing_to_do) unless moved
-
-          offset = steps.map(&:position).max
-          moved.each_with_index { |listed, index| listed.update_column(:position, offset + index + 1) }
-          moved.each_with_index { |listed, index| listed.update_column(:position, index + 1) }
+          AhoyDashboard::ReorderListService.call(scope: funnel.funnel_steps, moved: step, direction: direction,
+                                                 unique: true)
         end
+        return broadcast(:nothing_to_do) unless moved
+
         broadcast(:ok, step)
       end
 

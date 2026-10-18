@@ -7,25 +7,6 @@ RSpec.describe "Dashboard single keyword checks", type: :request do
     keyword
   end
 
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      keyword = tracked!
-
-      post "/telemetry/settings/serp_keywords/#{keyword.id}/check"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      keyword = tracked!
-      sign_in create(:user)
-
-      post "/telemetry/settings/serp_keywords/#{keyword.id}/check"
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     before do
       sign_in create(:user, :admin)

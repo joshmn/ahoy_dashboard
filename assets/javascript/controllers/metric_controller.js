@@ -1,10 +1,11 @@
 import { Controller, controllerFor } from "../runtime/controllers.js"
+import { getJSON } from "../runtime/fetch.js"
+import { modified } from "../runtime/keys.js"
+
+const CHART = '[data-controller~="dash--chart"]'
 
 export default class extends Controller {
-  static values = {
-    url: { type: String, default: "" },
-    chartSelector: { type: String, default: '[data-controller~="dash--chart"]' }
-  }
+  static values = { url: { type: String, default: "" } }
 
   disconnect() {
     this.pending?.abort()
@@ -16,7 +17,7 @@ export default class extends Controller {
     const key = event.params.key || button.value
 
     if (!key) return
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    if (modified(event)) return
 
     event.preventDefault()
 
@@ -34,10 +35,6 @@ export default class extends Controller {
     try {
       const payload = await this.fetchDashboard(params, request.signal)
 
-      // Nothing on the page moves until the chart swap is known to be
-      // possible, so an empty range or a chart that never registered falls
-      // through to a normal load instead of leaving the tiles describing a
-      // chart that did not change.
       const chart = this.chart
       if (!chart || !chart.update(payload.series, payload.options)) throw new Error("chart unavailable")
 
@@ -56,10 +53,7 @@ export default class extends Controller {
     const url = new URL(this.urlValue, window.location.origin)
     url.search = params.toString()
 
-    const response = await fetch(url, { headers: { Accept: "application/json" }, signal })
-    if (!response.ok) throw new Error(response.status)
-
-    const payload = await response.json()
+    const payload = await getJSON(url, { signal })
     if (!payload || !Array.isArray(payload.series)) throw new Error("malformed payload")
 
     return payload
@@ -89,8 +83,6 @@ export default class extends Controller {
     this.paintChange(tile, stat)
   }
 
-  // The server renders the pill, so a metric switch cannot draw it any
-  // differently from a page load. It sits straight after the number.
   paintChange(tile, stat) {
     tile.querySelector(".delta")?.remove()
 
@@ -103,7 +95,7 @@ export default class extends Controller {
   }
 
   get chart() {
-    const element = document.querySelector(this.chartSelectorValue)
+    const element = document.querySelector(CHART)
     if (!element) return null
 
     return controllerFor(element, "dash--chart")

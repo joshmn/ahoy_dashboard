@@ -1,27 +1,15 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Dashboards::SnapshotRefreshService do
   let(:snapshots) { AhoyDashboard::Dashboards }
 
-  around do |example|
-    cache = Rails.cache
-    adapter = snapshots::SnapshotRefreshJob.queue_adapter
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    snapshots::SnapshotRefreshJob.queue_adapter = :test
-    travel_to(Time.utc(2026, 8, 11, 14, 30)) { example.run }
-  ensure
-    Rails.cache = cache
-    snapshots::SnapshotRefreshJob.queue_adapter = adapter
-  end
+  include_context "with a test snapshot queue"
 
-  before { AhoyDashboard::Preferences.write(:site, precomputed_dashboard: true) }
+  around { |example| travel_to(Time.utc(2026, 8, 11, 14, 30)) { example.run } }
 
-  def key
-    snapshots::SnapshotKeyQuery.call(query: AhoyDashboard::QueryForm.from_params({period: "30d", filters: "none"}))
-  end
+  before { precompute_dashboard! }
 
   it "does no work while the saved setting is disabled" do
     AhoyDashboard::Preferences.write(:site, precomputed_dashboard: false)
@@ -48,13 +36,13 @@ RSpec.describe AhoyDashboard::Dashboards::SnapshotRefreshService do
   end
 
   it "does not publish under an obsolete identity when a definition changes during the build" do
-    original_key = key
+    original_key = default_snapshot_key
     changed = false
     capture = lambda do |*args|
       next unless !changed && args.last[:sql].include?("tm_journey")
 
       changed = true
-      AhoyDashboard::Annotation.create!(label: "Concurrent deploy", happened_at: Time.current, kind: "deploy")
+      create(:dash_annotation, label: "Concurrent deploy", kind: "deploy")
     end
     ActiveSupport::Notifications.subscribed(capture, "sql.active_record") { described_class.call }
 
@@ -62,7 +50,7 @@ RSpec.describe AhoyDashboard::Dashboards::SnapshotRefreshService do
   end
 
   it "rejects a queued refresh whose date range has rolled over" do
-    yesterday = key
+    yesterday = default_snapshot_key
     travel(1.day)
 
     expect(described_class.call(expected_key: yesterday)).to be_nil
@@ -76,14 +64,14 @@ RSpec.describe AhoyDashboard::Dashboards::SnapshotRefreshService do
   end
 
   it "recovers a cache entry containing an invalid calculation timestamp" do
-    Rails.cache.write(key, {"computed_at" => "invalid", "payload" => {}})
+    Rails.cache.write(default_snapshot_key, {"computed_at" => "invalid", "payload" => {}})
 
     expect(described_class.call.computed_at).to eq(Time.current)
   end
 
   it "keeps the previous reading after a failed database refresh" do
     original = described_class.call
-    original_key = key
+    original_key = default_snapshot_key
     travel(31.seconds)
     capture = lambda do |*args|
       AhoyDashboard::Record.connection.select_value("SELECT 1 / 0") if args.last[:sql].include?("tm_journey")
@@ -91,14 +79,13 @@ RSpec.describe AhoyDashboard::Dashboards::SnapshotRefreshService do
     begin
       ActiveSupport::Notifications.subscribed(capture, "sql.active_record") { described_class.call }
     rescue ActiveRecord::StatementInvalid
-      # Failed refreshes leave the still-bounded previous cache entry intact.
     end
 
     expect(snapshots::SnapshotStore.read(key: original_key).computed_at).to eq(original.computed_at)
   end
 
   it "does not publish an already expired reading after an exceptionally slow build" do
-    original_key = key
+    original_key = default_snapshot_key
     moved = false
     capture = lambda do |*args|
       next unless !moved && args.last[:sql].include?("tm_journey")

@@ -1,8 +1,5 @@
 module AhoyDashboard
   module Settings
-    # The schedule as a page. One row per entry in the registry, whether or not
-    # it has ever run, because a feature that has never run is the thing you most
-    # need to see and an empty table says nothing at all.
     class JobRunPresenter
       STATES = {
         "unknown" => [ "Never run", :neutral ],
@@ -85,14 +82,18 @@ module AhoyDashboard
           started_at.present?
         end
 
-        # Due is about the clock only. A switched off entry is never started, so
-        # saying it is due would be reporting on a thing that cannot happen.
         def due?
           on? && entry.due?(started_at, now: now)
         end
 
         def next_at
           on? ? entry.next_due_at(started_at, now: now) : nil
+        end
+
+        def next_label
+          return "Now" if due?
+
+          next_at.in_time_zone(AhoyDashboard.time_zone).strftime("%b %-d, %-l:%M %p")
         end
       end
 
@@ -110,9 +111,6 @@ module AhoyDashboard
         self
       end
 
-      # Everything, not only the scheduled entries: a fill started from the
-      # Search Console screen is a job somebody is waiting on, and a jobs screen
-      # that leaves it out is the one place they would think to look.
       def rows
         @rows ||= Schedule::EVERYTHING.map do |entry|
           Row.new(entry: entry, record: records[entry.key], now: now, blocker: entry.blocker)
@@ -123,13 +121,6 @@ module AhoyDashboard
         rows.any?(&:failed?)
       end
 
-      def off
-        rows.reject(&:on?)
-      end
-
-      # What the page has to say when nothing has ever run: almost always that
-      # nothing is scheduled, which is a different problem from a job failing and
-      # is the one nobody thinks to check.
       def never_run?
         rows.none?(&:ever?)
       end

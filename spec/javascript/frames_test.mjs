@@ -1,16 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import { deferred } from "./support/deferred.mjs"
 import { installFrameDom } from "./support/frame_dom.mjs"
 
 installFrameDom()
 const { Frame } = await import("../../assets/javascript/runtime/frames.js")
-
-const deferred = () => {
-  let resolve
-  let reject
-  const promise = new Promise((done, failed) => { resolve = done; reject = failed })
-  return { promise, resolve, reject }
-}
 
 const frame = () => {
   const element = new Frame()

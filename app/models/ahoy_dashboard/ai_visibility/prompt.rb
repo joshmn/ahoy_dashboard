@@ -1,6 +1,8 @@
 module AhoyDashboard
   module AiVisibility
     class Prompt < AhoyDashboard::Record
+      include Positioned
+
       MAX_LENGTH = 500
 
       has_many :answers, class_name: "AhoyDashboard::AiVisibility::Answer", inverse_of: :prompt,
@@ -9,8 +11,6 @@ module AhoyDashboard
       normalizes :text, with: ->(value) { value.to_s.squish }
 
       validates :text, presence: true, uniqueness: true, length: { maximum: MAX_LENGTH }
-
-      scope :ordered, -> { order(:position, :id) }
     end
   end
 end

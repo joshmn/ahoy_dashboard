@@ -1,9 +1,3 @@
-<%# The place picker, drawn as the command menu.
-
-    One per form rather than one per place row: it is a dialog, and which row it
-    fills in is whichever row's button was pressed. The controller binds its own
-    document listener for those buttons, the same way the value picker does, so
-    a row anywhere on the form can reach it. %>
 <div class="cmdk"
      id="tm-places"
      hidden
@@ -28,7 +22,7 @@
       <kbd>esc</kbd>
     </div>
 
-    <div class="cmdk-list" role="listbox" data-dash--place-picker-target="list">
+    <div class="cmdk-list" role="listbox">
       <%= render "ahoy_dashboard/settings/places/panel",
             parent: nil, term: "",
             result: AhoyDashboard::Places::SearchQuery::Result.new(places: [], more: false) %>

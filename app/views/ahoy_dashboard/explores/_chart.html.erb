@@ -6,7 +6,7 @@
     <% if chart_data.blank? %>
       <%= dash_empty fill: true,
             title: "No visits in this range",
-            hint: query.filters.any? ? "Try a wider date range, or drop one of the filters." : "Try a wider date range." %>
+            hint: dash_range_hint %>
     <% end %>
   </div>
 <% end %>

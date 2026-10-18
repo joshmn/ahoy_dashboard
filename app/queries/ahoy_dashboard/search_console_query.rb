@@ -2,11 +2,7 @@ module AhoyDashboard
   class SearchConsoleQuery
     Row = Data.define(:label, :clicks, :impressions, :ctr, :position)
 
-    Totals = Data.define(:clicks, :impressions, :ctr, :position) do
-      def any?
-        clicks.positive? || impressions.positive?
-      end
-    end
+    Totals = SearchConsole::Totals
 
     Coverage = Data.define(:counted_clicks, :counted_impressions, :total_clicks, :total_impressions) do
       def missing_clicks
@@ -18,11 +14,9 @@ module AhoyDashboard
       end
 
       def click_share
-        share(counted_clicks, total_clicks)
-      end
+        return 0.0 if total_clicks.to_i.zero?
 
-      def impression_share
-        share(counted_impressions, total_impressions)
+        (counted_clicks.to_f / total_clicks).clamp(0.0, 1.0)
       end
 
       def complete?
@@ -32,17 +26,9 @@ module AhoyDashboard
       def measurable?
         total_clicks.positive? || total_impressions.positive?
       end
-
-      private
-
-      def share(part, whole)
-        return 0.0 if whole.to_i.zero?
-
-        (part.to_f / whole).clamp(0.0, 1.0)
-      end
     end
 
-    Result = Data.define(:range, :queries, :pages, :totals, :coverage, :live_dates, :connected, :problem, :through) do
+    Result = Data.define(:range, :queries, :pages, :totals, :coverage, :connected, :problem, :through) do
       def initialize(problem: nil, through: nil, **rest)
         super
       end
@@ -53,10 +39,6 @@ module AhoyDashboard
 
       def any?
         totals.any? || queries.any?
-      end
-
-      def live?
-        live_dates.any?
       end
 
       def short?
@@ -73,7 +55,7 @@ module AhoyDashboard
       end
     end
 
-    def initialize(range:, limit: DEFAULT_LIMIT, live: false, account: nil)
+    def initialize(range:, limit: DEFAULT_LIMIT, account: nil)
       @range = range
       @limit = limit.to_i.clamp(1, MAX_LIMIT)
       @account = account || GoogleAccount.current
@@ -81,7 +63,7 @@ module AhoyDashboard
 
     def call
       Result.new(range: range, queries: rows(:query), pages: rows(:page), totals: totals,
-                 coverage: coverage, live_dates: [], connected: account.present? && account.ready?,
+                 coverage: coverage, connected: account.present? && account.ready?,
                  problem: problem, through: stored_query.last_date)
     end
 
@@ -103,17 +85,15 @@ module AhoyDashboard
 
     def rows(column)
       stored.fetch(:top).fetch(column).map do |label, (clicks, impressions, weight)|
-        Row.new(label: label, clicks: clicks, impressions: impressions, ctr: ratio(clicks, impressions),
-                position: average_position(weight, impressions))
+        reading = totals_of(clicks, impressions, weight)
+
+        Row.new(label: label, clicks: reading.clicks, impressions: reading.impressions, ctr: reading.ctr,
+                position: reading.position)
       end
     end
 
     def totals
-      @totals ||= begin
-        clicks, impressions, weight = stored.fetch(:totals)
-        Totals.new(clicks: clicks, impressions: impressions, ctr: ratio(clicks, impressions),
-                   position: average_position(weight, impressions))
-      end
+      @totals ||= totals_of(*stored.fetch(:totals))
     end
 
     def coverage
@@ -122,12 +102,8 @@ module AhoyDashboard
                    total_clicks: totals.clicks, total_impressions: totals.impressions)
     end
 
-    def average_position(weight, impressions)
-      impressions.positive? ? (weight / impressions).round(1) : 0.0
-    end
-
-    def ratio(part, whole)
-      whole.to_i.zero? ? 0.0 : part.to_f / whole
+    def totals_of(clicks, impressions, weight)
+      Totals.from(clicks: clicks, impressions: impressions, weight: weight, places: 1)
     end
   end
 end

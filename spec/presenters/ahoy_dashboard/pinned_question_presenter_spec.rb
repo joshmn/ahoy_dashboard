@@ -3,7 +3,7 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::PinnedQuestionPresenter do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 

@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::SerpRunPage do
   describe ".trim" do
@@ -17,10 +16,6 @@ RSpec.describe AhoyDashboard::SerpRunPage do
       expect(described_class.trim(nil, provider: :serpapi)).to eq({})
     end
 
-    # The bug this covers: the slice above is a list of top level keys, and
-    # dataforseo has none of them at the top level. Every reading through that
-    # provider stored an empty response while raw_bytes went on recording the
-    # real size, so the features were being paid for and thrown away.
     it "reaches into the nesting dataforseo answers with" do
       kept = described_class.trim({
         "status_code" => 20_000,

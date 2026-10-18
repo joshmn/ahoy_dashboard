@@ -50,10 +50,6 @@ class CreateAhoyDashboardCore < ActiveRecord::Migration[6.0]
     create_table :ahoy_dashboard_funnel_steps do |t|
       t.references :funnel, null: false, index: false,
                    foreign_key: { to_table: :ahoy_dashboard_funnels, on_delete: :cascade }
-      # Restrict rather than cascade. A funnel that quietly loses a step still
-      # renders and still reports numbers, and they answer a different question
-      # from the one somebody set up. Refusing the delete is the only version
-      # that cannot silently change what a funnel means.
       t.references :goal, null: false,
                    foreign_key: { to_table: :ahoy_dashboard_goals, on_delete: :restrict }
       t.integer :position, null: false
@@ -67,13 +63,6 @@ class CreateAhoyDashboardCore < ActiveRecord::Migration[6.0]
 
     create_table :ahoy_dashboard_segments do |t|
       t.string :name, null: false
-      # jsonb, because the value stored is already what AhoyDashboard::Filters#to_param
-      # hands back: an array of dimension, operator and value hashes. Postgres
-      # gives that array straight back with no Rails-side serializer in the way,
-      # so the saved row, the query string a link carries and the filter objects
-      # are all one shape. Same arrangement ahoy_events.properties has used all
-      # along. Text plus a serializer would make the column unreadable to
-      # anything but this app and turn a hand-edited row into a parse error.
       t.jsonb :filters, null: false, default: []
       t.integer :position, null: false, default: 0
       t.boolean :applied_by_default, null: false, default: false
@@ -87,9 +76,6 @@ class CreateAhoyDashboardCore < ActiveRecord::Migration[6.0]
 
     create_table :ahoy_dashboard_saved_queries do |t|
       t.string :name, null: false
-      # The whole question, in the shape the URL carries it, so opening one is
-      # the same navigation as editing the address bar and nothing has to know
-      # how to rebuild an explore from parts.
       t.jsonb :params, null: false, default: {}
       t.boolean :pinned, null: false, default: false
       t.integer :position, null: false, default: 0
@@ -101,8 +87,6 @@ class CreateAhoyDashboardCore < ActiveRecord::Migration[6.0]
 
     create_table :ahoy_dashboard_page_groups do |t|
       t.string :name, null: false
-      # One rule can name several paths, so the patterns are a list. First
-      # matching rule wins, which is what position orders.
       t.jsonb :patterns, null: false, default: []
       t.integer :position, null: false, default: 0
       t.timestamps
@@ -129,11 +113,6 @@ class CreateAhoyDashboardCore < ActiveRecord::Migration[6.0]
 
     add_index :ahoy_dashboard_exclusions, :name, unique: true
 
-    # One generic table for a named secret that is only ever "a handful of
-    # key/value pairs" and does not carry other columns alongside it. Serp and
-    # assistant providers keep their own credentials column because they carry
-    # caps, spend and an active flag too; anything smaller than that belongs
-    # here instead of a bespoke migration and model per integration.
     create_table :ahoy_dashboard_credentials do |t|
       t.string :name, null: false
       t.text :secrets
@@ -150,13 +129,6 @@ class CreateAhoyDashboardCore < ActiveRecord::Migration[6.0]
 
     add_index :ahoy_dashboard_settings, :key, unique: true
 
-    # When each scheduled thing last ran, and how it went. The schedule itself is
-    # a registry in code; this is the one part of it that has to survive a
-    # restart, because a tick that cannot remember either re-runs everything
-    # every time or never runs anything at all.
-    #
-    # It is also the answer to the question the manual buttons exist for: stale
-    # because nothing is scheduled, or stale because the last run failed.
     create_table :ahoy_dashboard_job_runs do |t|
       t.string :key, null: false
       t.integer :status, null: false, default: 0

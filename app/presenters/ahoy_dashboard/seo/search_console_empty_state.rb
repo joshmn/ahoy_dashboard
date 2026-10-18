@@ -3,12 +3,15 @@
 module AhoyDashboard
   module Seo
     class SearchConsoleEmptyState
-      TOP = { tm_frame: "_top" }.freeze
-      STEP_LABELS = { google: "Connect Search Console", property: "Pick a property" }.freeze
+      TOP = AhoyDashboard::SetupNotice::TOP
 
       class << self
         def call(**options)
           new(**options).call
+        end
+
+        def settings_action(routes)
+          { label: "Search Console settings", url: routes.settings_google_connection_path, data: TOP, primary: false }
         end
       end
 
@@ -35,40 +38,33 @@ module AhoyDashboard
       attr_reader :query, :context, :routes, :path, :title, :hint
 
       def in_range
-        return { title: title, hint: hint, action: widen } unless AhoyDashboard::SeoRange.wide_enough?(query)
+        return { title: title, hint: hint, action: widen } unless Periods.wide_enough?(query)
 
-        { title: title, hint: hint,
-          action: { label: "Search Console settings", url: routes.settings_google_connection_path, data: TOP, primary: false } }
+        { title: title, hint: hint, action: self.class.settings_action(routes) }
       end
 
       def widen
-        { label: AhoyDashboard::SeoRange.widen_label, data: TOP, primary: true,
-          url: path.call(period: AhoyDashboard::SeoRange.wide_period.key, from: nil, to: nil) }
+        { label: Periods.widen_label, data: TOP, primary: true,
+          url: path.call(period: Periods.wide.key, from: nil, to: nil) }
       end
 
       def out_of_range(stored)
-        dates = "#{SeoHelper.short_date(stored.first)} to #{SeoHelper.short_date(stored.last)}"
+        dates = "#{AhoyDashboard::DateFormat.short(stored.first)} to #{AhoyDashboard::DateFormat.short(stored.last)}"
+        step = AhoyDashboard::SetupNotice.search_console_step(context.account)
 
         { title: "Nothing stored for these dates",
           hint: "Search Console is not connected, so nothing new is coming in. " \
                 "What was pulled before is still here: #{kept(stored)} from #{dates}.",
           action: { label: "Show #{dates}", data: TOP, primary: true,
                     url: path.call(period: AhoyDashboard::Period::CUSTOM_KEY, from: stored.first.to_s, to: stored.last.to_s) },
-          secondary: { label: STEP_LABELS.fetch(step), url: step_url, data: TOP } }
+          secondary: { label: AhoyDashboard::SetupNotice::STEPS.fetch(step)[:label],
+                       url: AhoyDashboard::SetupNotice.search_console_url(routes, step), data: TOP } }
       end
 
       def kept(stored)
         return "#{ActiveSupport::NumberHelper.number_to_delimited(stored.rows)} rows" if stored.rows.positive?
 
         "#{stored.days} #{"day".pluralize(stored.days)}"
-      end
-
-      def step
-        AhoyDashboard::SetupNotice.search_console_step(context.account)
-      end
-
-      def step_url
-        step == :property ? routes.edit_settings_search_console_property_path : routes.settings_google_connection_path
       end
     end
   end

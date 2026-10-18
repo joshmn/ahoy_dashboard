@@ -12,10 +12,7 @@
       <% rows.each do |row| %>
         <div class="data-row" title="<%= row.label %>">
           <%= dash_bar_tag(row.share) %>
-          <span class="<%= class_names("rn", "mono" => mono) %>">
-            <%= dash_row_chip(chip, row.label) if chip %>
-            <%= dash_row_label(row.label, split: mono) %>
-          </span>
+          <%= dash_row_name row.label, chip: chip, mono: mono %>
           <span class="cnt"><%= dash_number(row.visitors) %></span>
         </div>
       <% end %>

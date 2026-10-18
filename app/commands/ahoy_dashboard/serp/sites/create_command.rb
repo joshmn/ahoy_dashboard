@@ -12,11 +12,11 @@ module AhoyDashboard
           return broadcast(:invalid, form) if form.invalid?
 
           site = SerpSite.new(form.record_attributes)
-          return copy_errors(site) unless site.save
+          return broadcast(:invalid, form.copy_errors_from(site)) unless site.save
 
           broadcast(:ok, Outcome.new(site: site, **attach_everywhere(site)))
         rescue ActiveRecord::RecordNotUnique
-          form.errors.add(:domain, "is already on the list")
+          form.add_duplicate_error
           broadcast(:invalid, form)
         end
 
@@ -39,14 +39,6 @@ module AhoyDashboard
           end
 
           { attached: attached, backfilled: backfilled }
-        end
-
-        def copy_errors(site)
-          site.errors.messages.each do |attribute, messages|
-            messages.each { |message| form.errors.add(attribute, message) }
-          end
-
-          broadcast(:invalid, form)
         end
       end
     end

@@ -1,34 +1,40 @@
 module AhoyDashboard
-  # One metric bucketed across the range, every bucket present even when it is
-  # empty, so the chart draws a flat line rather than a gap.
-  class TimeseriesQuery
+  class TimeseriesQuery < AhoyDashboard::Query
     INTERVALS = AhoyDashboard::Sql::Buckets::UNITS.keys.freeze
     DEFAULT_INTERVAL = :day
     VISIT_START = Arel.sql('"ahoy_visits"."started_at"').freeze
     SESSION_START = Arel.sql("tm_visits.started_at").freeze
-    VISITOR_TOKEN = Arel.sql("ahoy_visits.visitor_token collate \"C\"").freeze
+    VISITOR_TOKEN = Sql::VISITOR_TOKEN
     COUNT_METRICS = %w[visitors visits pageviews].freeze
     CountedSeries = Data.define(:total, :series)
 
-    def self.call(**options)
-      new(**options).call
-    end
+    class << self
+      def with_total(**options)
+        new(**options).with_total
+      end
 
-    def self.with_total(**options)
-      new(**options).with_total
+      def interval(value)
+        chosen = value.to_s.to_sym
+
+        INTERVALS.include?(chosen) ? chosen : DEFAULT_INTERVAL
+      end
+
+      def metric_key(metric)
+        metric.respond_to?(:key) ? metric.key : metric.to_s
+      end
     end
 
     def initialize(scope:, metric:, interval: DEFAULT_INTERVAL)
       @scope = scope
-      @metric_key = metric.respond_to?(:key) ? metric.key : metric.to_s
-      @interval = interval.to_s.to_sym
+      @metric_key = self.class.metric_key(metric)
+      @interval = self.class.interval(interval)
     end
 
     def call
       case metric_key
       when "visits" then series(visits_by_bucket)
       when "pageviews" then series(pageviews_by_bucket)
-      when "views_per_visit" then ratio(session_pageviews_by_bucket, visits_by_bucket, round: 2)
+      when "views_per_visit" then views_per_visit
       when "bounce_rate" then session_ratio(Sql::COUNT_BOUNCED, Sql::COUNT_BROWSED, scale: 100, round: 1)
       when "visit_duration" then session_ratio("sum(tm_visits.duration)", "count(*)", round: 0)
       when "scroll_depth" then percentages(scroll_depth_by_bucket)
@@ -36,29 +42,23 @@ module AhoyDashboard
       end
     end
 
-    # Pinned count metrics need both readings. GROUPING SETS counts the range
-    # independently of its buckets: summing daily distinct visitors would count
-    # a returning visitor more than once.
     def with_total
       relation = counted_relation
-      cached_pluck(relation: relation, columns: relation.select_values).yield_self do |rows|
-          total = 0
-          counts = {}
-          rows.each do |grouped, time, count|
-            if grouped == 1
-              total = count.to_i
-            else
-              counts[time] = count
-            end
-          end
-
-          points = Sql::Buckets.fill(counts, scope.range, interval).map { |time, count| [ time, count.to_i ] }
-          CountedSeries.new(total: total, series: points)
+      rows = cached_pluck(relation: relation, columns: relation.select_values)
+      total = 0
+      counts = {}
+      rows.each do |grouped, time, count|
+        if grouped == 1
+          total = count.to_i
+        else
+          counts[time] = count
         end
+      end
+
+      points = Sql::Buckets.fill(counts, scope.range, interval).map { |time, count| [ time, count.to_i ] }
+      CountedSeries.new(total: total, series: points)
     end
 
-    # Publish only rows just read from PostgreSQL. Re-publishing a cached
-    # headline would renew its age when a later panel reads these counts.
     def cache_counted_rows(rows)
       relation = counted_relation
       AnalyticsCache.write(key: ["timeseries", relation.to_sql], value: rows, connection: relation.connection)
@@ -66,11 +66,7 @@ module AhoyDashboard
 
     private
 
-    attr_reader :scope, :metric_key
-
-    def interval
-      INTERVALS.include?(@interval) ? @interval : DEFAULT_INTERVAL
-    end
+    attr_reader :scope, :metric_key, :interval
 
     def counted_relation
       raise ArgumentError, "no combined count for #{metric_key}" unless COUNT_METRICS.include?(metric_key)
@@ -84,9 +80,6 @@ module AhoyDashboard
         .reselect(Arel.sql("grouping(#{bucket})"), bucket, Arel.sql(aggregate))
     end
 
-    # Group by the bucket expression, then put the empty buckets back. Sql::Buckets
-    # owns both halves so the expression that decides where a row lands and the
-    # series that decides which buckets exist cannot disagree.
     def by_bucket(relation, column)
       grouped = relation.group(Sql::Buckets.sql(column, interval))
 
@@ -105,44 +98,33 @@ module AhoyDashboard
       by_bucket(scope.visits, VISIT_START, &:count)
     end
 
-    # Bucketed on the event's own time, pulled back to the edge of the range
-    # rather than filtered out of it. A visit that starts at 23:45 on the last
-    # day still owns the page it loads at 00:10, and dropping that row would
-    # leave the chart one behind the number printed above it.
     def pageviews_by_bucket
       by_bucket(scope.pageviews, clamped_time, &:count)
     end
 
     def clamped_time
-      connection = AhoyDashboard.event.connection
-      first = connection.quote(scope.range.begin)
-      last = connection.quote(scope.range.end)
-
-      Arel.sql("least(greatest(ahoy_events.time, #{first}::timestamp), #{last}::timestamp)")
+      Arel.sql("least(greatest(ahoy_events.time, #{Sql.timestamp(scope.range.begin)}), #{Sql.timestamp(scope.range.end)})")
     end
 
-    # Views per visit divides two counts that have to be counted the same way,
-    # so the numerator is bucketed by the visit's start like the denominator.
+    def views_per_visit
+      return ratio(session_pageviews_by_bucket, visits_by_bucket, round: 2) if scope.view_groups?
+
+      session_ratio(Sql::SESSION_PAGEVIEWS, "count(*)", round: 2)
+    end
+
     def session_pageviews_by_bucket
       by_bucket(scope.pageviews, VISIT_START, &:count)
     end
 
-    # Both components come off the same per-session reduction. Separate counts
-    # rebuilt that reduction twice, even when they were scheduled concurrently.
     def session_ratio(numerator, denominator, scale: 1, round: 0)
       bucket = Sql::Buckets.sql(SESSION_START, interval)
       columns = [bucket, Arel.sql(numerator), Arel.sql(denominator)]
-      cached_pluck(relation: session_relation.group(bucket), columns: columns).yield_self do |rows|
-        counts = rows.map do |time, top, bottom|
-          [ time, ratio_value(top, bottom, scale: scale, round: round) ]
-        end.to_h
+      rows = cached_pluck(relation: scope.sessions.group(bucket), columns: columns)
+      counts = rows.map do |time, top, bottom|
+        [ time, ratio_value(top, bottom, scale: scale, round: round) ]
+      end.to_h
 
-        Sql::Buckets.fill(counts, scope.range, interval, default: ratio_value(0, 0, scale: scale, round: round)).to_a
-      end
-    end
-
-    def session_relation
-      AhoyDashboard.visit.unscoped.from(Arel.sql("(#{scope.per_visit.to_sql}) tm_visits"))
+      Sql::Buckets.fill(counts, scope.range, interval, default: ratio_value(0, 0, scale: scale, round: round)).to_a
     end
 
     def cached_pluck(relation:, columns:)
@@ -151,10 +133,6 @@ module AhoyDashboard
       AnalyticsCache.fetch(key: ["timeseries", sql], connection: relation.connection) { relation.pluck(*columns) }
     end
 
-    # One engagement event is one page view, so the average inside a bucket is
-    # that bucket's own reading rather than an average of averages. Bucketed on
-    # the event's own time like the pageview count, since it fires when the page
-    # is left and that can be after the visit's own day.
     def scroll_depth_by_bucket
       relation = scope.visit_events.where(name: AhoyDashboard::ENGAGEMENT)
 
@@ -162,22 +140,16 @@ module AhoyDashboard
     end
 
     def series(buckets)
-      buckets.yield_self { |values| values.map { |time, value| [ time, value.to_i ] } }
+      buckets.map { |time, value| [ time, value.to_i ] }
     end
 
     def percentages(buckets)
-      buckets.yield_self { |values| values.map { |time, value| [ time, value.to_f.round(1) ] } }
+      buckets.map { |time, value| [ time, value.to_f.round(1) ] }
     end
 
-    # A ratio is worked out inside each bucket. Averaging the whole range's
-    # average across buckets would weight a quiet Sunday like a busy Monday.
     def ratio(numerators, denominators, scale: 1, round: 0)
-      denominators.yield_self do |denominator_values|
-        numerator_values = numerators
-
-        denominator_values.map do |bucket, denominator|
-          [ bucket, ratio_value(numerator_values[bucket], denominator, scale: scale, round: round) ]
-        end
+      denominators.map do |bucket, denominator|
+        [ bucket, ratio_value(numerators[bucket], denominator, scale: scale, round: round) ]
       end
     end
 

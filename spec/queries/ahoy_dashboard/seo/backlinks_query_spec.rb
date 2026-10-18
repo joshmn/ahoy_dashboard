@@ -5,9 +5,9 @@ RSpec.describe AhoyDashboard::Seo::BacklinksQuery do
   let(:range) { Time.utc(2026, 8, 10)..Time.utc(2026, 8, 20) }
 
   def domain(name, **attributes)
-    AhoyDashboard::BacklinkDomain.create!(domain: "#{name}.example", first_seen_on: day - 1,
-                                          last_seen_on: day, provider: "dataforseo", links: 2,
-                                          **attributes)
+    create(:dash_backlink_domain, domain: "#{name}.example", first_seen_on: day - 1,
+           last_seen_on: day, provider: "dataforseo", links: 2,
+           **attributes)
   end
 
   it "counts all live, gained and lost domains in one aggregate with the original date boundaries" do
@@ -17,17 +17,12 @@ RSpec.describe AhoyDashboard::Seo::BacklinksQuery do
     domain("lost-now", lost_on: day, links: 100)
     domain("lost-before", lost_on: day - 1, links: 100)
     domain("lost-future", lost_on: day + 30, links: 100)
-    sql = []
-    subscriber = ->(_name, _started, _finished, _id, payload) do
-      statement = payload[:sql]
-      sql << statement if statement.match?(/\ASELECT/) && statement.include?("count(*)") && statement.include?("backlink_domains")
-    end
-
-    result = ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { described_class.call(range: range) }
+    result = nil
+    sql = captured_sql(/\ASELECT/, cached: true) { result = described_class.call(range: range) }
 
     expect(result.totals).to have_attributes(domains: 3, links: 12, followed: 2, gained: 2, lost: 2, nofollow: 1)
     expect(result).not_to be_sample
-    expect(sql.size).to eq(1)
+    expect(sql.count { |statement| statement.include?("count(*)") && statement.include?("backlink_domains") }).to eq(1)
   end
 
   it "includes old lost sample domains when deciding whether the data contains samples" do
@@ -40,10 +35,10 @@ RSpec.describe AhoyDashboard::Seo::BacklinksQuery do
   end
 
   it "also detects sample snapshots only inside the requested range" do
-    AhoyDashboard::BacklinkSample.create!(on: day - 1, provider: "fake", domains: 1, links: 1)
+    create(:dash_backlink_sample, on: day - 1, provider: "fake", domains: 1, links: 1)
     expect(described_class.call(range: range)).not_to be_sample
 
-    AhoyDashboard::BacklinkSample.create!(on: day, provider: "fake", domains: 1, links: 1)
+    create(:dash_backlink_sample, on: day, provider: "fake", domains: 1, links: 1)
     expect(described_class.call(range: range)).to be_sample
   end
 end

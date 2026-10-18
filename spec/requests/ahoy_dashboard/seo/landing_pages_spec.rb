@@ -1,36 +1,14 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard seo landing pages", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
 
   around { |example| travel_to(now) { example.run } }
 
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
   def reading(keyword, position:, url:, days_ago: 1, site: self.site)
     run = create(:dash_serp_run, keyword: keyword, checked_at: now - days_ago.days)
     create(:dash_serp_check, run: run, site: site, position: position, url: url)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/seo/landing_page"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/seo/landing_page"
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do

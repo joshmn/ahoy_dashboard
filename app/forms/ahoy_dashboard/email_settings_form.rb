@@ -10,11 +10,11 @@ module AhoyDashboard
 
     attribute :alerts_digest, default: -> { [] }
     attribute :alerts_recipients, :string
-    attribute :alerts_from, :string
+    attribute :alerts_from, TRIMMED
     attribute :alerts_send_empty, :boolean, default: true
     attribute :reports_digest, default: -> { [] }
     attribute :reports_recipients, :string
-    attribute :reports_from, :string
+    attribute :reports_from, TRIMMED
 
     validate :periods_known
     validate :recipients_readable
@@ -30,10 +30,6 @@ module AhoyDashboard
           reports_from: Preferences.read(:reports, :from))
     end
 
-    def self.human_attribute_name(attribute, options = {})
-      LABELS.fetch(attribute.to_sym) { super }
-    end
-
     def self.address?(value)
       parsed = Mail::Address.new(value)
       parsed.address.to_s.match?(URI::MailTo::EMAIL_REGEXP) && parsed.domain.to_s.include?(".")
@@ -47,14 +43,6 @@ module AhoyDashboard
 
     def reports_digest
       Array(super()).map { |period| period.to_s.strip }.reject(&:blank?)
-    end
-
-    def alerts_from
-      super().to_s.strip.presence
-    end
-
-    def reports_from
-      super().to_s.strip.presence
     end
 
     def alerts_recipient_list

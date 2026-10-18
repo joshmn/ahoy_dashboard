@@ -1,17 +1,4 @@
 module AhoyDashboard
-  # The value picker: one dialog in two steps, drawn as the command menu.
-  #
-  # No facet named is the list of facets. A facet named is that facet's options,
-  # with a way back to the list. It is one panel swapping what is inside it, so
-  # the back step is this same show without the parameter.
-  #
-  # It differs from the filter dialog in what picking does. There, a value is
-  # added to the filters being built and applied to the dashboard. Here it writes into the form field that opened
-  # it, so every row is a button carrying what it would write rather than a URL.
-  # That is also why this is its own resource: the two answer the same question
-  # and do opposite things with the answer.
-  #
-  # Singular, because what is being picked from is the query string.
   class PickersController < AhoyDashboard::BaseController
     FRAME = "dash_picker".freeze
 

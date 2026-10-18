@@ -1,0 +1,12 @@
+<div>
+  <dt>From</dt>
+  <dd class="<%= "nil" if plan.places.empty? %>" data-dash--keyword-form-target="where"><%= plan.where_label.presence || "No place picked" %></dd>
+</div>
+<div>
+  <dt>Device</dt>
+  <dd data-dash--keyword-form-target="device"><%= plan.device_label %></dd>
+</div>
+<div>
+  <dt>Checked</dt>
+  <dd data-dash--keyword-form-target="often"><%= plan.often_label %></dd>
+</div>

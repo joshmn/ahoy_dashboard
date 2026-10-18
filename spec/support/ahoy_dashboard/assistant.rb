@@ -1,6 +1,4 @@
 module AssistantFixtures
-  # Off in test, the same posture as search console and the serp tracking, so a
-  # spec that wants a real turn has to say so.
   def assistant_enabled!(model: "test-model")
     allow(AhoyDashboard::Assistant).to receive_messages(available?: true, model_name: model)
   end
@@ -8,7 +6,7 @@ module AssistantFixtures
   def answer_double(content, input_tokens: 10, output_tokens: 20, truncated: false)
     instance_double(AhoyDashboard::LLM::Message, content: content, input_tokens: input_tokens,
                                                  output_tokens: output_tokens, truncated?: truncated,
-                                                 cache_read_tokens: 0, cache_write_tokens: 0)
+                                                 cache_read_tokens: 0, cache_write_tokens: 0, reasoning: "")
   end
 
   def assistant_answers(content, tool_calls: [], input_tokens: 10, output_tokens: 20, truncated: false)
@@ -23,8 +21,6 @@ module AssistantFixtures
     chat
   end
 
-  # Answers in pieces, the way a real one does, so a spec can watch the half
-  # written answer land on the row the page is reading.
   def assistant_streams(*chunks, tool_calls: [], input_tokens: 10, output_tokens: 20)
     answer = answer_double(chunks.join, input_tokens: input_tokens, output_tokens: output_tokens)
     chat = instance_double(AhoyDashboard::LLM::Chat)

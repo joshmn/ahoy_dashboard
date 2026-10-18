@@ -33,7 +33,7 @@ module AhoyDashboard
       end
 
       def csv_date(value)
-        AhoyDashboard::SeoHelper.local_date(value)&.iso8601
+        AhoyDashboard::DateFormat.local(value)&.iso8601
       end
 
       def csv_time(value)

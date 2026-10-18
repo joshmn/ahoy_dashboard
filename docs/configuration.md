@@ -127,7 +127,7 @@ The analytics dashboard is always on. Everything in this table is optional, and 
 | Keyword research | `keywords` | A DataForSEO login | [Keyword research and backlinks](keyword-research-and-backlinks.md) |
 | Backlinks | `backlinks` | A DataForSEO login | [Keyword research and backlinks](keyword-research-and-backlinks.md) |
 | The place list | `places` | Nothing. It builds itself once a month. | [Keyword research and backlinks](keyword-research-and-backlinks.md) |
-| The assistant | `assistant` | An Anthropic or OpenAI key, or LM Studio | [Assistant](assistant.md) |
+| The assistant | `assistant` | An Anthropic, OpenAI or DeepSeek key, or an OpenAI-compatible server like LM Studio | [Assistant](assistant.md) |
 | AI visibility | `ai_visibility` | A key for at least one assistant and some prompts | [AI visibility](ai-visibility.md) |
 | Alerts | `alerts` | At least one rule on, and email periods and recipients | [Alerts](alerts.md) |
 | Email reports | `reports` | Email periods and recipients | [Email reports](email-reports.md) |

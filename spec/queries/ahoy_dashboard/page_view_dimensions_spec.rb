@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard page dimensions read page views only" do
   let(:range) { dash_day_range(2026, 8, 10) }
@@ -15,8 +14,7 @@ RSpec.describe "Dashboard page dimensions read page views only" do
   end
 
   before do
-    reader = dash_visit(started_at: at, visitor: "reader", landing_page: "https://example.com/read")
-    dash_page_view(reader, path: "/read", at: at)
+    dash_landing("/read", at: at, visitor: "reader", landing_page: "https://example.com/read")
 
     scanner = dash_visit(started_at: at, visitor: "scanner", landing_page: "https://example.com/wp-login.php")
     dash_goal(scanner, "request_blocked", at: at, path: "/wp-login.php", format: "html")

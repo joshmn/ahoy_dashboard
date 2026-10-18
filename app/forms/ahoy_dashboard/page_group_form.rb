@@ -2,7 +2,7 @@ module AhoyDashboard
   class PageGroupForm < AhoyDashboard::Form
     FIELDS = %i[name patterns].freeze
 
-    attribute :name, :string
+    attribute :name, TRIMMED
     attribute :patterns, :string
 
     validates :name, presence: true
@@ -12,18 +12,16 @@ module AhoyDashboard
       new(name: record.name, patterns: record.pattern_list.join(", "))
     end
 
-    def name
-      super().to_s.strip.presence
-    end
-
-    # Typed as one comma separated line, stored as a list. The form keeps the
-    # line because that is what somebody edits.
     def pattern_list
       AhoyDashboard::PageGroup.clean(patterns)
     end
 
     def record_attributes
       { name: name, patterns: pattern_list }
+    end
+
+    def add_duplicate_error
+      errors.add(:name, "is already taken")
     end
 
     private

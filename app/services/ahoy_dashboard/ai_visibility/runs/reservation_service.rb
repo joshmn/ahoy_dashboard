@@ -14,6 +14,10 @@ module AhoyDashboard
           def call(**options)
             new(**options).call
           end
+
+          def lock
+            Run.connection.execute("SELECT pg_advisory_xact_lock(#{LOCK_NAMESPACE}, #{LOCK_KEY})")
+          end
         end
 
         def initialize(prompts:, targets:, trigger:, now:)
@@ -25,7 +29,7 @@ module AhoyDashboard
 
         def call
           Run.transaction do
-            Run.connection.execute("SELECT pg_advisory_xact_lock(#{LOCK_NAMESPACE}, #{LOCK_KEY})")
+            self.class.lock
             remaining = AiVisibility.remaining(now: now)
             next skipped(remaining: remaining) if requests > remaining
 

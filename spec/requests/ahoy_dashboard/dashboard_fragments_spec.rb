@@ -1,51 +1,25 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard snapshot fragments", type: :request do
   let(:now) { Time.utc(2026, 8, 11, 14, 30) }
   let!(:funnel) { create(:dash_funnel, name: "Original funnel") }
 
-  around do |example|
-    previous_cache = Rails.cache
-    previous_fragments = AhoyDashboard::BaseController.cache_store
-    previous_caching = AhoyDashboard::BaseController.perform_caching
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    AhoyDashboard::BaseController.cache_store = Rails.cache
-    AhoyDashboard::BaseController.perform_caching = true
-    travel_to(now) { example.run }
-  ensure
-    Rails.cache = previous_cache
-    AhoyDashboard::BaseController.cache_store = previous_fragments
-    AhoyDashboard::BaseController.perform_caching = previous_caching
-    AhoyDashboard::Current.reset
-  end
+  include_context "with fragment caching"
+
+  around { |example| travel_to(now) { example.run } }
 
   before do
-    AhoyDashboard::Preferences.write(:site, precomputed_dashboard: true)
+    precompute_dashboard!
     sign_in(create(:user, :admin))
     visit = dash_visit(started_at: now - 2.days, visitor: "original", country: "US")
     dash_page_view(visit, path: "/original", at: visit.started_at)
     get("/telemetry?loading=complete", params: { period: "30d" })
   end
 
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
   def card_markup
     document.css("#panels tm-frame[id^='report_']").map(&:to_html)
-  end
-
-  def rendered_cards
-    cards = []
-    capture = lambda do |*args|
-      identifier = args.last[:identifier].to_s
-      cards << identifier if identifier.match?(%r{/(reports|funnels)/_card\.html\.erb\z})
-    end
-    ActiveSupport::Notifications.subscribed(capture, "render_partial.action_view") { yield }
-    cards
   end
 
   def add_traffic
@@ -62,7 +36,7 @@ RSpec.describe "Dashboard snapshot fragments", type: :request do
   end
 
   it "avoids rebuilding report and funnel cards for an unchanged snapshot" do
-    cards = rendered_cards { get("/telemetry?loading=complete", params: { period: "30d" }) }
+    cards = rendered_card_partials { get("/telemetry?loading=complete", params: { period: "30d" }) }
 
     expect(cards).to be_empty
   end
@@ -119,7 +93,7 @@ RSpec.describe "Dashboard snapshot fragments", type: :request do
     previous_locales = I18n.available_locales
     I18n.available_locales = previous_locales + [:fr]
     cards = I18n.with_locale(:fr) do
-      rendered_cards { get("/telemetry?loading=complete", params: { period: "30d" }) }
+      rendered_card_partials { get("/telemetry?loading=complete", params: { period: "30d" }) }
     end
 
     expect(cards).not_to be_empty
@@ -130,7 +104,7 @@ RSpec.describe "Dashboard snapshot fragments", type: :request do
   it "stops caching the cards when precomputation is disabled" do
     AhoyDashboard::Preferences.write(:site, precomputed_dashboard: false)
 
-    cards = rendered_cards { get("/telemetry?loading=complete", params: { period: "30d" }) }
+    cards = rendered_card_partials { get("/telemetry?loading=complete", params: { period: "30d" }) }
 
     expect(cards).not_to be_empty
   end
@@ -138,7 +112,7 @@ RSpec.describe "Dashboard snapshot fragments", type: :request do
   it "honors the host application's fragment caching setting" do
     AhoyDashboard::BaseController.perform_caching = false
 
-    cards = rendered_cards { get("/telemetry?loading=complete", params: { period: "30d" }) }
+    cards = rendered_card_partials { get("/telemetry?loading=complete", params: { period: "30d" }) }
 
     expect(cards).not_to be_empty
   end

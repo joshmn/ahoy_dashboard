@@ -70,22 +70,20 @@ RSpec.describe AhoyDashboard::Reports::DigestPresenter do
   end
 
   describe "the tiles" do
-    # Bounce rate is the one that reads the other way round, which is the whole
-    # reason the colour comes off the metric rather than off the sign.
     it "colours a falling bounce rate as the good news and a falling visitor count as the bad" do
       view = present(window: window(:daily, Date.new(2026, 9, 18), Date.new(2026, 9, 18)),
                      stats: [ stat("visitors", 80, 100), stat("bounce_rate", 40.0, 50.0) ])
       visitors, bounce = view.tiles
 
-      expect(visitors).to have_attributes(change: "-20%", direction: :down, color: described_class::DOWN)
-      expect(bounce).to have_attributes(change: "-20%", direction: :down, color: described_class::UP)
+      expect(visitors).to have_attributes(change: "-20%", color: described_class::DOWN)
+      expect(bounce).to have_attributes(change: "-20%", color: described_class::UP)
     end
 
     it "leaves the change off when there is nothing behind it" do
       view = present(window: window(:daily, Date.new(2026, 9, 18), Date.new(2026, 9, 18)),
                      stats: [ stat("visitors", 80) ])
 
-      expect(sole_item(view.tiles)).to have_attributes(value: "80", change: nil, direction: :none)
+      expect(sole_item(view.tiles)).to have_attributes(value: "80", change: nil, color: described_class::LEVEL)
     end
   end
 

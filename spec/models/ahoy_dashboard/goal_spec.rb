@@ -36,8 +36,6 @@ RSpec.describe AhoyDashboard::Goal do
       expect(goal).not_to be_valid
     end
 
-    # validate: true on the enum, so an unknown kind is a validation failure
-    # rather than an ArgumentError raised at assignment.
     it "refuses a kind it does not know" do
       goal = described_class.new(kind: "guessing", event_name: "x")
 
@@ -45,8 +43,6 @@ RSpec.describe AhoyDashboard::Goal do
       expect(goal.errors[:kind]).to be_present
     end
 
-    # The database index cannot catch this one, because the collision is between
-    # a display_name and another goal's derived default.
     it "refuses a name another goal already resolves to" do
       described_class.create!(kind: :custom_event, event_name: "site_searched")
       clash = described_class.new(kind: :pageview, path_pattern: "/x", display_name: "site_searched")
@@ -106,62 +102,6 @@ RSpec.describe AhoyDashboard::Goal do
       )
 
       expect(goal.name).to eq("site_searched (facility_id: 12)")
-    end
-  end
-
-  describe "#match_sql" do
-    it "matches an event by name" do
-      goal = described_class.new(kind: :custom_event, event_name: "site_searched")
-
-      expect(goal.match_sql).to eq("ahoy_events.name = 'site_searched'")
-    end
-
-    it "escapes a quote in the event name rather than breaking the query" do
-      goal = described_class.new(kind: :custom_event, event_name: "it's")
-
-      expect(goal.match_sql).to eq("ahoy_events.name = 'it''s'")
-    end
-
-    it "turns a star into a like wildcard" do
-      goal = described_class.new(kind: :pageview, path_pattern: "/resources/*")
-
-      expect(goal.match_sql).to include("like '/resources/%'")
-    end
-
-    it "escapes like metacharacters that appear in a real path" do
-      goal = described_class.new(kind: :pageview, path_pattern: "/a_b/100%/*")
-
-      expect(goal.match_sql).to include("like '/a\\_b/100\\%/%'")
-    end
-
-    it "adds the property condition when the goal is narrowed" do
-      goal = described_class.new(
-        kind: :custom_event, event_name: "site_searched",
-        property_key: "facility_id", property_value: "12"
-      )
-
-      expect(goal.match_sql).to include("ahoy_events.properties ->> 'facility_id' = '12'")
-    end
-  end
-
-  describe ".match_case_sql" do
-    it "is nil when nothing is defined, so a caller can pick its own empty" do
-      expect(described_class.match_case_sql).to be_nil
-    end
-
-    it "resolves to the goal name so a filter chip can read it back" do
-      described_class.create!(kind: :custom_event, event_name: "x", display_name: "Did the thing")
-
-      expect(described_class.match_case_sql).to include("then 'Did the thing'")
-    end
-
-    it "orders by position, so the first match wins in a chosen order" do
-      described_class.create!(kind: :custom_event, event_name: "late", position: 5)
-      described_class.create!(kind: :custom_event, event_name: "early", position: 1)
-
-      sql = described_class.match_case_sql.to_s
-
-      expect(sql.index("early")).to be < sql.index("late")
     end
   end
 

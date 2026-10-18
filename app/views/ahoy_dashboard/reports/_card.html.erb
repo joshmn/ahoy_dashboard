@@ -1,39 +1,27 @@
-<%# The panel: a 46px head with the title and its tabs, a list, and a foot that
-    opens the full list. %>
 <%= dash_card element: :section, class: "panel h-100",
       "aria-labelledby": "tm-card-#{report.key}-title",
-      data: { controller: "dash--tabs", "dash--tabs-frame-value": "report_#{report.key}" } do %>
-  <% primary_tabs, overflow_tabs = dash_tab_split(report) %>
+      data: { controller: "dash--tabs" } do %>
+  <% primary_tabs, overflow_tabs = dash_tab_split(presenter.tabs) %>
   <% properties = presenter.property_options %>
-  <% breakdowns = tab.breakdown_options %>
+  <% breakdowns = presenter.breakdown_options %>
 
   <%= dash_card_header report.title, id: "tm-card-#{report.key}-title", element: :header do %>
     <% if report.tabs.many? || properties.any? || breakdowns.many? %>
       <div class="d-flex align-items-center gap-1 min-w-0">
         <% if report.tabs.many? %>
-          <%= dash_tabs primary_tabs.map { |card_tab|
-                { label: card_tab.label,
-                  url: report_path(report.key, query.to_query.merge(tab: card_tab.key)),
-                  current: card_tab.key == tab.key }
-              },
+          <%= dash_tabs primary_tabs.map { |option| { label: option.label, url: option.path, current: option.active? } },
               label: "Views of #{report.title.downcase}", select: true %>
 
           <% if overflow_tabs.any? %>
-            <%= render "ahoy_dashboard/reports/tab_picker", report: report, tab: tab, tabs: overflow_tabs %>
+            <%= render "ahoy_dashboard/reports/tab_picker", report: report, presenter: presenter, tabs: overflow_tabs %>
           <% end %>
         <% end %>
 
-<%# Only on the properties tab, and a third control rather than a tab: it says
-    which custom property the card is grouping by, which a tab per key cannot,
-    because the keys are rows in a table somebody edits. %>
         <% if properties.any? %>
           <%= render "ahoy_dashboard/reports/property_picker", report: report, presenter: presenter %>
         <% end %>
 
-<%# Same idea again: which reading of this card's own dimension is showing. A tab
-    with one option renders nothing, because a menu holding one item is a control
-    that does nothing. %>
-        <%= render "ahoy_dashboard/reports/breakdown_picker", report: report, tab: tab %>
+        <%= render "ahoy_dashboard/reports/breakdown_picker", report: report, presenter: presenter %>
       </div>
     <% end %>
   <% end %>
@@ -50,19 +38,9 @@
   <%= render "ahoy_dashboard/reports/rows", report: report, tab: tab, presenter: presenter %>
 
   <% unless presenter.empty? %>
-    <%= dash_card_footer action: true do %>
-      <%= dash_button presenter.details_path,
-            tone: :link,
-            class: "more",
-            "aria-haspopup": "dialog",
-            data: {
-              tm_frame: "report_details_#{report.key}",
-              action: "dash--modal#open",
-              "dash--modal-key-param": report.key
-            } do %>
-        <%= dash_icon(:expand, size: 13, class_name: "bx") %>
-        <span>Show all <%= tab.label_column.to_s.downcase.pluralize %></span>
-      <% end %>
+    <%= dash_details_opener presenter.details_path, frame: presenter.details_frame_id, key: report.key do %>
+      <%= dash_icon(:expand, size: 13, class_name: "bx") %>
+      <span>Show all <%= tab.label_column.to_s.downcase.pluralize %></span>
     <% end %>
   <% end %>
 <% end %>

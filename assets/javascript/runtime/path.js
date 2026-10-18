@@ -1,14 +1,3 @@
-// Monotone cubic interpolation, Fritsch-Carlson.
-//
-// A plain cardinal spline overshoots: three points at 40, 41, 400 draw a curve
-// that dips below 40 on its way up, and a visitor count that never went
-// negative renders as if it did. This does not overshoot, which is the whole
-// reason to prefer it over a smoothing factor.
-//
-// Shared by the main chart, the pinned-question sparklines and Explore's
-// multi-series plot. Written once here.
-//
-// Takes an array of [x, y] pairs and returns an SVG path string.
 export function smoothPath(points) {
   const n = points.length;
   if (n === 0) return "";
@@ -30,9 +19,6 @@ export function smoothPath(points) {
     slopes[i] = secants[i - 1] * secants[i] <= 0 ? 0 : (secants[i - 1] + secants[i]) / 2;
   }
 
-  // Where the data is flat the tangent has to be flat too, and where a tangent
-  // is steep enough to overshoot it gets pulled back onto the circle of radius
-  // three. This is the monotonicity guarantee.
   for (let i = 0; i < n - 1; i++) {
     if (secants[i] === 0) {
       slopes[i] = 0;
@@ -66,7 +52,6 @@ export function smoothPath(points) {
   return d;
 }
 
-// Closes a line path back down to a baseline so it can be filled.
 export function areaPath(line, points, baseY) {
   if (!line || points.length === 0) return "";
 

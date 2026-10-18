@@ -1,8 +1,6 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::Seo::PositionChangesPresenter do
-  include ActiveSupport::Testing::TimeHelpers
-
   let(:zone) { AhoyDashboard.time_zone }
   let(:now) { zone.local(2026, 8, 10, 12) }
   let(:range) { (now - 7.days).beginning_of_day..now.end_of_day }

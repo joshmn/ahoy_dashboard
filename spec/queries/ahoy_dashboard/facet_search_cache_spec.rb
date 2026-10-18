@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Facet search caching" do
   let(:range) { dash_day_range(2026, 8, 10) }

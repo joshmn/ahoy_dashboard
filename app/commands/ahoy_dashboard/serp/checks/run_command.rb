@@ -135,19 +135,7 @@ module AhoyDashboard
         end
 
         def record_check(run, target, combined)
-          site = target.site
-          rank = combined.rank_for(site.domain, match_subdomains: site.match_subdomains)
-          overview = combined.ai_overview
-          source = overview.source_for(site.domain, match_subdomains: site.match_subdomains)
-
-          upsert_check(run, target, {
-            position: rank&.position, page: rank&.page, url: rank&.link,
-            ai_overview_present: overview.shown?,
-            ai_overview_cited: overview.shown? && source.present?,
-            ai_overview_citation_position: source ? overview.sources.index(source) + 1 : nil,
-            ai_overview_source_count: overview.sources.size,
-            status: :success, error_message: nil
-          })
+          upsert_check(run, target, combined.check_attributes_for(target.site).merge(status: :success, error_message: nil))
         end
 
         def upsert_check(run, target, attributes)
@@ -162,7 +150,7 @@ module AhoyDashboard
         def record_citations(run, combined)
           return [] unless combined.ai_overview.shown?
 
-          run.ai_citations.destroy_all
+          run.ai_citations.delete_all(:delete_all)
           combined.ai_overview.sources.each_with_index.map do |source, index|
             run.ai_citations.create!(slot: index + 1, link: source.link, domain: source.domain,
                                      title: source.title, checked_at: run.checked_at)

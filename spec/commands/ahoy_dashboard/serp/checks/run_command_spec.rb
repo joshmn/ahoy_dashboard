@@ -1,10 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp::Checks::RunCommand do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
   let(:keyword) { create(:dash_serp_keyword, query: "visiting hours", locations: [ "us" ]) }
   let(:adapter) { instance_double(AhoyDashboard::Serp::Adapters::FakeAdapter) }
@@ -190,7 +187,7 @@ RSpec.describe AhoyDashboard::Serp::Checks::RunCommand do
 
     it "does nothing when the provider has no credentials" do
       serp_enabled!(provider: :serpapi)
-      allow(AhoyDashboard::Serp).to receive(:credential).with(:serpapi, :api_key).and_return(nil)
+      serpapi_configured!(api_key: nil)
 
       events = described_class.call(keyword: keyword, location: "us")
 

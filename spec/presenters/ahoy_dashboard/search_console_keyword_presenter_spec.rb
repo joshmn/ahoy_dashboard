@@ -1,9 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe AhoyDashboard::SearchConsoleKeywordPresenter do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:keyword) { "fci thomson visiting" }
   let(:query) { AhoyDashboard::QueryForm.from_params({ period: "30d" }) }
 
@@ -31,9 +29,7 @@ RSpec.describe AhoyDashboard::SearchConsoleKeywordPresenter do
       keyword!(Date.new(2026, 8, 2), clicks: 8, impressions: 100, ctr: 0.08, position: 6.0)
     end
 
-    let(:presented) do
-      presenter(range: AhoyDashboard.time_zone.local(2026, 8, 2)..AhoyDashboard.time_zone.local(2026, 8, 2).end_of_day)
-    end
+    let(:presented) { presenter(range: dash_day_range(2026, 8, 2)) }
 
     it "reads clicks as a proportion of the window before it" do
       clicks = figure(presented, "clicks")
@@ -47,8 +43,6 @@ RSpec.describe AhoyDashboard::SearchConsoleKeywordPresenter do
       expect(figure(presented, "ctr").delta[:text]).to eq("6.0 pts")
     end
 
-    # Position runs the other way: a fall in the number is the keyword doing
-    # better, so the colour cannot follow the sign.
     it "reads position in places and calls a fall an improvement" do
       position = figure(presented, "position")
 
@@ -73,7 +67,7 @@ RSpec.describe AhoyDashboard::SearchConsoleKeywordPresenter do
     it "draws clicks as an area with zero on the days Google said nothing" do
       presented = presenter
 
-      expect(presented.chart_kind).to eq(:area)
+      expect(presented.chart_options.dig(:library, :tmFill)).to be(true)
       expect(presented.chart_data.first[:name]).to eq("Clicks")
       expect(presented.chart_data.first[:data].map(&:last)).to eq([ 4, 0, 1 ])
     end
@@ -81,7 +75,7 @@ RSpec.describe AhoyDashboard::SearchConsoleKeywordPresenter do
     it "draws position as a line, upside down, and leaves the quiet day empty" do
       presented = presenter(series: "position")
 
-      expect(presented.chart_kind).to eq(:line)
+      expect(presented.chart_options.dig(:library, :tmFill)).to be(false)
       expect(presented.chart_data.first[:data].map(&:last)).to eq([ 9.4, nil, 4.2 ])
       expect(presented.chart_options.dig(:library, :scales, :y, :reverse)).to be(true)
     end
@@ -91,6 +85,11 @@ RSpec.describe AhoyDashboard::SearchConsoleKeywordPresenter do
 
       expect(presented.chart_data.first[:data].map(&:last)).to eq([ 2.0, nil, 2.0 ])
       expect(presented.chart_options.dig(:library, :plugins, :tmFormat, :value)).to eq("rate")
+    end
+
+    it "draws click through and impressions the way their series say" do
+      expect(presenter(series: "ctr").chart_options.dig(:library, :tmFill)).to be(false)
+      expect(presenter(series: "impressions").chart_options.dig(:library, :tmFill)).to be(true)
     end
 
     it "falls back to clicks when the series is not one of the four" do

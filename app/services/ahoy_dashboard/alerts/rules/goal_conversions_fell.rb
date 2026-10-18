@@ -11,29 +11,24 @@ module AhoyDashboard
 
         def findings
           readings.goal_days.map do |series|
-            drop = percent_drop(series)
+            drop = drop_for(series)
             next unless drop && drop >= threshold
 
-            finding(subject: series.name, reading: now.beginning_of_hour.utc.iso8601,
+            finding(subject: series.name, reading: this_hour,
                     headline: "#{series.name} conversions fell #{drop}%",
                     detail: "#{counted(series.this_week, "conversion")} in the last 7 days, " \
                             "against #{number(series.last_week)} the 7 days before.")
-          end.select { |value| value }
+          end.compact
         end
 
         def cleared
-          readings.goal_days.map do |series|
-            drop = percent_drop(series)
-            series.name if drop && drop < threshold / 2.0
-          end.select { |value| value }
+          readings.goal_days.select { |series| drop_recovered?(drop_for(series)) }.map(&:name)
         end
 
         private
 
-        def percent_drop(series)
-          return nil if series.last_week.zero?
-
-          ((series.last_week - series.this_week) * 100.0 / series.last_week).floor
+        def drop_for(series)
+          percent_drop(previous: series.last_week, current: series.this_week)
         end
       end
     end

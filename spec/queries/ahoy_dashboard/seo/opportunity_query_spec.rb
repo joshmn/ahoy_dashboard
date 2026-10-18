@@ -72,12 +72,51 @@ RSpec.describe AhoyDashboard::Seo::OpportunityQuery do
     row!("https://example.com/a", device: "mobile", country: "usa", clicks: 5)
 
     result = described_class.call(range: range, limit: 1)
+    striking = result.striking.index_by(&:query)
 
     expect(result.rows.size).to eq(1)
-    expect(result.all.size).to eq(2)
-    expect(result.all.index_by(&:query).fetch(query).page).to eq("https://example.com/a")
-    expect(result.all.index_by(&:query).fetch("without a recorded page").page).to be_nil
+    expect(striking.size).to eq(2)
+    expect(striking.fetch(query).page).to eq("https://example.com/a")
+    expect(striking.fetch("without a recorded page").page).to be_nil
     expect(result.impressions).to eq(3_000)
+  end
+
+  it "reads the range once however many lists and tiles the page asks for" do
+    search!("fci thomson", clicks: 5, impressions: 2_000, position: 12.0)
+    search!("federal prison consultant", clicks: 1, impressions: 1_000, position: 2.0)
+    statements = captured_sql("ahoy_dashboard_search_console_keywords", cached: true) do
+      result = described_class.call(range: range)
+      [ result.rows, result.striking(limit: 20), result.under_performing(limit: 15), result.clicks,
+        result.impressions, result.upside, result.striking_count, result.under_performing_count ]
+    end
+
+    expect(statements.count { |sql| sql.include?("GROUP BY") }).to eq(1)
+  end
+
+  it "orders the below expected list by the shortfall, then by upside, impressions and the search" do
+    search!("short by a lot", clicks: 0, impressions: 2_000, position: 5.0)
+    search!("short by less, less upside", clicks: 50, impressions: 4_000, position: 8.0)
+    search!("short by less, more upside", clicks: 34, impressions: 4_000, position: 9.0)
+    search!("short by less, same again", clicks: 50, impressions: 4_000, position: 8.0)
+    search!("on target", clicks: 300, impressions: 3_000, position: 4.0)
+
+    result = described_class.call(range: range)
+
+    expect(result.under_performing.map(&:query))
+      .to eq([ "short by a lot", "short by less, more upside", "short by less, less upside", "short by less, same again" ])
+    expect(result.under_performing.map(&:expected)).to eq([ 104, 96, 112, 112 ])
+    expect(result.under_performing_count).to eq(4)
+  end
+
+  it "adds the tiles up over every qualifying search, rounded the way the list is" do
+    search!("fci thomson", clicks: 5, impressions: 2_000, position: 12.04)
+    search!("federal prison consultant", clicks: 1, impressions: 1_000, position: 2.0)
+    search!("too quiet to count", clicks: 1, impressions: 20, position: 15.0)
+
+    result = described_class.call(range: range)
+
+    expect([ result.clicks, result.impressions, result.upside, result.striking_count ]).to eq([ 6, 3_000, 197, 1 ])
+    expect(result.rows.map(&:position)).to eq([ 12.0, 2.0 ])
   end
 
   it "keeps striking distance and the band column on the same positions" do

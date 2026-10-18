@@ -1,19 +1,10 @@
 module AhoyDashboard
-  # Markdown, but only the parts an answer needs.
-  #
-  # This exists so the gem carries no markdown library. The input is one
-  # assistant reply, and the output is fed straight to Rails' sanitizer against
-  # a fixed tag allowlist, so anything this does not understand degrades to the
-  # literal characters the model typed rather than to markup. That is the whole
-  # safety story: a gap here is cosmetic, never structural.
   module Markdown
     def self.to_html(text)
       Renderer.new(text).to_html
     end
 
     class Renderer
-      # h1 and h2 belong to the page, not to something written inside a chat
-      # bubble, so everything shallower than h3 is pulled down to it.
       HEADING = /\A(\#{1,6})\s+(.*)\z/
       FENCE = /\A\s*(```|~~~)\s*[\w+-]*\s*\z/
       RULE = /\A\s*([-*_])(?:\s*\1){2,}\s*\z/
@@ -22,9 +13,6 @@ module AhoyDashboard
       NUMBER = /\A(\s*)\d+[.)]\s+(.*)\z/
       DIVIDER = /\A\s*\|?[\s:|-]*-[\s:|-]*\|?\s*\z/
 
-      # Anything else, mailto and javascript included, drops back to its text.
-      # The sanitizer would take it too; this way the reader sees what the model
-      # actually wrote instead of a link that silently lost its href.
       SAFE_HREF = %r{\A(?:https?://|/|\#)}
 
       def initialize(text)
@@ -97,9 +85,6 @@ module AhoyDashboard
         cursor
       end
 
-      # Indentation opens a nested list and closing it returns to the outer one.
-      # A model produces those constantly, and a flat parser renders them as a
-      # run of same-level items that reads as a different answer.
       def list(lines, index)
         ordered = lines[index].match?(NUMBER)
         indent = item(lines[index]).first.length
@@ -187,10 +172,6 @@ module AhoyDashboard
 
       SPAN = /(`[^`]+`)/
 
-      # The text is cut around its code spans and only the pieces between them
-      # are read for emphasis and links. Split rather than substitute a
-      # placeholder: every placeholder that reads as ordinary text is a
-      # collision waiting for the answer that happens to contain it.
       def inline(text)
         text.to_s.split(SPAN).map do |part|
           if part.match?(/\A`[^`]+`\z/)

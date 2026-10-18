@@ -1,6 +1,8 @@
 module AhoyDashboard
   module Seo
     class BrandSplitPresenter < BasePresenter
+      delegate :terms, :matched?, :unnamed_clicks, :clicks, :brand, :other, to: :result
+
       def tracking_phrases
         (brand.terms + other.terms).map(&:query)
       end
@@ -16,24 +18,8 @@ module AhoyDashboard
         ]
       end
 
-      def terms
-        result.terms
-      end
-
       def terms_text
         terms.join(", ")
-      end
-
-      def stored_terms?
-        BrandTerms.stored?
-      end
-
-      def pattern
-        result.pattern
-      end
-
-      def matched?
-        result.matched?
       end
 
       def other?
@@ -44,28 +30,12 @@ module AhoyDashboard
         result.unnamed_clicks.positive?
       end
 
-      def unnamed_clicks
-        result.unnamed_clicks
-      end
-
-      def clicks
-        result.clicks
-      end
-
       def brand_points
         result.points.map { |point| [ on_label(point.on), point.brand_clicks ] }
       end
 
       def other_points
         result.points.map { |point| [ on_label(point.on), point.other_clicks ] }
-      end
-
-      def brand
-        result.brand
-      end
-
-      def other
-        result.other
       end
 
       def csv_tables
@@ -89,10 +59,6 @@ module AhoyDashboard
 
       def clicks_label(count)
         pluralize(number(count), "click")
-      end
-
-      def last_date
-        totals.last_date
       end
 
       def no_brand_hint

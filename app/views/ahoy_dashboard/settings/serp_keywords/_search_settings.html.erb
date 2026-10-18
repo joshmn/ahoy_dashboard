@@ -1,4 +1,5 @@
 <% import = local_assigns.fetch(:import, false) %>
+<% scope = form.object_name %>
 <% cost_line = import ? "Each place adds a search for every keyword." : "Each place is another search every time it runs." %>
 
 <% places_hint = capture do %>
@@ -66,16 +67,15 @@
 <% end %>
 
 <%= form.grid do %>
-  <%= form.segmented :device, AhoyDashboard::Serp::DEVICES, label: "Device", id: form.field_id(:device) %>
+  <%= form.segmented :device, form.object.device_options, label: "Device", id: form.field_id(:device) %>
 
   <%= form.text_field :language, label: "Language", hint: "Two letter code, like en or es.", mono: true,
         class: "kw-lang", autocomplete: "off", placeholder: "en" %>
 <% end %>
 
-<%= form.segmented :frequency, AhoyDashboard::Settings::KeywordPlanPresenter::FREQUENCY_LABELS.to_a,
+<%= form.segmented :frequency, form.object.frequency_options,
       label: "How often", hint: "Weekly is enough for most keywords and costs a seventh of daily.",
       id: form.field_id(:frequency) %>
 
-<%= form.segmented :pages,
-      (1..AhoyDashboard::Serp::MAX_PAGES).map { |count| [ count, "Top #{count * AhoyDashboard::Serp::RESULTS_PER_PAGE}" ] },
+<%= form.segmented :pages, form.object.page_options,
       label: "How deep", hint: "Most people never look past the top 20.", id: form.field_id(:pages) %>

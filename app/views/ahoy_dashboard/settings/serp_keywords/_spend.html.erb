@@ -21,23 +21,8 @@
   </div>
 
   <% if stacks.any? %>
-    <div class="seo-dist__plot">
-      <svg viewBox="0 0 <%= AhoyDashboard::SeoHelper::PLOT_WIDTH %> <%= AhoyDashboard::SeoHelper::PLOT_HEIGHT %>"
-           preserveAspectRatio="none" role="img" aria-label="<%= spend.chart_label %>">
-        <% stacks.each do |stack| %>
-          <g>
-            <title><%= spend.day_title(stack[:day]) %></title>
-            <% stack[:segments].each do |segment| %>
-              <rect class="seo-dist__seg spend-band--<%= segment[:key] %>" x="<%= stack[:x] %>" y="<%= segment[:y] %>"
-                    width="<%= stack[:width] %>" height="<%= segment[:height] %>"></rect>
-            <% end %>
-          </g>
-        <% end %>
-      </svg>
-      <div class="seo-plot__dates">
-        <% spend.dates.each do |label| %><span><%= label %></span><% end %>
-      </div>
-    </div>
+    <%= render "ahoy_dashboard/seo/shared/stacks", stacks: stacks, source: spend, band: "spend-band",
+          label: spend.chart_label, dates: spend.dates %>
 
     <ul class="spend__legend" aria-label="What the units went on">
       <% spend.legend.each do |item| %>

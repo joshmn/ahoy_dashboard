@@ -1,12 +1,5 @@
 module AhoyDashboard
   module LLM
-    # What a tool has to look like. Subclasses declare a description and a
-    # parameter block, and answer #execute with something that serialises.
-    #
-    # In lib rather than app, and required from the entrypoint, so the constant
-    # exists before Zeitwerk autoloads anything that subclasses it. A base class
-    # that is itself autoloaded is a NameError waiting for the first host whose
-    # load order differs.
     class Tool
       class << self
         def desc(text = nil)

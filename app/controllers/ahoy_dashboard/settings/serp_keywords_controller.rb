@@ -1,10 +1,10 @@
 module AhoyDashboard
   module Settings
-    class SerpKeywordsController < AhoyDashboard::BaseController
+    class SerpKeywordsController < AhoyDashboard::Settings::BaseController
       requires_installed :serp
 
       before_action :set_keyword, only: [ :edit, :update, :destroy ]
-      before_action :set_sites, only: [ :new, :create, :edit, :update ]
+      before_action :set_check, only: [ :edit, :update ]
 
       SUGGESTIONS = 8
 
@@ -19,11 +19,13 @@ module AhoyDashboard
         @provider_notice = AhoyDashboard::Settings::SerpProviderStatus.notice
         @adapter = AhoyDashboard::Serp.adapter_class
         @spend = AhoyDashboard::Serp::SpendPresenter.new
-        @confirming = params[:confirm].presence
+        @check_all = AhoyDashboard::Serp::CheckNowPresenter.new(listed: @keywords)
       end
 
       def new
-        @form = AhoyDashboard::Serp::KeywordForm.new(site_ids: default_site_ids, query: params[:query].to_s.strip.presence)
+        @form = AhoyDashboard::Serp::KeywordForm.new(
+          site_ids: AhoyDashboard::Serp::KeywordForm.default_site_ids, query: params[:query].to_s.strip.presence
+        )
         @plan = plan_for(@form, suggestions: suggestions)
       end
 
@@ -33,7 +35,6 @@ module AhoyDashboard
         AhoyDashboard::Serp::Keywords::CreateCommand.call(form: @form) do
           on(:ok) { redirect_to return_path || settings_serp_keywords_path, notice: "Keyword saved." }
           on(:invalid) { |form| rejected(form, :new) }
-          on(:duplicate) { |form| rejected(form, :new) }
         end
       end
 
@@ -47,13 +48,12 @@ module AhoyDashboard
 
         AhoyDashboard::Serp::Keywords::UpdateCommand.call(keyword: @keyword, form: @form) do
           on(:ok) { |outcome| redirect_to settings_serp_keywords_path, notice: saved(outcome) }
-          on(:invalid) { |form| rejected(form, :edit) }
-          on(:duplicate) { |form| rejected(form, :edit) }
+          on(:invalid) { |form| rejected(form) }
         end
       end
 
       def destroy
-        AhoyDashboard::Serp::Keywords::DestroyCommand.call(keyword: @keyword) do
+        AhoyDashboard::Records::DestroyCommand.call(record: @keyword) do
           on(:ok) do |keyword|
             redirect_to settings_serp_keywords_path,
               notice: "#{keyword.query} is no longer tracked, and its history is gone with it."
@@ -64,22 +64,15 @@ module AhoyDashboard
       private
 
       def return_path
-        value = params[:return_to].to_s
-        return nil unless value.start_with?("/") && !value.start_with?("//") && !value.include?("\\")
-
-        value
+        local_path(params[:return_to])
       end
 
       def set_keyword
         @keyword = AhoyDashboard::SerpKeyword.find(params[:id])
       end
 
-      def set_sites
-        @sites = AhoyDashboard::SerpSite.ordered.to_a
-      end
-
-      def default_site_ids
-        AhoyDashboard::SerpSite.ours ? [ AhoyDashboard::SerpSite.ours.id.to_s ] : []
+      def set_check
+        @check = AhoyDashboard::Serp::CheckNowPresenter.new(keyword: @keyword)
       end
 
       def saved(outcome)
@@ -88,18 +81,14 @@ module AhoyDashboard
           parts << "Its history starts over. The old readings are kept on a paused keyword, " \
                    "#{outcome.archived.query} (#{AhoyDashboard::SerpKeywordDecorator.new(outcome.archived).search_label})."
         end
-        if outcome.backfilled.positive?
-          parts << "#{ActionController::Base.helpers.pluralize(outcome.backfilled, 'past search')} " \
-                   "#{outcome.backfilled == 1 ? 'was' : 'were'} read again for the site you attached."
-        end
+        parts << "#{read_again(outcome.backfilled)} for the site you attached." if outcome.backfilled.positive?
 
         parts.join(" ")
       end
 
-      def rejected(form, template)
-        @form = form
+      def rejected(form, template = :edit)
         @plan = plan_for(form, suggestions: template == :new ? suggestions : [])
-        render template, status: :unprocessable_entity
+        super
       end
 
       def plan_for(form, suggestions: [])

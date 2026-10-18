@@ -4,6 +4,8 @@ module AhoyDashboard
       class AttachCommand < AhoyDashboard::Command
         Outcome = Data.define(:target, :backfilled)
 
+        BATCH = 500
+
         def initialize(keyword:, site:, backfill: true)
           @keyword = keyword
           @site = site
@@ -23,31 +25,25 @@ module AhoyDashboard
         attr_reader :keyword, :site, :backfill
 
         def replay(target)
-          keyword.runs.usable.includes(:run_pages).find_each.count do |run|
-            write_check(target, run)
+          written = 0
+          keyword.runs.usable.includes(:run_pages).find_in_batches(batch_size: BATCH) do |runs|
+            rows = runs.map { |run| check_row(target, run) }.compact
+            SerpCheck.insert_all(rows) if rows.any?
+            written += rows.size
           end
+          written
         end
 
-        def write_check(target, run)
+        def check_row(target, run)
           combined = run.result
-          return false if combined.nil?
+          return nil if combined.nil?
 
-          rank = combined.rank_for(site.domain, match_subdomains: site.match_subdomains)
-          overview = combined.ai_overview
-          source = overview.source_for(site.domain, match_subdomains: site.match_subdomains)
-
-          check = target.checks.find_or_initialize_by(run: run)
-          check.assign_attributes(
-            keyword: keyword, site: site, location: run.location, checked_at: run.checked_at,
-            position: rank&.position, page: rank&.page, url: rank&.link,
-            ai_overview_present: overview.shown?,
-            ai_overview_cited: overview.shown? && source.present?,
-            ai_overview_citation_position: source ? overview.sources.index(source) + 1 : nil,
-            ai_overview_source_count: overview.sources.size,
-            status: :success
+          now = Time.current
+          combined.check_attributes_for(site).merge(
+            run_id: run.id, keyword_id: keyword.id, target_id: target.id, site_id: site.id,
+            location: run.location, checked_at: run.checked_at, status: SerpCheck.statuses.fetch("success"),
+            created_at: now, updated_at: now
           )
-          check.save!
-          true
         end
       end
     end

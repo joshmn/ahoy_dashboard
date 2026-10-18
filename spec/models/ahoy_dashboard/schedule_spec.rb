@@ -1,6 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe AhoyDashboard::Schedule do
   describe "the registry" do
@@ -27,8 +25,6 @@ RSpec.describe AhoyDashboard::Schedule do
       expect(described_class.keys).to eq(described_class.keys.uniq)
     end
 
-    # The dispatch is a fan out that returns before any check is written, so
-    # alerts evaluated after it in one tick would read the sweep before it lands.
     it "evaluates alerts before the serp dispatch" do
       keys = described_class.keys
 
@@ -38,6 +34,10 @@ RSpec.describe AhoyDashboard::Schedule do
 
   describe "an hourly entry" do
     let(:entry) { described_class.find("serp_dispatch") }
+
+    it "runs an hour apart" do
+      expect(entry.interval).to eq(1.hour)
+    end
 
     it "is due when it has never run" do
       expect(entry).to be_due(nil)
@@ -52,8 +52,6 @@ RSpec.describe AhoyDashboard::Schedule do
     end
   end
 
-  # The list it reads is published on the first of the month and does not change
-  # again, so anything more often than this is sixteen megabytes for nothing.
   describe "a monthly entry" do
     let(:entry) { described_class.find("places") }
     let(:zone) { AhoyDashboard.time_zone }
@@ -74,9 +72,6 @@ RSpec.describe AhoyDashboard::Schedule do
       expect(entry).to be_due(zone.parse("2026-09-02 03:30"), now: now)
     end
 
-    # Before the day it wants has come round, the window it belongs to is still
-    # last month's, the same way a daily entry before its hour belongs to
-    # yesterday.
     it "still belongs to last month before its day comes round" do
       expect(entry.window_start(zone.parse("2026-09-01 12:00"))).to eq(zone.parse("2026-08-02 03:00"))
     end
@@ -87,18 +82,21 @@ RSpec.describe AhoyDashboard::Schedule do
       expect(entry.next_due_at(zone.parse("2026-09-02 03:30"), now: now)).to eq(zone.parse("2026-10-02 03:00"))
     end
 
-    # A day past the end of February is clamped rather than raising on the way to
-    # a window that does not exist, so the 31st is the 28th there and the month
-    # still has a window at all.
     it "clamps a day past the end of a short month" do
-      entry = described_class.entry(key: "x", name: "X", job: "AhoyDashboard::Places::SyncJob", day: 31, hour: 3)
+      entry = described_class::Entry.new(key: "x", name: "X", job: "AhoyDashboard::Places::SyncJob", day: 31, hour: 3)
 
       expect(entry.window_start(zone.parse("2026-02-28 12:00"))).to eq(zone.parse("2026-02-28 03:00"))
       expect(entry.window_start(zone.parse("2026-02-20 12:00"))).to eq(zone.parse("2026-01-31 03:00"))
     end
 
     it "says when it runs in words" do
-      expect(entry.cadence).to include("monthly on the 2nd")
+      row = AhoyDashboard::Settings::JobRunPresenter.call.rows.find { |candidate| candidate.key == "places" }
+
+      expect(row.cadence).to start_with("Monthly on the 2nd")
+    end
+
+    it "runs a month apart" do
+      expect(entry.interval).to eq(1.month)
     end
 
     it "is not read as a daily entry" do
@@ -110,6 +108,10 @@ RSpec.describe AhoyDashboard::Schedule do
   describe "a daily entry pinned to an hour and a zone" do
     let(:entry) { described_class.find("search_console_ingest") }
     let(:zone) { ActiveSupport::TimeZone["America/Los_Angeles"] }
+
+    it "runs a day apart" do
+      expect(entry.interval).to eq(1.day)
+    end
 
     it "is not due before the hour has come round" do
       now = zone.parse("2026-09-09 03:30")
@@ -129,8 +131,6 @@ RSpec.describe AhoyDashboard::Schedule do
       expect(entry).not_to be_due(zone.parse("2026-09-09 04:05"), now: now)
     end
 
-    # A tick at 3am belongs to yesterday's window, not to a window that has not
-    # opened yet.
     it "counts the small hours as the previous window" do
       now = zone.parse("2026-09-09 03:00")
 
@@ -140,8 +140,6 @@ RSpec.describe AhoyDashboard::Schedule do
 
   describe "the guards" do
     it "leaves the serp dispatch off while tracking is switched off" do
-      allow(AhoyDashboard::Serp).to receive(:enabled?).and_return(false)
-
       expect(described_class.find("serp_dispatch")).not_to be_on
     end
 
@@ -158,8 +156,6 @@ RSpec.describe AhoyDashboard::Schedule do
       expect(described_class.find("alerts")).to be_on
     end
 
-    # The adapter that invents referring domains is the default one. A cron
-    # writing those into the database nightly is worse than a stale page.
     it "never switches backlinks on against the fake provider" do
       allow(AhoyDashboard::Backlinks).to receive(:enabled?).and_return(true)
       allow(AhoyDashboard::Backlinks).to receive(:provider).and_return(:fake)
@@ -172,6 +168,10 @@ RSpec.describe AhoyDashboard::Schedule do
 
       expect(described_class.find("serp_dispatch")).not_to be_on
     end
+  end
+
+  it "gives an entry started only by hand no interval" do
+    expect(described_class.find("search_console_fill").interval).to be_nil
   end
 
   it "says a feature that is installed but switched off is turned off" do

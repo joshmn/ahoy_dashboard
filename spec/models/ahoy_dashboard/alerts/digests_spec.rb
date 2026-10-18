@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/alerts"
 
 RSpec.describe AhoyDashboard::Alerts::Digests do
   before { AhoyDashboard::Preferences.write(:site, time_zone: "America/Chicago") }
@@ -44,8 +43,6 @@ RSpec.describe AhoyDashboard::Alerts::Digests do
     around { |example| alert_settings(digest: :daily, recipients: [ "ops@example.com" ]) { example.run } }
 
     it "needs alerts switched on" do
-      allow(AhoyDashboard::Alerts).to receive(:enabled?).and_return(false)
-
       expect(described_class).not_to be_enabled
     end
 
@@ -59,6 +56,19 @@ RSpec.describe AhoyDashboard::Alerts::Digests do
       allow(AhoyDashboard::Alerts).to receive(:enabled?).and_return(true)
 
       expect(described_class).to be_enabled
+    end
+  end
+
+  describe ".mailer" do
+    it "is the one the host names" do
+      expect([ described_class.mailer, described_class.parent_mailer ]).to eq([ SeoAlertMailer, ApplicationMailer ])
+    end
+
+    it "falls back to the engine's own when the host names none" do
+      alert_settings(mailer: nil, parent_mailer: "") do
+        expect([ described_class.mailer, described_class.parent_mailer ])
+          .to eq([ AhoyDashboard::AlertMailer, ActionMailer::Base ])
+      end
     end
   end
 

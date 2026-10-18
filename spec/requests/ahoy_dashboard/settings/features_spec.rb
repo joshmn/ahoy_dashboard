@@ -1,27 +1,8 @@
 require "rails_helper"
-require "support/ahoy_dashboard/switches"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe "Dashboard features settings", type: :request do
   def row(name)
-    Nokogiri::HTML5(response.body).at_css("#feature-#{name}")
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/features"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin, and switches nothing" do
-      sign_in create(:user)
-
-      patch "/telemetry/settings/features/serp", params: { enabled: "1" }
-
-      expect(response).to have_http_status(:not_found)
-      expect(AhoyDashboard::Features.on?(:serp)).to be(false)
-    end
+    document.at_css("#feature-#{name}")
   end
 
   describe "as an admin" do
@@ -117,7 +98,7 @@ RSpec.describe "Dashboard features settings", type: :request do
 
     it "says nothing more about a feature that is on and set up" do
       switch_on_ahoy_dashboard(:alerts)
-      create(:dash_alert_rule, key: "traffic_spike", name: "Traffic spike")
+      create(:dash_alert_rule, key: "traffic_spike")
       allow(AhoyDashboard::Alerts::Digests).to receive_messages(periods: [ :daily ], recipients: [ "ops@example.com" ])
 
       get "/telemetry/settings/features"

@@ -41,7 +41,7 @@
         <div class="chat-view__figure">
           <span class="chat-view__flbl">
             <%= figure[:label] %>
-            <% if (delta = view.delta(figure[:change])) %>
+            <% if (delta = view.delta(figure)) %>
               <%= dash_delta(**delta) %>
             <% end %>
           </span>

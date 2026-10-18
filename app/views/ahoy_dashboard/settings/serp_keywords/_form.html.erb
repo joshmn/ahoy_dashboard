@@ -1,11 +1,6 @@
 <% editing = local_assigns.fetch(:editing, false) %>
 <%= dash_form_with stack: false, model: @form, scope: :serp_keyword, url: url, method: method, class: "kw-form",
-      data: { controller: "dash--keyword-form",
-              action: "change->dash--keyword-form#refresh input->dash--keyword-form#refresh",
-              "dash--keyword-form-costs-value": plan.costs.to_json,
-              "dash--keyword-form-durations-value": plan.durations.to_json,
-              "dash--keyword-form-month-value": AhoyDashboard::Settings::KeywordPlanPresenter::MONTH.to_i,
-              "dash--keyword-form-remaining-value": (plan.remaining if plan.capped?) } do |form| %>
+      data: dash_keyword_form_data(plan) do |form| %>
   <div class="kw-main">
     <% unless plan.tracking_on? %>
       <%= dash_notice "Rank tracking is off.",
@@ -43,25 +38,16 @@
     <%= dash_card element: :section, aria: { labelledby: "kw-how-title" } do %>
       <div class="d-flex flex-column gap-3 p-3">
         <h2 class="fs-6 fw-semibold mb-0" id="kw-how-title">Where and how to search</h2>
-        <%= render "ahoy_dashboard/settings/serp_keywords/search_settings", form: form, plan: plan, scope: "serp_keyword" %>
+        <%= render "ahoy_dashboard/settings/serp_keywords/search_settings", form: form, plan: plan %>
       </div>
     <% end %>
 
     <%= dash_card element: :section do %>
       <div class="d-flex flex-column gap-3 p-3">
-        <% if @sites.any? %>
-          <%= form.check_boxes :site_ids, @sites, ->(site) { site.id.to_s }, :name, label: "Sites to look for",
-                hint: "Every site is read from the same search, so extra sites cost nothing.",
-                detail: ->(site) { site.domain }, id: form.field_id(:site_ids) %>
-        <% else %>
-          <% sites_hint = capture do %>
-            Add a site to see where it ranks. You can save the keyword now and attach one later.
-            <%= dash_link "Add site", new_settings_serp_site_path, data: { tm_frame: "_top" } %>
-          <% end %>
-          <%= form.fieldset :site_ids, label: "Sites to look for", hint: sites_hint, id: form.field_id(:site_ids) do %><% end %>
-        <% end %>
+        <%= render "ahoy_dashboard/settings/serp_keywords/sites_field", form: form,
+              empty_hint: "Add a site to see where it ranks. You can save the keyword now and attach one later." %>
 
-        <%= render "ahoy_dashboard/settings/serp_keywords/tags_field", form: form, scope: "serp_keyword" %>
+        <%= render "ahoy_dashboard/settings/serp_keywords/tags_field", form: form %>
 
         <% if editing %>
           <%= form.fieldset :enabled, label: "Checking" do %>
@@ -85,18 +71,7 @@
         <dt>Keyword</dt>
         <dd class="<%= "nil" if @form.query.blank? %>" data-dash--keyword-form-target="queryOut"><%= @form.query.presence || "Not typed yet" %></dd>
       </div>
-      <div>
-        <dt>From</dt>
-        <dd class="<%= "nil" if plan.places.empty? %>" data-dash--keyword-form-target="where"><%= plan.where_label.presence || "No place picked" %></dd>
-      </div>
-      <div>
-        <dt>Device</dt>
-        <dd data-dash--keyword-form-target="device"><%= plan.device_label %></dd>
-      </div>
-      <div>
-        <dt>Checked</dt>
-        <dd data-dash--keyword-form-target="often"><%= plan.often_label %></dd>
-      </div>
+      <%= render "ahoy_dashboard/settings/serp_keywords/plan_facts", plan: plan %>
     </dl>
 
     <div class="kw-cost" aria-live="polite">
@@ -116,14 +91,7 @@
           Through <%= plan.provider_label %>. Each check is
           <span data-dash--keyword-form-target="perCheck"><%= number_with_delimiter(plan.per_check) %> <%= "search".pluralize(plan.per_check) %></span>.
         </p>
-        <% if plan.capped? %>
-          <p class="kw-cost-hint">
-            Your cap is <%= number_with_delimiter(plan.cap) %> a month, and <%= number_with_delimiter(plan.remaining) %> are left.
-          </p>
-          <p class="kw-over" data-dash--keyword-form-target="over" <%= "hidden" unless plan.over_cap? %>>
-            That is more than what is left of your cap this month.
-          </p>
-        <% end %>
+        <%= render "ahoy_dashboard/settings/serp_keywords/cap", plan: plan, over: plan.over_cap? %>
       <% end %>
     </div>
 

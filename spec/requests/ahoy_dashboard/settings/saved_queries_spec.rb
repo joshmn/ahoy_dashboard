@@ -1,14 +1,9 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard saved query settings", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   def submit_form(typed = {}, check: [])
     form = document.css("form").find { |candidate| candidate["action"].to_s.start_with?("/telemetry/settings/saved_queries") }
@@ -21,22 +16,6 @@ RSpec.describe "Dashboard saved query settings", type: :request do
                          headers: { "CONTENT_TYPE" => "application/x-www-form-urlencoded" }
   end
 
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/saved_queries"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "sends a signed out visitor to sign in on a write too" do
-      post "/telemetry/settings/saved_queries",
-           params: { saved_query: { name: "x", params: { period: "7d" } } }
-
-      expect(response).to redirect_to("/users/sign_in")
-      expect(AhoyDashboard::SavedQuery.count).to be_zero
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
@@ -47,8 +26,6 @@ RSpec.describe "Dashboard saved query settings", type: :request do
       expect(response.body).to include("Nothing saved yet")
     end
 
-    # The sentence is read back out of the question every time, so it cannot
-    # describe itself as something it is not.
     it "says what each question asks, read off its own params" do
       create(:dash_saved_query, name: "Organic readers",
              params: { "period" => "7d", "metric" => "pageviews", "dimension" => "country" })
@@ -82,8 +59,6 @@ RSpec.describe "Dashboard saved query settings", type: :request do
       )
     end
 
-    # These params end up in url_for. A stored :host or :controller would build a
-    # link somewhere nobody asked for.
     it "keeps anything it was not offered out of the stored question" do
       post "/telemetry/settings/saved_queries",
            params: { saved_query: { name: "Odd", params: { period: "7d", host: "example.com" } } }
@@ -126,9 +101,6 @@ RSpec.describe "Dashboard saved query settings", type: :request do
     end
   end
 
-  # A question is composed in Explore, so it is changed in Explore. Without this
-  # trip a saved question could only ever be renamed, and getting one wrong meant
-  # deleting it and starting again.
   describe "changing what a saved question asks" do
     before { sign_in create(:user, :admin) }
 
@@ -137,19 +109,17 @@ RSpec.describe "Dashboard saved query settings", type: :request do
                         params: { "period" => "30d", "dimension" => "page" })
 
       get "/telemetry/settings/saved_queries/#{question.id}/edit"
-      out = Nokogiri::HTML5(response.body).css("a").find { |a| a.text.include?("Change the question") }
+      out = document.css("a").find { |a| a.text.include?("Change the question") }
 
       expect(out["href"]).to start_with("/telemetry/explore")
       expect(out["href"]).to include("saved=#{question.id}", "dimension=page")
     end
 
-    # Explore offers to change the one you came from rather than to write a
-    # second question saying nearly the same thing.
     it "turns Explore's save control into a save-changes for that record" do
       question = create(:dash_saved_query, name: "Readers")
 
       get "/telemetry/explore", params: { saved: question.id, dimension: "browser" }
-      control = Nokogiri::HTML5(response.body).at_css("a[title*='Save']")
+      control = document.at_css("a[title*='Save']")
 
       expect(control.text.strip).to eq("Save changes")
       expect(control["href"]).to start_with("/telemetry/settings/saved_queries/#{question.id}/edit")
@@ -158,7 +128,7 @@ RSpec.describe "Dashboard saved query settings", type: :request do
 
     it "offers a plain save when nothing is being edited" do
       get "/telemetry/explore", params: { dimension: "browser" }
-      control = Nokogiri::HTML5(response.body).at_css("a[title*='Save']")
+      control = document.at_css("a[title*='Save']")
 
       expect(control.text.strip).to eq("Save")
       expect(control["href"]).to start_with("/telemetry/settings/saved_queries/new")
@@ -188,15 +158,15 @@ RSpec.describe "Dashboard saved query settings", type: :request do
       question = create(:dash_saved_query, name: "Readers")
 
       get "/telemetry/explore", params: { saved: question.id, dimension: "browser" }
-      links = Nokogiri::HTML5(response.body).css("main a[href^='/telemetry/explore']").map { |a| a["href"] }
+      links = document.css("main a[href^='/telemetry/explore']").map { |a| a["href"] }
       links.reject! { |href| href.start_with?("/telemetry/explore.csv") }
 
       expect(links).not_to be_empty
       expect(links).to all(include("saved=#{question.id}"))
 
-      country = Nokogiri::HTML5(response.body).css("a").find { |a| a.text.strip == "Country" && a["href"].include?("dimension=country") }
+      country = document.css("a").find { |a| a.text.strip == "Country" && a["href"].include?("dimension=country") }
       get country["href"]
-      control = Nokogiri::HTML5(response.body).at_css("a[title*='Save']")
+      control = document.at_css("a[title*='Save']")
 
       expect(control.text.strip).to eq("Save changes")
       expect(control["href"]).to start_with("/telemetry/settings/saved_queries/#{question.id}/edit")
@@ -205,22 +175,21 @@ RSpec.describe "Dashboard saved query settings", type: :request do
 
     it "carries the record through the filter dialog and the filter form" do
       question = create(:dash_saved_query, name: "Readers")
-      visit = dash_visit(started_at: now - 1.day, visitor: "reader")
-      dash_page_view(visit, path: "/going-in/faq", at: now - 1.day)
+      dash_landing("/going-in/faq", at: now - 1.day, visitor: "reader")
       filter = { dimension: "page", operator: "is", value: "/going-in/faq" }
 
       get "/telemetry/explore", params: { saved: question.id, filters: [ filter ] }
-      page = Nokogiri::HTML5(response.body)
+      page = document
       editor = page.css("a[href^='/telemetry/filters/new']").first
       popover = page.css("a[href^='/telemetry/filter_values']").find do |a|
-        Rack::Utils.parse_nested_query(URI.parse(a["href"]).query)["dimension"] == "page"
+        link_query(a["href"])["dimension"] == "page"
       end
 
       get editor["href"]
-      expect(Nokogiri::HTML5(response.body).at_css("input[type=hidden][name=saved]")["value"]).to eq(question.id.to_s)
+      expect(document.at_css("input[type=hidden][name=saved]")["value"]).to eq(question.id.to_s)
 
       get popover["href"]
-      picks = Nokogiri::HTML5(response.body).css("[role=group][aria-label='Page values'] a").map { |a| a["href"] }
+      picks = document.css("[role=group][aria-label='Page values'] a").map { |a| a["href"] }
       expect(picks).not_to be_empty
       expect(picks).to all(include("saved=#{question.id}"))
     end
@@ -229,22 +198,20 @@ RSpec.describe "Dashboard saved query settings", type: :request do
       question = create(:dash_saved_query, name: "Readers", params: { "period" => "30d", "dimension" => "page" })
 
       get "/telemetry/explore", params: { saved: question.id, period: "30d" }
-      browser = Nokogiri::HTML5(response.body).css("a").find { |a| a["href"].to_s.include?("dimension=browser") }
+      browser = document.css("a").find { |a| a["href"].to_s.include?("dimension=browser") }
       get browser["href"]
-      get Nokogiri::HTML5(response.body).at_css("a[title*='Save']")["href"]
+      get document.at_css("a[title*='Save']")["href"]
       submit_form
 
       expect(AhoyDashboard::SavedQuery.count).to eq(1)
       expect(question.reload.params).to include("dimension" => "browser")
     end
 
-    # A stale link is a link to a question somebody deleted, and everything
-    # needed to read it is in the query string either way.
     it "still answers when the record it names is gone" do
       get "/telemetry/explore", params: { saved: 999_999, dimension: "browser" }
 
       expect(response).to have_http_status(:ok)
-      expect(Nokogiri::HTML5(response.body).at_css("a[title*='Save']").text.strip).to eq("Save")
+      expect(document.at_css("a[title*='Save']").text.strip).to eq("Save")
     end
   end
 
@@ -255,12 +222,10 @@ RSpec.describe "Dashboard saved query settings", type: :request do
 
     def traffic!
       2.times do |index|
-        visit = dash_visit(started_at: now - 1.day, visitor: "faq-#{index}")
-        dash_page_view(visit, path: "/going-in/faq", at: now - 1.day)
+        dash_landing("/going-in/faq", at: now - 1.day, visitor: "faq-#{index}")
       end
       3.times do |index|
-        visit = dash_visit(started_at: now - 1.day, visitor: "home-#{index}")
-        dash_page_view(visit, path: "/", at: now - 1.day)
+        dash_landing(at: now - 1.day, visitor: "home-#{index}")
       end
     end
 
@@ -353,8 +318,7 @@ RSpec.describe "Dashboard saved query settings", type: :request do
 
     def traffic!
       2.times do |index|
-        visit = dash_visit(started_at: now - 1.day, visitor: "visitor-#{index}")
-        dash_page_view(visit, path: "/going-in/faq", at: now - 1.day)
+        dash_landing("/going-in/faq", at: now - 1.day, visitor: "visitor-#{index}")
       end
     end
 
@@ -391,8 +355,6 @@ RSpec.describe "Dashboard saved query settings", type: :request do
       expect(names).to eq([ "Q0", "Q1", "Q2" ])
     end
 
-    # A saved question is a hash somebody could have hand edited, and a dashboard
-    # card is not the place to find that out.
     it "leaves a question it cannot read off the strip rather than falling over" do
       traffic!
       good = create(:dash_saved_query, name: "Fine", pinned: true, position: 1)

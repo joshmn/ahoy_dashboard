@@ -6,13 +6,15 @@ module AhoyDashboard
   module LLM
     class Transport
       RETRYABLE_STATUSES = [ 408, 409, 429 ].freeze
-      NETWORK_ERRORS = [ Net::OpenTimeout, Net::ReadTimeout, Errno::ECONNRESET, Errno::ECONNREFUSED,
-                         Errno::EHOSTUNREACH, Errno::EPIPE, EOFError, SocketError, OpenSSL::SSL::SSLError ].freeze
+      OUT_OF_CREDIT = 402
+      OUT_OF_CREDIT_MESSAGE = "the account is out of credit, so top it up with the provider and ask again".freeze
       MAX_RETRIES = 2
       BASE_DELAY = 0.5
       MAX_DELAY = 8.0
       MAX_SERVER_DELAY = 60.0
       DONE = "[DONE]".freeze
+      STREAM_TYPE = "text/event-stream".freeze
+      JSON_TYPE = "application/json".freeze
 
       Event = Struct.new(:name, :data)
 
@@ -34,11 +36,20 @@ module AhoyDashboard
       end
 
       def stream(url, headers:, body:, &block)
-        uri = URI(url)
+        retrying { deliver(URI(url), headers, body, &block) }
+      end
+
+      def post(url, headers:, body:)
+        retrying { fetch(URI(url), headers, body) }
+      end
+
+      private
+
+      def retrying
         attempt = 0
 
         begin
-          deliver(uri, headers, body, &block)
+          yield
         rescue Retry => e
           raise e.error if attempt >= @max_retries
 
@@ -48,31 +59,47 @@ module AhoyDashboard
         end
       end
 
-      private
-
       def deliver(uri, headers, body, &block)
         started = false
 
-        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
-                                            open_timeout: @open_timeout, read_timeout: @read_timeout) do |http|
-          http.request(build(uri, headers, body)) do |response|
+        connect(uri) do |http|
+          http.request(build(uri, headers, body, accept: STREAM_TYPE)) do |response|
             fail_with(response) unless response.code.to_i == 200
 
             started = true
             read(response, &block)
           end
         end
-      rescue *NETWORK_ERRORS => e
-        error = Error.new("could not reach the model: #{e.class}: #{e.message}")
-        raise error if started
+      rescue *HttpClient::NETWORK_ERRORS => e
+        raise unreachable(e) if started
 
-        raise Retry.new(error)
+        raise Retry.new(unreachable(e))
       end
 
-      def build(uri, headers, body)
+      def fetch(uri, headers, body)
+        response = connect(uri) { |http| http.request(build(uri, headers, body, accept: JSON_TYPE)) }
+        fail_with(response) unless response.code.to_i == 200
+
+        parsed(response.body.to_s)
+      rescue *HttpClient::CONNECTION_ERRORS => e
+        raise Retry.new(unreachable(e))
+      rescue *HttpClient::NETWORK_ERRORS => e
+        raise unreachable(e)
+      end
+
+      def connect(uri, &block)
+        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
+                                            open_timeout: @open_timeout, read_timeout: @read_timeout, &block)
+      end
+
+      def unreachable(error)
+        Error.new("could not reach the model: #{error.class}: #{error.message}")
+      end
+
+      def build(uri, headers, body, accept:)
         Net::HTTP::Post.new(uri).tap do |request|
           request["Content-Type"] = "application/json"
-          request["Accept"] = "text/event-stream"
+          request["Accept"] = accept
           headers.each { |key, value| request[key] = value if value.present? }
           request.body = JSON.generate(body)
         end
@@ -118,15 +145,22 @@ module AhoyDashboard
         status = response.code.to_i
         body = response.read_body.to_s
         said = detail(body)
-        error = Error.new([ "#{status} from the model", said ].compact.join(": "),
-                          status: status, type: error_type(body), detail: said)
+        error = Error.new(failure_message(status, said), status: status, type: error_type(body), detail: said)
 
         raise Retry.new(error, delay: server_delay(response)) if retryable?(response, status)
 
         raise error
       end
 
+      def failure_message(status, said)
+        return [ "#{status} from the model", said ].compact.join(": ") unless status == OUT_OF_CREDIT
+
+        [ "#{status} from the model: #{OUT_OF_CREDIT_MESSAGE}", said ].compact.join(". it said: ")
+      end
+
       def retryable?(response, status)
+        return false if status == OUT_OF_CREDIT
+
         case response["x-should-retry"]
         when "true" then true
         when "false" then false
@@ -158,8 +192,10 @@ module AhoyDashboard
       end
 
       def detail(body)
-        error = parsed(body)["error"]
+        payload = parsed(body)
+        error = payload["error"]
         message = error.is_a?(Hash) ? error["message"] : error
+        message = payload["message"] if message.blank?
 
         message.to_s.presence || (json?(body) ? nil : body.first(200).presence)
       end

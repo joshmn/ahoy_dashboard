@@ -33,10 +33,7 @@ RSpec.describe AhoyDashboard::Seo::AiVisibilityPromptPresenter do
     answer = create(:dash_ai_answer, prompt: prompt, text: "Ask federal-prison dude.")
     create(:dash_ai_source, answer: answer)
     shown = presenter
-    statements = []
-    subscriber = ->(*args) { statements << args.last[:sql] if args.last[:sql].match?(/\ASELECT/) }
-
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+    statements = captured_sql(/\ASELECT/, cached: true) do
       shown.groups.each do |group|
         shown.summary(group)
         group.answers.each do |item|

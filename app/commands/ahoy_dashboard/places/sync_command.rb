@@ -3,12 +3,6 @@ module AhoyDashboard
     class SyncCommand < AhoyDashboard::Command
       BATCH = 2_000
 
-      # What a run has to have written before it is allowed to take anything out.
-      # A truncated download that pruned would delete whatever it did not reach,
-      # and the picker would quietly go missing a third of the world with
-      # nothing anywhere saying why. A smaller list than last month's is kept as
-      # it is instead: an extra place on the list costs nothing, and a missing
-      # one is a search somebody cannot set up.
       FLOOR = 1_000
       KEEP_SHARE = 0.9
 
@@ -59,9 +53,6 @@ module AhoyDashboard
         Place.where(Place.arel_table[:synced_at].lt(started)).delete_all
       end
 
-      # One column rather than a count per row at render time. The picker asks
-      # whether a place can be opened for every row it draws, and a list of forty
-      # states is forty counts over a table this size.
       def count_children
         table = Place.quoted_table_name
 

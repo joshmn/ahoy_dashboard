@@ -4,8 +4,7 @@
   <% if presenter.answered? %>
     <td>
       <div class="seo-cell">
-        <%= seo_label(asked.top, path: true) %>
-        <% if presenter.ours?(asked.top) %><%= dash_badge "You", tone: :kind %><% end %>
+        <%= seo_domain(asked.top, mine: presenter.mine?(asked.top)) %>
       </div>
     </td>
   <% end %>

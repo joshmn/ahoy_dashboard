@@ -2,15 +2,9 @@
 
 module AhoyDashboard
 
-  class PaletteItem
-    attr_reader :label, :icon, :path, :badge, :note
-
-    def initialize(label:, icon:, path:, badge: nil, note: nil)
-      @label = label
-      @icon = icon
-      @path = path
-      @badge = badge
-      @note = note
+  PaletteItem = Data.define(:label, :icon, :path, :badge) do
+    def initialize(badge: nil, **rest)
+      super(badge: badge, **rest)
     end
   end
 end

@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Reports::DigestQuery do
   let(:window) do
@@ -55,9 +54,6 @@ RSpec.describe AhoyDashboard::Reports::DigestQuery do
     expect(result.list(:countries).rows.map(&:label)).to include("US")
   end
 
-  # The email has no query string behind it, so there is nowhere for a default
-  # segment or a remembered filter to come from. It is the whole site or it is
-  # a number nobody asked for.
   it "leaves crawlers out" do
     crawler_visit = dash_visit(started_at: dash_time(2026, 8, 10, 10), visitor: "bot")
     create(:page_view_event, :crawler, visit: crawler_visit, time: dash_time(2026, 8, 10, 10))

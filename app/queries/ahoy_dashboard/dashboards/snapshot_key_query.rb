@@ -46,7 +46,6 @@ module AhoyDashboard
           end
         end
         digests = Record.uncached { Record.connection.select_rows("SELECT #{projections.join(', ')}").first }
-        # Empty definitions in two different tenant scopes must still be isolated.
         [projections, digests]
       end
 
@@ -55,7 +54,7 @@ module AhoyDashboard
       end
 
       def reports
-        Report.cards.reject { |report| report.key == Report::BEHAVIOURS }.map do |report|
+        Report.grid_cards.map do |report|
           tabs = report.tabs.map do |tab|
             [tab.key, tab.label, tab.resolved_dimension_key, tab.metrics, tab.detail_metrics,
               tab.label_column, tab.breakdown_options.map(&:to_h)]

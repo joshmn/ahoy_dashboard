@@ -1,10 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard rankings", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
 
   around { |example| travel_to(now) { example.run } }
@@ -21,22 +18,6 @@ RSpec.describe "Dashboard rankings", type: :request do
              domain: domain, checked_at: at)
     end
     run
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/rankings"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/rankings"
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do
@@ -74,8 +55,6 @@ RSpec.describe "Dashboard rankings", type: :request do
       end
 
       it "stays on the page and says rank tracking is off" do
-        allow(AhoyDashboard::Serp).to receive(:enabled?).and_return(false)
-
         get "/telemetry/rankings"
         button, reason = unavailable
 
@@ -97,10 +76,10 @@ RSpec.describe "Dashboard rankings", type: :request do
       it "explains a blocked check in a notice once the page is set up" do
         allow(AhoyDashboard::Serp).to receive(:enabled?).and_return(true)
         create(:dash_serp_keyword_target, site: site)
-        allow_any_instance_of(AhoyDashboard::Serp::SweepCommand).to receive(:refusal).and_return(:capped)
+        create(:dash_serp_provider, :active, :spent)
 
         get "/telemetry/rankings"
-        notice = Nokogiri::HTML5(response.body).css("[role=status]").find { |node| node.text.include?("Check now is off.") }
+        notice = document.css("[role=status]").find { |node| node.text.include?("Check now is off.") }
 
         expect(notice.text).to include("This month's search limit is used up.")
         expect(notice.at_css("a")["href"]).to eq("/telemetry/settings/serp_providers")
@@ -112,7 +91,7 @@ RSpec.describe "Dashboard rankings", type: :request do
 
         get "/telemetry/rankings"
         button, = unavailable
-        form = Nokogiri::HTML5(response.body).at_css("form[action='/telemetry/rank_check']")
+        form = document.at_css("form[action='/telemetry/rank_check']")
 
         expect(button).to be_nil
         expect(form.at_css("button")["disabled"]).to be_nil
@@ -138,7 +117,7 @@ RSpec.describe "Dashboard rankings", type: :request do
 
       get "/telemetry/rankings"
 
-      badge = Nokogiri::HTML5(response.body).at_css(".seo-delta")
+      badge = document.at_css(".seo-delta")
 
       expect(badge.text.squish).to eq("up 5")
     end
@@ -150,6 +129,18 @@ RSpec.describe "Dashboard rankings", type: :request do
       get "/telemetry/rankings"
 
       expect(response.body).to include("Who else is on page one", "bop.gov")
+    end
+
+    it "marks a subdomain of a site that matches subdomains as yours on page one" do
+      site.update!(match_subdomains: true)
+      keyword = create(:dash_serp_keyword)
+      reading(keyword: keyword, position: 2, domains: %w[bop.gov blog.example.com])
+
+      get "/telemetry/rankings"
+      share = document.at_css("[aria-label='Who else is on page one']")
+      yours = share.css("tbody tr").select { |row| row.at_css(".badge")&.text == "You" }
+
+      expect(yours.map { |row| row.at_css(".seo-label").text.squish }).to eq([ "blog.example.com" ])
     end
 
     it "says whether an overview showed and whether it quoted us" do
@@ -183,10 +174,6 @@ RSpec.describe "Dashboard rankings", type: :request do
     end
 
     describe "the rankings distribution" do
-      def document
-        Nokogiri::HTML5(response.body)
-      end
-
       def legend
         document.at_css("[aria-label='Filter tracked searches by band']")
       end
@@ -266,10 +253,6 @@ RSpec.describe "Dashboard rankings", type: :request do
     end
 
     describe "the tracked searches" do
-      def document
-        Nokogiri::HTML5(response.body)
-      end
-
       def table
         document.at_css("##{AhoyDashboard::Serp::RankingsPresenter::TABLE_ANCHOR} table")
       end

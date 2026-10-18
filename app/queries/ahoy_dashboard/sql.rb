@@ -1,6 +1,4 @@
 module AhoyDashboard
-  # The SQL fragments every query shares, so nobody writes the same expression a
-  # second time and slightly differently.
   module Sql
     PAID_SEARCH = "Paid Search".freeze
     EMAIL = "Email".freeze
@@ -10,10 +8,6 @@ module AhoyDashboard
     REFERRAL = "Referral".freeze
     INTERNAL = "Internal".freeze
     DIRECT = "Direct / None".freeze
-
-    CHANNELS = [
-      PAID_SEARCH, EMAIL, ORGANIC_SOCIAL, ORGANIC_SEARCH, AI_ASSISTANTS, REFERRAL, INTERNAL, DIRECT
-    ].freeze
 
     PAID_MEDIUMS = %w[cpc ppc paid paidsearch].freeze
     EMAIL_MEDIUMS = %w[email e-mail newsletter].freeze
@@ -29,8 +23,6 @@ module AhoyDashboard
       startpage.com baidu.com
     ].freeze
 
-    # ahoy stores the referrer host as it arrives, so the country domains have to
-    # be matched with a wildcard rather than listed one by one.
     SEARCH_DOMAIN_PATTERNS = %w[google.% yandex.%].freeze
 
     SOCIAL_DOMAINS = %w[
@@ -44,9 +36,6 @@ module AhoyDashboard
       copilot.microsoft.com
     ].freeze
 
-    # Public because AhoyDashboard::Goal composes its match predicate into a case
-    # expression and a group by, where a positional bind cannot reach, so it
-    # quotes its own values through here rather than inventing a second way.
     def self.literal(value)
       "'#{value.to_s.gsub("'", "''")}'"
     end
@@ -59,20 +48,15 @@ module AhoyDashboard
       "(#{patterns.map { |pattern| "#{expression} ilike #{literal(pattern)}" }.join(" or ")})"
     end
 
-    def self.internal_host
-      AhoyDashboard.host.to_s.downcase.delete_prefix("www.").presence
-    end
+    PAGE_VIEW_EVENT = "ahoy_events.name = #{literal(AhoyDashboard::PAGE_VIEW)}".freeze
+    PAGEVIEW_COUNT = Arel.sql("count(*) filter (where #{PAGE_VIEW_EVENT})").freeze
 
-    def self.internal_domain?(domain)
-      host = internal_host
-      return false if host.blank? || domain.blank?
+    VISITOR_TOKEN = Arel.sql(%(ahoy_visits.visitor_token collate "C")).freeze
+    VISITORS = Arel.sql("count(distinct #{VISITOR_TOKEN})").freeze
+    SESSION_VISITORS = Arel.sql(%(count(distinct tm_visits.visitor_token collate "C"))).freeze
+    SESSION_PAGEVIEWS = Arel.sql("coalesce(sum(tm_visits.pageviews), 0)").freeze
+    SESSION_DURATION = Arel.sql("coalesce(avg(tm_visits.duration), 0)").freeze
 
-      domain == host || domain.end_with?(".#{host}")
-    end
-
-    # The host is read by the query rather than baked in when this class loads,
-    # so changing it under Settings, General reclassifies traffic on the next
-    # request instead of after a restart. Postgres runs the subquery once.
     HOST = "(select nullif(regexp_replace(lower(value #>> '{}'), '^www[.]', ''), '') " \
            "from ahoy_dashboard_settings where key = 'site.host')".freeze
 
@@ -80,15 +64,12 @@ module AhoyDashboard
       "coalesce(#{expression} = #{HOST} or #{expression} like '%.' || #{HOST}, false)"
     end
 
-    # A leading www is not a different site, and dropping it is what lets
-    # google.% catch www.google.com.
     DOMAIN = "(case when lower(ahoy_visits.referring_domain) like 'www.%' " \
              "then substr(lower(ahoy_visits.referring_domain), 5) " \
              "else lower(coalesce(ahoy_visits.referring_domain, '')) end)".freeze
 
     MEDIUM = "lower(coalesce(ahoy_visits.utm_medium, ''))".freeze
 
-    # The path out of a full landing-page URL: strip scheme and host, then the query string.
     ENTRY_PATH = Arel.sql(<<~SQL.squish).freeze
       nullif(split_part((case
         when left(ahoy_visits.landing_page, 7) = 'http://' and split_part(ahoy_visits.landing_page, '/', 3) <> ''
@@ -99,15 +80,8 @@ module AhoyDashboard
       end), '?', 1), '')
     SQL
 
-    # The landing page as it was recorded, scheme, host and query string still on
-    # it. ENTRY_PATH throws all three away, and on a site that answers on four
-    # hosts and takes a search term in the query string, all three are worth
-    # reading. This is the only full URL either ahoy table holds.
     ENTRY_URL = Arel.sql("nullif(ahoy_visits.landing_page, '')").freeze
 
-    # The host out of that URL without its port, so the dev host on :5000 and the
-    # production one group together. A landing page recorded without a scheme has
-    # no host in it to read and groups as nothing rather than as its own path.
     ENTRY_HOST = Arel.sql(<<~SQL.squish).freeze
       nullif(split_part((case
         when left(ahoy_visits.landing_page, 7) ilike 'http://' or left(ahoy_visits.landing_page, 8) ilike 'https://'
@@ -117,6 +91,7 @@ module AhoyDashboard
     SQL
 
     EVENT_PATH = Arel.sql("ahoy_events.properties ->> 'path'").freeze
+    PAGE_VIEW_STEP = Arel.sql(%((case when #{PAGE_VIEW_EVENT} then nullif(#{EVENT_PATH}, '') end) collate "C")).freeze
 
     REFERRER = Arel.sql(<<~SQL.squish).freeze
       nullif(
@@ -132,8 +107,9 @@ module AhoyDashboard
     COUNT_BOUNCED = "count(*) filter (where #{SESSION_BOUNCED})".freeze
     COUNT_BROWSED = "count(*) filter (where #{SESSION_BROWSED})".freeze
 
-    VIEWED_A_PAGE = "exists (select 1 from ahoy_events dash_views where dash_views.visit_id = ahoy_visits.id " \
-                    "and dash_views.name = '#{AhoyDashboard::PAGE_VIEW}')".freeze
+    PAGE_VIEWS_OF_VISIT = "select 1 from ahoy_events dash_views where dash_views.visit_id = ahoy_visits.id " \
+                          "and dash_views.name = '#{AhoyDashboard::PAGE_VIEW}'".freeze
+    VIEWED_A_PAGE = "exists (#{PAGE_VIEWS_OF_VISIT})".freeze
     NEVER_VIEWED_A_PAGE = "not #{VIEWED_A_PAGE}".freeze
     BROWSED = Arel.sql("case when #{VIEWED_A_PAGE} then 'Yes' else 'No' end").freeze
 
@@ -162,8 +138,6 @@ module AhoyDashboard
       end
     SQL
 
-    # The search-only predicate keeps the precedence of CHANNEL without
-    # classifying every visit that the conversion report will discard.
     ORGANIC_SEARCH_PREDICATE = Arel.sql(<<~SQL.squish).freeze
       coalesce(ahoy_visits.referring_domain, '') <> ''
       and not #{in_list(MEDIUM, PAID_MEDIUMS + EMAIL_MEDIUMS + SOCIAL_MEDIUMS)}
@@ -185,11 +159,29 @@ module AhoyDashboard
     }.freeze
 
     class << self
-      def dimension_inclusion(dimension)
+      def dimension_inclusion(dimension, floor: nil)
         return if dimension.exclude.nil?
-        return VIEWED_A_PAGE if dimension.exclude == NEVER_VIEWED_A_PAGE
+        return viewed_a_page(floor: floor) if dimension.exclude == NEVER_VIEWED_A_PAGE
 
         "not (#{dimension.exclude})"
+      end
+
+      def viewed_a_page(floor: nil)
+        return VIEWED_A_PAGE if floor.nil?
+
+        "exists (#{PAGE_VIEWS_OF_VISIT} and dash_views.time >= #{timestamp(floor)})"
+      end
+
+      def timestamp(value)
+        "#{AhoyDashboard.event.connection.quote(value)}::timestamp"
+      end
+
+      def value_in(relation, expression, values)
+        present = values.compact
+        return relation.where("#{expression} is null") if present.empty?
+        return relation.where("#{expression} in (:values) or #{expression} is null", values: present) if present.size < values.size
+
+        relation.where("#{expression} in (:values)", values: present)
       end
     end
 

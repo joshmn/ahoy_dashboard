@@ -9,7 +9,7 @@ module AhoyDashboard
         def call
           return broadcast(:invalid, form) if form.invalid?
 
-          Setting.write(Assistant::WITHHELD_KEY, form.to_store)
+          Preferences.write(:assistant, withheld: form.to_store)
 
           broadcast(:ok, form)
         end

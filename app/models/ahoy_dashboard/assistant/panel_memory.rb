@@ -1,24 +1,25 @@
 module AhoyDashboard
   module Assistant
+    PanelMemory = Data.define(:open, :chat_id)
+
     class PanelMemory
       OPEN = "open".freeze
       SHUT = "shut".freeze
 
-      attr_reader :chat_id
+      class << self
+        def read(raw)
+          state, chat_id = raw.to_s.split(":", 2)
 
-      def self.read(raw)
-        state, chat_id = raw.to_s.split(":", 2)
-
-        new(open: state == OPEN, chat_id: chat_id)
+          new(open: state == OPEN, chat_id: chat_id)
+        end
       end
 
       def initialize(open: false, chat_id: nil)
-        @open = open
-        @chat_id = chat_id.to_s[/\A\d+\z/]
+        super(open: open, chat_id: chat_id.to_s[/\A\d+\z/])
       end
 
       def open?
-        @open
+        open
       end
 
       def to_s

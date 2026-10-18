@@ -1,22 +1,12 @@
 module AhoyDashboard
-  # A conversion worth naming. Two triggers: an event fired by name, or a page
-  # view whose path matches a pattern. Either can be narrowed to one value of a
-  # custom property, which is how "a search that named a facility" becomes its
-  # own row rather than being buried inside every search.
-  #
-  # The record is the definition only. Nothing is counted here and nothing is
-  # backfilled: a goal created today reads the whole history of events that
-  # already match it, because the events were always being recorded.
   class Goal < AhoyDashboard::Record
+    include Positioned
+
     WILDCARD = "*".freeze
-    REVENUE_PROPERTY = "revenue".freeze
     CURRENCIES = %w[USD].freeze
 
     enum :kind, { custom_event: 0, pageview: 1 }, validate: true
 
-    # No dependent option on purpose. The foreign key restricts, because a funnel
-    # that quietly lost a step still renders and still reports numbers, and they
-    # answer a different question than the one somebody set up.
     has_many :funnel_steps, class_name: "AhoyDashboard::FunnelStep", inverse_of: :goal
 
     validates :event_name, presence: true, if: :custom_event?
@@ -29,11 +19,8 @@ module AhoyDashboard
     normalizes :event_name, :path_pattern, :property_key, :property_value, :display_name,
                with: ->(value) { value.to_s.strip.presence }
 
-    scope :ordered, -> { order(:position, :id) }
-
-    def self.match_case_sql(goals: ordered.to_a)
-      Sql::GoalCompiler.match_case(goals: goals)
-    end
+    after_save :forget
+    after_destroy :forget
 
     def name
       display_name.presence || default_name
@@ -43,19 +30,11 @@ module AhoyDashboard
       currency.present?
     end
 
-    def to_param
-      id.to_s
-    end
-
-    def match_sql
-      Sql::GoalCompiler.new(goal: self).predicate
-    end
-
-    def revenue_sql
-      Sql::GoalCompiler.new(goal: self).revenue
-    end
-
     private
+
+    def forget
+      AhoyDashboard::Current.forget_dimensions
+    end
 
     def default_name
       return path_pattern.to_s if pageview?
@@ -69,10 +48,6 @@ module AhoyDashboard
       errors.add(:path_pattern, "has to start with a slash")
     end
 
-    # Two goals resolving to the same name would make the case expression in
-    # .match_case_sql ambiguous and a goal filter unable to say which one it
-    # means. The expression index enforces the same effective name; this check
-    # supplies a useful validation error before attempting the write.
     def name_is_not_taken
       return if name.blank?
 

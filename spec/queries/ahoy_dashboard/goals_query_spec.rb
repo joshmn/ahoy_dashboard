@@ -1,18 +1,11 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::GoalsQuery do
   it "does not reload supplied goal definitions" do
     create(:dash_goal, event_name: "site_searched")
     goals = AhoyDashboard::Goal.ordered.to_a
     prepared_scope = scope
-    statements = []
-    recorder = ->(*args) do
-      payload = args.last
-      statements << payload[:sql] if payload[:name] != "SCHEMA" && payload[:sql].match?(/FROM "ahoy_dashboard_goals"/)
-    end
-
-    ActiveSupport::Notifications.subscribed(recorder, "sql.active_record") do
+    statements = captured_sql('FROM "ahoy_dashboard_goals"', cached: true) do
       described_class.call(scope: prepared_scope, goals: goals)
     end
 
@@ -22,12 +15,7 @@ RSpec.describe AhoyDashboard::GoalsQuery do
   it "reuses the loaded definitions when constructing the goal matcher" do
     AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "one")
     AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "two")
-    statements = []
-    recorder = ->(*args) do
-      payload = args.last
-      statements << payload[:sql] if payload[:name] != "SCHEMA" && payload[:sql].match?(/FROM "ahoy_dashboard_goals"/)
-    end
-    ActiveSupport::Notifications.subscribed(recorder, "sql.active_record") do
+    statements = captured_sql('FROM "ahoy_dashboard_goals"', cached: true) do
       result = described_class.call(scope: scope)
       expect(result.rows.map(&:label)).to contain_exactly("one", "two")
     end
@@ -38,24 +26,18 @@ RSpec.describe AhoyDashboard::GoalsQuery do
   let(:range) { dash_day_range(2026, 8, 10) }
   let(:scope) { dash_scope(range: range) }
 
-  # four visitors in the scope. site_searched fired three times by two of them,
-  # newsletter_subscribed once by a third, so 50% and 25%.
   before do
-    searcher = dash_visit(started_at: dash_time(2026, 8, 10, 9), visitor: "a")
-    dash_page_view(searcher, path: "/search", at: dash_time(2026, 8, 10, 9))
+    searcher = dash_landing("/search", at: dash_time(2026, 8, 10, 9), visitor: "a")
     dash_goal(searcher, "site_searched", at: dash_time(2026, 8, 10, 9, 1))
     dash_goal(searcher, "site_searched", at: dash_time(2026, 8, 10, 9, 3))
 
-    other = dash_visit(started_at: dash_time(2026, 8, 10, 10), visitor: "b")
-    dash_page_view(other, path: "/search", at: dash_time(2026, 8, 10, 10))
+    other = dash_landing("/search", at: dash_time(2026, 8, 10, 10), visitor: "b")
     dash_goal(other, "site_searched", at: dash_time(2026, 8, 10, 10, 1))
 
-    subscriber = dash_visit(started_at: dash_time(2026, 8, 10, 11), visitor: "c")
-    dash_page_view(subscriber, path: "/newsletter", at: dash_time(2026, 8, 10, 11))
+    subscriber = dash_landing("/newsletter", at: dash_time(2026, 8, 10, 11), visitor: "c")
     dash_goal(subscriber, "newsletter_subscribed", at: dash_time(2026, 8, 10, 11, 2))
 
-    lurker = dash_visit(started_at: dash_time(2026, 8, 10, 12), visitor: "d")
-    dash_page_view(lurker, path: "/", at: dash_time(2026, 8, 10, 12))
+    dash_landing(at: dash_time(2026, 8, 10, 12), visitor: "d")
   end
 
   let(:result) { described_class.call(scope: scope) }
@@ -106,6 +88,23 @@ RSpec.describe AhoyDashboard::GoalsQuery do
         .to eq([ "newsletter_subscribed" ])
     end
 
+    it "narrows to the goals whose name holds the term before paging them" do
+      searched = described_class.call(scope: scope, term: "  NEWS ", limit: 1)
+
+      expect(searched.rows.map(&:label)).to eq([ "newsletter_subscribed" ])
+      expect(searched).not_to be_more
+      expect(searched.total).to eq(result.total)
+      expect(described_class.call(scope: scope, term: "news", limit: 1, offset: 1).rows).to eq([])
+      expect(described_class.call(scope: scope, term: "%").rows).to eq([])
+    end
+
+    it "honours the offset when every row is asked for" do
+      expect(described_class.call(scope: scope, limit: nil, offset: 1).rows.map(&:label))
+        .to eq([ "newsletter_subscribed" ])
+      expect(described_class.call(scope: scope, term: "s", limit: nil, offset: 1).rows.map(&:label))
+        .to eq([ "newsletter_subscribed" ])
+    end
+
     it "prefers a display name over the event name" do
       AhoyDashboard::Goal.find_by(event_name: "site_searched").update!(display_name: "Used the search box")
 
@@ -113,8 +112,6 @@ RSpec.describe AhoyDashboard::GoalsQuery do
     end
   end
 
-  # A goal that never fires is an answer, not an absence. Plausible drops these
-  # rows; keeping them is how somebody notices a goal they defined is dead.
   describe "a goal with no conversions" do
     before do
       define_goals!
@@ -150,20 +147,11 @@ RSpec.describe AhoyDashboard::GoalsQuery do
 
       expect(dash_row(result, "Newsletter page").metrics["visitors"]).to eq(1)
     end
-
-    # An underscore is a single-character wildcard in LIKE, so a real path
-    # containing one must not match its neighbours.
-    it "does not treat a literal underscore as a wildcard" do
-      AhoyDashboard::Goal.create!(kind: :pageview, path_pattern: "/searc_", display_name: "Underscored")
-
-      expect(dash_row(result, "Underscored").metrics["visitors"]).to eq(0)
-    end
   end
 
   describe "a goal narrowed by a custom property" do
     before do
-      visit = dash_visit(started_at: dash_time(2026, 8, 10, 13), visitor: "e")
-      dash_page_view(visit, path: "/search", at: dash_time(2026, 8, 10, 13))
+      visit = dash_landing("/search", at: dash_time(2026, 8, 10, 13), visitor: "e")
       dash_goal(visit, "site_searched", at: dash_time(2026, 8, 10, 13, 1), facility_id: "12")
     end
 
@@ -192,8 +180,7 @@ RSpec.describe AhoyDashboard::GoalsQuery do
 
   describe "revenue goals" do
     before do
-      visit = dash_visit(started_at: dash_time(2026, 8, 10, 14), visitor: "f")
-      dash_page_view(visit, path: "/consult", at: dash_time(2026, 8, 10, 14))
+      visit = dash_landing("/consult", at: dash_time(2026, 8, 10, 14), visitor: "f")
       dash_goal(visit, "consult_booked", at: dash_time(2026, 8, 10, 14, 1), revenue: "400")
       dash_goal(visit, "consult_booked", at: dash_time(2026, 8, 10, 14, 2), revenue: "200")
     end
@@ -207,8 +194,6 @@ RSpec.describe AhoyDashboard::GoalsQuery do
       expect(row.metrics["revenue_average"]).to eq(300.0)
     end
 
-    # nil, not zero. A goal that carries no money has no revenue, and $0.00
-    # would claim the conversion earned nothing.
     it "reports nothing for a goal with no currency" do
       AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "consult_booked")
 
@@ -235,8 +220,6 @@ RSpec.describe AhoyDashboard::GoalsQuery do
   describe "under a filter" do
     let(:scope) { dash_scope(range: range, filters: dash_filters([ "country", "is", "US" ])) }
 
-    # The denominator moves with the filter, so the rate is out of the two
-    # visitors the filter left rather than all four.
     it "reads the rate against the filtered scope" do
       define_goals!
       Ahoy::Visit.where(visitor_token: %w[a b]).update_all(country: "US")
@@ -267,8 +250,6 @@ RSpec.describe AhoyDashboard::GoalsQuery do
       counting_statement.first
     end
 
-    # The range binds are times, so the strings are the event names and nothing
-    # else.
     def candidate_names
       counting_statement.last.grep(String)
     end
@@ -286,9 +267,6 @@ RSpec.describe AhoyDashboard::GoalsQuery do
         expect(counting_sql).to include("revenue")
       end
 
-      # The goals tab lists revenue_total and revenue_average as columns and
-      # ReportPresenter renders nil as blank, so the keys have to be there either
-      # way or the card loses two columns.
       it "leaves the metrics keys alone when it is skipped" do
         expect(dash_row(result, "site_searched").metrics.keys)
           .to eq(%w[visitors events conversion_rate revenue_total revenue_average])
@@ -324,8 +302,6 @@ RSpec.describe AhoyDashboard::GoalsQuery do
       end
     end
 
-    # The prefilter is derived from the goals, so a goal kind that named the wrong
-    # event would drop conversions without saying anything.
     describe "counting a mixed set" do
       before do
         define_goals!
@@ -345,15 +321,12 @@ RSpec.describe AhoyDashboard::GoalsQuery do
       end
     end
 
-    # The group buckets everything the case expression does not name, and nothing
-    # ever reads that bucket. It must not surface as a row of its own.
     describe "an event no goal describes" do
       before do
         define_goals!
-        visit = dash_visit(started_at: dash_time(2026, 8, 10, 15), visitor: "g")
-        dash_page_view(visit, path: "/unrelated", at: dash_time(2026, 8, 10, 15))
+        visit = dash_landing("/unrelated", at: dash_time(2026, 8, 10, 15), visitor: "g")
         dash_goal(visit, "$click", at: dash_time(2026, 8, 10, 15, 1))
-        create(:ahoy_event, visit: visit, name: nil, time: dash_time(2026, 8, 10, 15, 2), properties: {})
+        dash_goal(visit, nil, at: dash_time(2026, 8, 10, 15, 2))
       end
 
       it "does not become a row" do

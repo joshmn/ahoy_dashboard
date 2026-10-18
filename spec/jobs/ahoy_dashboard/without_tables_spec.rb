@@ -1,6 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe "AhoyDashboard jobs with their tables not installed" do
   let(:feature_tables) { AhoyDashboard::Installation::FEATURES.flat_map(&:tables).uniq }
@@ -13,10 +11,7 @@ RSpec.describe "AhoyDashboard jobs with their tables not installed" do
   end
 
   def touched_tables
-    statements = []
-    subscriber = ->(_name, _started, _finished, _id, payload) { statements << payload[:sql] unless payload[:name] == "SCHEMA" }
-
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { yield }
+    statements = captured_sql(cached: true) { yield }
 
     feature_tables.select { |table| statements.any? { |sql| sql.include?(table) } }
   end

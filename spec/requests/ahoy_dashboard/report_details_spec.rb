@@ -1,33 +1,25 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard report details", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
   before { sign_in create(:user, :admin) }
 
   def page_at(path, visitor:)
-    visit = dash_visit(started_at: now - 1.day, visitor: visitor)
-    dash_page_view(visit, path: path, at: now - 1.day)
-    visit
+    dash_landing(path, at: now - 1.day, visitor: visitor)
   end
 
   def details(params = {})
     get "/telemetry/reports/pages", params: { view: "details" }.merge(params)
-    Nokogiri::HTML5(response.body)
+    document
   end
 
   def labels(document)
     document.css(".m-list .data-row .nm").map { |cell| cell.text.strip }
   end
 
-  # The header controls used to be static markup in the dialog's header, rendered
-  # once with the dashboard. Two things were wrong with that: the tab marked was
-  # the report's default rather than the one on screen, and it was the tabs alone,
-  # so the dialog could not group by a different reading of the dimension the way
-  # the card behind it can. Both are drawn by the frame now.
   describe "the views" do
     before { page_at("/alpha", visitor: "one") }
 
@@ -56,8 +48,6 @@ RSpec.describe "Dashboard report details", type: :request do
       expect(picker.at_css("button")["id"]).to eq("tm-modal-pages-breakdown-button")
     end
 
-    # Every link a picker builds has to say it is the dialog asking, or the
-    # answer comes back as the card and the frame swaps a panel into a modal.
     it "keep a picked breakdown inside the dialog" do
       hrefs = details.css('[data-tm-picker="breakdown"] [data-dash--menu-target=panel] a').map { |item| item["href"] }
 
@@ -65,10 +55,9 @@ RSpec.describe "Dashboard report details", type: :request do
       expect(hrefs).to all(include("view=details"))
     end
 
-    # Both are on the page at once, so their ids cannot be the one id.
     it "do not collide with the card's own picker" do
       get "/telemetry?loading=complete"
-      ids = Nokogiri::HTML5(response.body).css("[data-tm-picker] button").map { |node| node["id"] }
+      ids = document.css("[data-tm-picker] button").map { |node| node["id"] }
 
       expect(ids).to eq(ids.uniq)
     end
@@ -124,6 +113,16 @@ RSpec.describe "Dashboard report details", type: :request do
       expect(label.text.strip).to eq("Find a row in top pages")
     end
 
+    it "searches on the same capped term it gives back to the box" do
+      long = "/#{"x" * 99}"
+      page_at(long, visitor: "four")
+
+      document = details(q: "#{long}-and-then-some")
+
+      expect(document.at_css(".form-control")["value"]).to eq(long)
+      expect(labels(document)).to eq([ long ])
+    end
+
     it "carries the dashboard's own question with it" do
       document = details(q: "bet", period: "7d", filters: [
         { dimension: "country", operator: "is", value: "US" }
@@ -142,7 +141,6 @@ RSpec.describe "Dashboard report details", type: :request do
       )
     end
 
-    # A term is a piece of a URL somebody can edit, so nothing in it can raise.
     it "still renders on nonsense in the term" do
       [ { q: [ "alpha" ] }, { q: { a: "b" } }, { q: "%" }, { q: "'" }, { q: "a" * 500 },
         { q: "\\" }, { q: "alpha", page: "banana" } ].each do |params|
@@ -159,8 +157,6 @@ RSpec.describe "Dashboard report details", type: :request do
     end
   end
 
-  # A term is text somebody typed to look for, so the two characters that mean
-  # something to LIKE have to mean nothing here.
   describe "a term that looks like a wildcard" do
     before do
       page_at("/a%b", visitor: "one")
@@ -207,9 +203,6 @@ RSpec.describe "Dashboard report details", type: :request do
     end
   end
 
-  # Same reason as the property below: which breakdown the card is grouping by is
-  # the card's state, and a search that dropped it would answer about a different
-  # grouping than the heading says.
   describe "a card with a breakdown chosen" do
     before do
       %w[alpha beta].each_with_index do |name, index|
@@ -232,16 +225,12 @@ RSpec.describe "Dashboard report details", type: :request do
     end
   end
 
-  # Which custom property the card is grouping by is part of the card's state,
-  # not the tab's, so a page forward that dropped it would silently show a
-  # different property's rows under the same heading.
   describe "a custom property card" do
     before do
       stub_const("AhoyDashboard::ReportQuery::DETAIL_ROWS", 2)
 
       %w[alpha beta gamma].each_with_index do |spot, index|
-        visit = dash_visit(started_at: now - 1.day, visitor: "visitor-#{index}")
-        dash_page_view(visit, path: "/page-#{index}", at: now - 1.day)
+        visit = dash_landing("/page-#{index}", at: now - 1.day, visitor: "visitor-#{index}")
         dash_goal(visit, "site_searched", at: now - 1.day, spot: spot)
       end
     end
@@ -249,7 +238,7 @@ RSpec.describe "Dashboard report details", type: :request do
     def property_details(params = {})
       get "/telemetry/reports/behaviours",
           params: { tab: "properties", view: "details", property: "spot" }.merge(params)
-      Nokogiri::HTML5(response.body)
+      document
     end
 
     it "groups by the property somebody picked" do
@@ -302,14 +291,13 @@ RSpec.describe "Dashboard report details", type: :request do
   describe "searching a visit-level tab" do
     before do
       %w[US US CA DE].each_with_index do |country, index|
-        visit = dash_visit(started_at: now - 1.day, visitor: "visitor-#{index}", country: country)
-        dash_page_view(visit, path: "/p#{index}", at: now - 1.day)
+        dash_landing("/p#{index}", at: now - 1.day, visitor: "visitor-#{index}", country: country)
       end
     end
 
     def country_details(params = {})
       get "/telemetry/reports/locations", params: { tab: "countries", view: "details" }.merge(params)
-      Nokogiri::HTML5(response.body)
+      document
     end
 
     def percents(document)
@@ -346,7 +334,7 @@ RSpec.describe "Dashboard report details", type: :request do
 
     it "links to the dashboard without that filter" do
       row = row_for(details(filters: applied), "/alpha")
-      query = Rack::Utils.parse_nested_query(URI.parse(row["href"]).query.to_s)
+      query = link_query(row["href"])
 
       expect(row["aria-current"]).to eq("true")
       expect(row["title"]).to eq("Remove filter")
@@ -356,23 +344,21 @@ RSpec.describe "Dashboard report details", type: :request do
     it "keeps the other filters when it removes its own" do
       filters = applied + [ { dimension: "country", operator: "is", value: "US" } ]
       row = row_for(details(filters: filters), "/alpha")
-      query = Rack::Utils.parse_nested_query(URI.parse(row["href"]).query.to_s)
+      query = link_query(row["href"])
 
       expect(query["filters"]).to eq([ { "dimension" => "country", "operator" => "is", "value" => "US" } ])
     end
 
     it "still adds the filter from a row that is not applied" do
       get "/telemetry/reports/pages", params: { view: "details" }
-      row = row_for(Nokogiri::HTML5(response.body), "/beta")
-      query = Rack::Utils.parse_nested_query(URI.parse(row["href"]).query.to_s)
+      row = row_for(document, "/beta")
+      query = link_query(row["href"])
 
       expect(row["aria-current"]).to be_nil
       expect(query["filters"]).to eq([ { "dimension" => "page", "operator" => "is", "value" => "/beta" } ])
     end
   end
 
-  # The goals card's rows are the goals table rather than a group by, so its
-  # search is a name match. It still has to behave like the others.
   describe "the goals card" do
     before do
       create(:dash_goal, kind: :custom_event, event_name: "site_searched",
@@ -380,14 +366,13 @@ RSpec.describe "Dashboard report details", type: :request do
       create(:dash_goal, kind: :custom_event, event_name: "consult_requested",
              display_name: "Consult booked")
 
-      visit = dash_visit(started_at: now - 1.day, visitor: "one")
-      dash_page_view(visit, path: "/alpha", at: now - 1.day)
+      visit = dash_landing("/alpha", at: now - 1.day, visitor: "one")
       dash_goal(visit, "site_searched", at: now - 1.day)
     end
 
     def goal_details(params = {})
       get "/telemetry/reports/behaviours", params: { tab: "goals", view: "details" }.merge(params)
-      Nokogiri::HTML5(response.body)
+      document
     end
 
     it "lists every goal with no term" do

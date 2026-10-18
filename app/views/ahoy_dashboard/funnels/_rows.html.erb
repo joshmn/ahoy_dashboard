@@ -1,6 +1,5 @@
 <% if presenter.empty? %>
-  <%= dash_empty title: "Nobody reached the first step",
-        hint: query.filters.any? ? "Try a wider date range, or drop one of the filters." : "Try a wider date range." %>
+  <%= dash_empty title: "Nobody reached the first step", hint: dash_range_hint %>
 <% else %>
   <div class="p-cols">
     <span class="pc-l">Step</span>
@@ -9,13 +8,9 @@
     <% end %>
   </div>
 
-  <%# An ordered list, because the order is the point. That also means the step
-      number is already announced, so the chip beside it is decoration. %>
   <ol class="p-list list-unstyled d-flex flex-column mb-0">
     <% presenter.rows.each do |row| %>
       <li>
-        <%# Not a link. A step is a goal at a place in a sequence, and there is
-            nothing for a click to narrow the dashboard down to. %>
         <div class="data-row data-row--static">
           <%= dash_bar_tag(row.share, columns: presenter.columns.size) %>
           <span class="rn">

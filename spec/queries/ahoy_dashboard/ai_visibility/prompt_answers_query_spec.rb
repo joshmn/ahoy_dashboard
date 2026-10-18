@@ -32,12 +32,7 @@ RSpec.describe AhoyDashboard::AiVisibility::PromptAnswersQuery do
     end
 
     it "reads all retained answers and their sources in two SQL statements" do
-      statements = []
-      subscriber = lambda do |*, payload|
-        statements << payload[:sql] if payload[:sql].match?(/\ASELECT.*ahoy_dashboard_ai_visibility_(answers|sources)/m)
-      end
-
-      ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+      statements = captured_sql(/\ASELECT.*ahoy_dashboard_ai_visibility_(answers|sources)/m, cached: true) do
         described_class.call(prompt: prompt, limit: 2)
       end
 

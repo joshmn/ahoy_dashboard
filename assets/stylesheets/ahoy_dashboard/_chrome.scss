@@ -1,77 +1,21 @@
-
-
-.tm-top.navbar {
-  padding: 0;
-}
-
-.tm-icon-btn.active {
-  color: var(--t1);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-// Who is here now. A capsule the same 28px as every other control in the
-// header, and the only thing on the screen that moves on its own.
 .live {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  font-size: $font-size-md;
   color: var(--t1);
   white-space: nowrap;
-  transition: background 0.12s, border-color 0.12s;
 }
 
 .live:hover {
-  background: rgba(76, 183, 130, 0.06);
-  border-color: rgba(76, 183, 130, 0.28);
   color: var(--t1);
-  text-decoration: none;
 }
 
-.live-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--green);
-  box-shadow: 0 0 0 0 rgba(76, 183, 130, 0.45);
-  animation: live-pulse 2.4s ease-out infinite;
-}
-
-@keyframes live-pulse {
-  70% { box-shadow: 0 0 0 6px rgba(76, 183, 130, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(76, 183, 130, 0); }
-}
-
-.live-num {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.live-lbl {
-  color: var(--t3);
-}
-
-.tm-tabs .nav-link {
-  white-space: nowrap;
-}
-
-// A dashed edge marks a control that changes what is shown rather than what is
-// asked, the same idea as the add-a-filter affordance.
 .tm-dashed {
   border-style: dashed;
 }
 
-// Adding a filter is an affordance rather than a command, so it reads as an
-// empty slot: dashed edge, accent label.
 .btn.tm-add {
   --bs-btn-color: var(--bs-primary-text-emphasis);
   --bs-btn-hover-color: var(--bs-primary-text-emphasis);
   --bs-btn-active-color: var(--bs-primary-text-emphasis);
-  --bs-btn-bg: rgba(255, 255, 255, 0.02);
+  --bs-btn-bg: var(--secondary-fill);
   --bs-btn-padding-x: 0.75rem;
   --bs-btn-hover-bg: var(--bs-primary-bg-subtle);
   --bs-btn-active-bg: var(--bs-primary-bg-subtle);
@@ -79,19 +23,6 @@
   --bs-btn-hover-border-color: var(--bs-primary);
   --bs-btn-active-border-color: var(--bs-primary);
   border-style: dashed;
-}
-
-// ---------- dialogs ----------
-// Bootstrap's modal is driven by its own JavaScript, which this does not load.
-// The controller toggles .show, so the display and the scrim live here instead
-// of in an injected backdrop element.
-//
-// Above the popovers, not below them. Bootstrap's own order puts a dropdown at
-// 1000 and a modal at 1055, but these popovers are lifted to 1070 so they clear
-// the two sticky bars, and a dialog opened from one was landing behind the
-// menu that opened it.
-.modal {
-  --bs-modal-zindex: 1082;
 }
 
 .modal.show {

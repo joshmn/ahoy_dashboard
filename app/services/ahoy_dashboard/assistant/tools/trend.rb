@@ -2,10 +2,6 @@ module AhoyDashboard
   module Assistant
     module Tools
       class Trend < BaseTool
-        # Buckets that can be added up to make the window's own number, and
-        # buckets that cannot. A visitor who came on Monday and again on Friday
-        # is one visitor for the week and two daily points, so adding the points
-        # counts them twice; a rate and an average are not quantities at all.
         ADDITIVE = %w[visits pageviews].freeze
 
         SUMMABLE = "adding the points up gives the window total".freeze
@@ -28,7 +24,9 @@ module AhoyDashboard
           AhoyDashboard::Assistant::Tools::BaseTool.window_params(self)
         end
 
-        def execute(metric: "visitors", interval: nil, **asked)
+        private
+
+        def answer(metric: "visitors", interval: nil, **asked)
           found = AhoyDashboard::Metric.find_by_key(metric.to_s)
           return { error: "no metric called #{metric}", metrics: keys } if found.nil?
           return { error: "#{found.key} can not be charted over time", metrics: keys } unless found.chartable?
@@ -49,13 +47,7 @@ module AhoyDashboard
             metric: found.key, total: figure(found, total), summing: summing(found),
             **drawn, points: points.map { |at, value| { at: at, value: value } }
           )
-        rescue Window::UnknownPeriod => e
-          unknown_period(e)
-        rescue Slice::InvalidFilters => e
-          invalid_filters(e)
         end
-
-        private
 
         def total_for(read, metric)
           AhoyDashboard::TopStatsQuery.call(scope: read.scope, metrics: [ metric ])

@@ -1,9 +1,9 @@
 module AhoyDashboard
   module Seo
     class PositionChangesPresenter < BasePresenter
-      Group = Data.define(:key, :title, :note, :rows, :tone)
-
       Move = Data.define(:key, :label, :count)
+
+      delegate :comparable?, to: :result
 
       def groups
         [
@@ -45,6 +45,11 @@ module AhoyDashboard
 
       def unranked
         memo(:unranked) { result.for(:level).reject(&:ranked?) }
+      end
+
+      def unranked_group
+        Group.new(key: :unranked, title: "Not ranking", tone: :neutral, rows: unranked,
+                  note: "Nowhere at either end of the range.")
       end
 
       def crossings_note
@@ -89,13 +94,7 @@ module AhoyDashboard
       end
 
       def window(row)
-        return on_label(row.first_at) if local_date(row.first_at) == local_date(row.last_at)
-
-        "#{on_label(row.first_at)} to #{on_label(row.last_at)}"
-      end
-
-      def comparable?
-        result.comparable?
+        AhoyDashboard::DateFormat.span(local_date(row.first_at), local_date(row.last_at), zone: time_zone)
       end
 
       def csv_tables
@@ -119,21 +118,9 @@ module AhoyDashboard
       def change_row(row)
         values = [ row.query ]
         values << row.place.label if places?
-        values.push(row.from, row.to, csv_change(row), csv_url(row.url))
+        values.push(row.from, row.to, csv_change(row), Formatting.url_path(row.url))
         values << window(row) if windows?
         values
-      end
-
-      def csv_change(row)
-        case change_kind(row)
-        when :new then "New"
-        when :gone then "Gone"
-        else row.change
-        end
-      end
-
-      def csv_url(url)
-        url.presence && path_of(url)
       end
 
       def unranked_headers

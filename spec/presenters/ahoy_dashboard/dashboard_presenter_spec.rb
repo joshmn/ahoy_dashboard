@@ -31,7 +31,7 @@ RSpec.describe AhoyDashboard::DashboardPresenter do
   end
 
   describe "the change pill against a running range" do
-    let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+    let(:now) { dash_time(2026, 8, 11, 14, 30) }
     let(:query) { AhoyDashboard::QueryForm.from_params({ period: "day", comparison: "previous_period" }) }
 
     around { |example| travel_to(now) { example.run } }
@@ -51,12 +51,31 @@ RSpec.describe AhoyDashboard::DashboardPresenter do
     end
 
     it "calls today so far" do
-      expect(described_class.new(query: query).period_label).to eq("Today so far")
+      expect(query.period_label).to eq("Today so far")
+    end
+  end
+
+  describe "the comparison switch beside the tiles" do
+    it "offers the previous period while nothing is being compared" do
+      presenter = described_class.new(query: query)
+
+      expect(presenter).not_to be_comparing
+      expect(presenter.comparison_switch_label).to eq("Previous period")
+      expect(presenter.comparison_switch_path).to include("comparison=previous_period")
+    end
+
+    it "names the comparison on and takes it off when one is" do
+      comparing = AhoyDashboard::QueryForm.from_params({ period: "yesterday", comparison: "year_over_year" })
+      presenter = described_class.new(query: comparing)
+
+      expect(presenter).to be_comparing
+      expect(presenter.comparison_switch_label).to eq("Year over year")
+      expect(presenter.comparison_switch_path).not_to include("comparison=")
     end
   end
 
   describe "the chart payload" do
-    let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+    let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
     around { |example| travel_to(now) { example.run } }
 
@@ -65,16 +84,7 @@ RSpec.describe AhoyDashboard::DashboardPresenter do
       presenter = described_class.new(query: query, annotations: [note])
       query.range
       AhoyDashboard.time_zone
-      statements = []
-      subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
-        statements << payload[:sql] unless payload[:name].in?(["SCHEMA", "TRANSACTION"])
-      end
-
-      presenter.chart_options
-
-      expect(statements).to be_empty
-    ensure
-      ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
+      expect(captured_sql(cached: true) { presenter.chart_options }).to be_empty
     end
 
     it "includes supplied annotation labels and local timestamps in the chart payload" do
@@ -104,7 +114,7 @@ RSpec.describe AhoyDashboard::DashboardPresenter do
   end
 
   describe "picking a range off the chart" do
-    let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+    let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
     around { |example| travel_to(now) { example.run } }
 

@@ -35,9 +35,6 @@ module AhoyDashboard
 
       attr_reader :range, :site, :depth, :limit, :tag
 
-      # One reading per keyword and place, the most recent in the range. Counting
-      # every day would rank a domain by how often the search ran rather than by
-      # how much of the page it holds.
       def latest_run_ids
         runs.order("keyword_id, location, checked_at desc, id desc")
           .pluck(Arel.sql("distinct on (keyword_id, location) id"))
@@ -47,7 +44,7 @@ module AhoyDashboard
         scope = SerpRun.usable.where(checked_at: range).for_tag(tag).at_current_places
         return scope if site.nil?
 
-        scope.where(id: SerpCheck.where(site_id: site.id, status: SerpCheck.statuses[:success]).select(:run_id))
+        scope.where(id: SerpCheck.success.where(site_id: site.id).in_range(range).select(:run_id))
       end
 
       def rows(ids)

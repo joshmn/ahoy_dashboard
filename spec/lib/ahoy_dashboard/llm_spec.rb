@@ -1,15 +1,9 @@
 require "rails_helper"
 
-# The client is the one part of the dashboard that talks to somebody else's
-# server, and every other assistant spec stubs the chat out entirely. So this
-# file drives the real thing over a faked socket: sse framing, the tool loop,
-# and the token arithmetic across it.
 RSpec.describe AhoyDashboard::LLM do
   let(:endpoint) { "https://api.example.com/v1/chat/completions" }
   let(:context) { described_class::Context.new(api_base: "https://api.example.com/v1", api_key: "k") }
 
-  # One frame per element. Split deliberately mid-frame in one case below, to
-  # prove the reader buffers rather than assuming a whole event per read.
   def sse(*events)
     events.map { |event| "data: #{event.is_a?(String) ? event : JSON.generate(event)}\n\n" }.join + "data: [DONE]\n\n"
   end
@@ -88,10 +82,10 @@ RSpec.describe AhoyDashboard::LLM do
   end
 
   describe described_class::Context do
-    it "needs a key unless the endpoint is a local one" do
+    it "needs a key unless the reader takes one only if it is given" do
       expect(described_class.new(api_base: "https://x/v1", api_key: nil)).not_to be_configured
       expect(described_class.new(api_base: "https://x/v1", api_key: "k")).to be_configured
-      expect(described_class.new(api_base: "http://localhost:1234/v1", local: true)).to be_configured
+      expect(described_class.new(api_base: "http://localhost:1234/v1", key_optional: true)).to be_configured
       expect(described_class.new(api_base: "", api_key: "k")).not_to be_configured
     end
 
@@ -147,10 +141,6 @@ RSpec.describe AhoyDashboard::LLM do
       }
     end
 
-    # The reader buffers by line rather than assuming one frame per read. A
-    # faked socket hands the whole body over at once, so what this pins is that
-    # several frames in one delivery are each decoded; genuine mid-frame splits
-    # are only exercised against a real server.
     it "decodes every frame in a single delivery" do
       stub_request(:post, endpoint)
         .to_return(status: 200, body: sse(text_frame("half "), text_frame("and half"), usage_frame(1, 1)))
@@ -185,8 +175,6 @@ RSpec.describe AhoyDashboard::LLM do
       end.new
     end
 
-    # Arguments stream in fragments the same way text does, so nothing can be
-    # parsed until the round is finished.
     def tool_round
       sse(tool_frame(index: 0, id: "call_1", name: "adder", arguments: '{"a":'),
           tool_frame(index: 0, arguments: "41}"),
@@ -378,8 +366,6 @@ RSpec.describe AhoyDashboard::LLM do
       }.once
     end
 
-    # A model that keeps asking for the same tool should cost a bounded number
-    # of requests rather than running until something else times out.
     it "stops after MAX_ROUNDS of tool calls" do
       stub_request(:post, endpoint).to_return(status: 200, body: tool_round)
 

@@ -1,9 +1,4 @@
 module AhoyDashboard
-  # The search queries card. Its own resource rather than a AhoyDashboard::Report,
-  # because a Search Console row carries no visitor and no session: it cannot be
-  # filtered against the ahoy tables and clicking one cannot narrow the
-  # dashboard. Giving it a dimension so it fitted the report machinery would have
-  # meant a filter that silently did nothing.
   class SearchConsoleController < AhoyDashboard::BaseController
     CARD_ROWS = 9
     DETAIL_ROWS = 100

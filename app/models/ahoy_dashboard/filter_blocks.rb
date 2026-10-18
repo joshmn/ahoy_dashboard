@@ -3,7 +3,6 @@ module AhoyDashboard
     include Enumerable
 
     BLOCK = "block".freeze
-    BLOCK_FORMAT = /\A\d{1,6}\z/
 
     attr_reader :to_a
 
@@ -12,36 +11,21 @@ module AhoyDashboard
     end
 
     def self.from_entries(entries)
-      buckets = Array(entries).each_with_object({}) do |entry, found|
-        next unless entry.respond_to?(:[])
+      buckets = Array(entries).each_with_object({}) do |raw, found|
+        entry = AhoyDashboard::FilterEntry.read(raw)
+        next if entry.nil?
 
-        (found[block_of(entry)] ||= []) << entry
+        (found[entry.block] ||= []) << raw
       end
 
       new(buckets.values.map { |members| AhoyDashboard::Filters.from_params(filters: members) })
-    end
-
-    def self.block_of(entry)
-      raw = (entry[BLOCK] || entry[BLOCK.to_sym]).to_s.strip
-
-      raw.match?(BLOCK_FORMAT) ? raw.to_i : 0
     end
 
     def initialize(blocks = [])
       @to_a = Array(blocks).select(&:any?).freeze
     end
 
-    def each(&block)
-      to_a.each(&block)
-    end
-
-    def size
-      to_a.size
-    end
-
-    def empty?
-      to_a.empty?
-    end
+    delegate :each, :size, :empty?, to: :to_a
 
     def single?
       size == 1

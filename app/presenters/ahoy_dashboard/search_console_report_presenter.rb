@@ -1,23 +1,17 @@
 module AhoyDashboard
-  # The Search Console page: four numbers, a chart of one of them, and the rows
-  # underneath.
-  #
-  # The three tables disagree with each other on purpose, so the page says once,
-  # under the chart, that the rows come up short of the totals.
   class SearchConsoleReportPresenter
     include AhoyDashboard::Seo::Exportable
+    include AhoyDashboard::Seo::Formatting
 
-    TITLE = "Performance".freeze
-    SUBTITLE = "Clicks, impressions, CTR and position from Google Search Console.".freeze
+    SURFACE = AhoyDashboard::Seo::Surface.find("search_console")
+
+    TOP = AhoyDashboard::SetupNotice::TOP
 
     CLICKS = "clicks".freeze
     IMPRESSIONS = "impressions".freeze
     CTR = "ctr".freeze
     POSITION = "position".freeze
 
-    # Position counts the wrong way round: one is the best a page can do, so a
-    # fall is an improvement and the arrow has to be read the other way. inverted
-    # is the only thing that says so, and every delta on this page reads it.
     Measure = Data.define(:key, :label, :short, :caption, :inverted, :format) do
       def inverted?
         inverted
@@ -31,19 +25,20 @@ module AhoyDashboard
       Measure.new(POSITION, "Position", "Avg position", "Daily avg position", true, :place)
     ].freeze
 
-    # The line the design draws for each. Position is the odd one out and looks
-    # it: a banded axis running the wrong way is not the same kind of picture as
-    # a count rising off zero, and colouring it the same would say it was.
+    DELTA_KINDS = { number: :percent, percent: :points, place: :places }.freeze
+
     STROKES = { POSITION => "#d8c08a" }.freeze
 
     CHART_FORMATS = { CLICKS => "integer", IMPRESSIONS => "integer", CTR => "rate", POSITION => "decimal" }.freeze
 
-    UNSLICED_NOTE = "Clicks and impressions are Google's totals for the property. Google reports two to three " \
-                    "days late, and query and page rows add up to less than these totals because Google leaves " \
-                    "out rare searches.".freeze
+    ROWS_NOTE = "Google reports two to three days late, and query and page rows add up to less than these totals " \
+                "because Google leaves out rare searches.".freeze
 
-    SLICED_LAG_NOTE = "Google reports two to three days late, and it leaves out more searches the finer you cut, " \
-                      "so the rows add up to less than these totals.".freeze
+    UNSLICED_NOTE = "Clicks and impressions are Google's totals for the property. #{ROWS_NOTE}".freeze
+
+    SLICED_NOTE = "Days stored before device and country were pulled have neither, so they are left out here. " \
+                  "Google reports two to three days late, and it leaves out more searches the finer you cut, " \
+                  "so the rows add up to less than these totals.".freeze
 
     Tile = Data.define(:measure, :display, :delta) do
       def key
@@ -55,61 +50,36 @@ module AhoyDashboard
       end
     end
 
-    Option = Data.define(:label, :value, :path, :active) do
-      def active?
-        active
+    class << self
+      def data_note(through:, slice:, sliced: SLICED_NOTE)
+        lead = through ? "Data runs through #{through}. " : ""
+        return "#{lead}#{UNSLICED_NOTE}" unless slice&.any?
+
+        "#{lead}Showing #{slice.label} only. #{sliced}"
       end
     end
 
     attr_reader :query, :result, :measure
 
-    def initialize(query:, result:, measure: nil, context: SearchConsole::PageContext.new,
-      routes: AhoyDashboard::Engine.routes.url_helpers)
+    delegate :connected?, :any?, :rows, :rows?, :term, :tab, :slice, to: :result
+
+    def initialize(query:, result:, measure: nil, context: SearchConsole::PageContext.new)
       @query = query
       @result = result
       @measure = MEASURES.find { |candidate| candidate.key == measure.to_s } || MEASURES.first
-      @routes = routes
       @context = context
     end
 
     def title
-      TITLE
+      SURFACE.title
     end
 
-    def subtitle
-      SUBTITLE
-    end
-
-    def connected?
-      result.connected?
-    end
-
-    def any?
-      result.any?
-    end
-
-    def rows
-      result.rows
-    end
-
-    def rows?
-      result.rows?
-    end
-
-    def term
-      result.term
-    end
-
-    def tab
-      result.tab
+    def blurb
+      SURFACE.blurb
     end
 
     def queries?
       tab == AhoyDashboard::SearchConsoleReportQuery::QUERIES
-    end
-
-    def slice
-      result.slice
     end
 
     def menus
@@ -129,29 +99,21 @@ module AhoyDashboard
 
       window = result.previous_window
 
-      "vs #{AhoyDashboard::SeoHelper.short_date(window.begin)} to #{AhoyDashboard::SeoHelper.short_date(window.end)}"
-    end
-
-    def measures
-      MEASURES.map do |candidate|
-        Option.new(candidate.label, candidate.key, path(measure: candidate.key), candidate == self.measure)
-      end
+      "vs #{on_label(window.begin)} to #{on_label(window.end)}"
     end
 
     def tabs
       AhoyDashboard::SearchConsoleReportQuery::TABS.map do |key|
-        Option.new(key.capitalize, key, path(tab: key, q: nil), key == tab)
+        AhoyDashboard::MenuOption.new(key.capitalize, key, path(tab: key, q: nil), key == tab)
       end
     end
 
-    # Says where the chart stops, because Google lands two to three days late
-    # and a line that ran to today would show a cliff that is not there.
-    def data_note
-      through = last_date ? "Data runs through #{last_date}. " : ""
-      return "#{through}#{UNSLICED_NOTE}" unless slice.any?
+    def period_options
+      AhoyDashboard::Seo::Periods.menu(query, custom: false) { |period| path(period: period.key) }
+    end
 
-      "#{through}Showing #{slice.label} only. Days stored before device and country were pulled have " \
-        "neither, so they are left out here. #{SLICED_LAG_NOTE}"
+    def data_note
+      self.class.data_note(through: last_date, slice: slice)
     end
 
     def rows_caption
@@ -165,16 +127,12 @@ module AhoyDashboard
       row.trend? && row.trend.any?(&:positive?)
     end
 
-    # The period's own name where it has one, and the dates only when it does
-    # not. Lower-casing the label was turning "Jul 17 to Aug 15" into "aug".
     def range_label
-      query.period.custom? ? query.range_label : query.period.label
+      query.range_title
     end
 
     def last_date
-      return if result.last_date.nil?
-
-      AhoyDashboard::SeoHelper.short_date(result.last_date)
+      on_label(result.last_date)
     end
 
     def chart_data
@@ -212,7 +170,10 @@ module AhoyDashboard
     end
 
     def empty_state
-      return sliced_empty_state if slice.any?
+      if slice.any?
+        return { title: "No Search Console data in this range", hint: slice.empty_hint,
+                 action: menus.clear_action(data: TOP) }
+      end
 
       AhoyDashboard::Seo::SearchConsoleEmptyState.call(
         query: query, context: context, routes: routes, path: ->(overrides) { path(overrides) },
@@ -221,21 +182,12 @@ module AhoyDashboard
       )
     end
 
-    def sliced_empty_state
-      { title: "No Search Console data in this range", hint: slice.empty_hint,
-        action: { label: "Show all devices and countries", url: path(device: nil, country: nil),
-                  data: { tm_frame: "_top" }, primary: true } }
-    end
-
     def setup_notice
       AhoyDashboard::SetupNotice.search_console(routes, account: context.account)
     end
 
     def sync_reason
-      return AhoyDashboard::SearchConsole.unavailable_reason unless AhoyDashboard::SearchConsole.enabled?
-      return "Connect Google first." unless context.account && context.account.connected?
-
-      "Pick a property first." unless context.account.property_selected?
+      AhoyDashboard::SearchConsole.sync_refusal(context.account)
     end
 
     def sync_fix
@@ -260,22 +212,12 @@ module AhoyDashboard
       end
     end
 
-    def number(value)
-      ActiveSupport::NumberHelper.number_to_delimited(value.to_i)
-    end
-
-    # A fraction on the way in. Google reports ctr as a proportion, not a
-    # percent, and printing 0.03 as "0%" was the first thing this got wrong.
-    def percentage(value)
-      "#{(value.to_f * 100).round(1)}%"
-    end
-
     def place(value)
-      value.to_f.round(1).to_s
+      super.to_s
     end
 
     def export_key
-      AhoyDashboard::Seo::Surface.find("search_console").export
+      SURFACE.export
     end
 
     def export_path(params)
@@ -294,7 +236,7 @@ module AhoyDashboard
         end,
         AhoyDashboard::Seo::CsvTable.new(key: AhoyDashboard::SearchConsoleReportQuery::PAGES, label: "Pages",
                                          headers: [ "Page", "Clicks", "Impressions", "CTR", "Position" ]) do
-          queries? ? [] : rows.map { |row| csv_row(url_csv(row.label), row) }
+          queries? ? [] : rows.map { |row| csv_row(AhoyDashboard::Seo::Formatting.url_path(row.label), row) }
         end
       ]
     end
@@ -305,6 +247,8 @@ module AhoyDashboard
 
     private
 
+    attr_reader :context
+
     def query_csv_label(row)
       row.label.presence || AhoyDashboard::SearchConsole::ANONYMIZED_QUERY
     end
@@ -313,45 +257,18 @@ module AhoyDashboard
       [ label, row.clicks, row.impressions, csv_percent(row.ctr), row.position&.to_f&.round(1) ]
     end
 
-    def url_csv(url)
-      return nil if url.blank?
-
-      url.to_s.sub(%r{\Ahttps?://[^/]+}, "").presence || "/"
-    end
-
-    attr_reader :routes, :context
-
     def value_of(source, measure)
       source.public_send(measure.key)
     end
 
     def delta_for(measure)
       return nil unless result.comparable? && result.previous.impressions.positive?
-
-      before = value_of(result.previous, measure).to_f
-      now = value_of(result.totals, measure).to_f
-
       return nil if measure.format != :number && !result.totals.impressions.positive?
 
-      case measure.format
-      when :percent
-        moved = ((now - before) * 100).round(1)
-        delta("#{moved.abs} pts", moved)
-      when :place
-        moved = (now - before).round(1)
-        delta(moved.abs.to_s, moved, inverted: true)
-      else
-        return nil if before.zero?
+      kind = DELTA_KINDS.fetch(measure.format)
 
-        moved = ((now - before) / before * 100).round
-        delta("#{moved.abs}%", moved)
-      end
-    end
-
-    def delta(text, moved, inverted: false)
-      return nil if moved.zero?
-
-      AhoyDashboard::Delta.build(text, moved, inverted: inverted)
+      AhoyDashboard::Delta.between(kind, now: value_of(result.totals, measure), before: value_of(result.previous, measure),
+                                         places: kind == :percent ? 0 : 1, hide_zero: true)
     end
 
     def chart_value(day)
@@ -363,6 +280,10 @@ module AhoyDashboard
       when POSITION then value.to_f.round(2)
       else value
       end
+    end
+
+    def routes
+      AhoyDashboard::Engine.routes.url_helpers
     end
   end
 end

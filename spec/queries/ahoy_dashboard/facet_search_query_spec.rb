@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::FacetSearchQuery do
   let(:range) { dash_day_range(2026, 8, 10) }
@@ -22,15 +21,12 @@ RSpec.describe AhoyDashboard::FacetSearchQuery do
   end
 
   before do
-    first = dash_visit(started_at: clock(9), visitor: "a", country: "US", browser: "Chrome")
-    dash_page_view(first, path: "/going-in/faq", at: clock(9))
+    first = dash_landing("/going-in/faq", at: clock(9), visitor: "a", country: "US", browser: "Chrome")
     dash_page_view(first, path: "/going-in/faq/visits", at: clock(9, 5))
 
-    second = dash_visit(started_at: clock(10), visitor: "b", country: "CA", browser: "Firefox")
-    dash_page_view(second, path: "/going-in/faq", at: clock(10))
+    dash_landing("/going-in/faq", at: clock(10), visitor: "b", country: "CA", browser: "Firefox")
 
-    third = dash_visit(started_at: clock(11), visitor: "c", country: "US", browser: "Safari")
-    dash_page_view(third, path: "/resources", at: clock(11))
+    dash_landing("/resources", at: clock(11), visitor: "c", country: "US", browser: "Safari")
   end
 
   it "finds a value without being told which dimension holds it" do
@@ -41,8 +37,6 @@ RSpec.describe AhoyDashboard::FacetSearchQuery do
     expect(keys(search("faq"))).to include("page", "entry_page", "exit_page")
   end
 
-  # Below the floor every dimension matches something and the answer is the
-  # whole site, which is not an answer.
   it "says nothing at all under the minimum term" do
     expect(search("f")).to eq([])
     expect(search("")).to eq([])
@@ -73,10 +67,8 @@ RSpec.describe AhoyDashboard::FacetSearchQuery do
     expect(group).not_to be_more
   end
 
-  # A goal is already a row on the behaviours card and a crawler flag is a yes
-  # or a no, so neither answers the question this box is for.
   it "leaves the goal and crawler dimensions out" do
-    AhoyDashboard::Goal.create!(kind: :pageview, path_pattern: "/going-in/*", display_name: "faq reader")
+    create(:dash_goal, :pageview, path_pattern: "/going-in/*", display_name: "faq reader")
 
     expect(keys(search("faq"))).not_to include("goal", "crawler")
   end
@@ -101,8 +93,7 @@ RSpec.describe AhoyDashboard::FacetSearchQuery do
     AhoyDashboard::Dimension.register(key: "custom_city", label: "Custom city", group: "Location", scope: :visit,
                                      sql: "ahoy_visits.city")
     create(:dash_property, key: "question?'s", enabled: true)
-    visit = dash_visit(started_at: clock(12), visitor: "custom", city: "faq city")
-    dash_page_view(visit, path: "/faq-page", at: clock(12))
+    visit = dash_landing("/faq-page", at: clock(12), visitor: "custom", city: "faq city")
     dash_goal(visit, "custom", at: clock(12, 1), path: "/faq-goal", "question?'s" => "faq answer")
     dash_goal(visit, "custom", at: clock(12, 2), "question?'s" => "faq answer")
 
@@ -120,8 +111,7 @@ RSpec.describe AhoyDashboard::FacetSearchQuery do
       visit = dash_visit(started_at: clock(12, index), visitor: "rank-#{index}", city: "faq #{label}")
       2.times { dash_page_view(visit, path: "/faq/#{label}", at: clock(12, index)) }
     end
-    visitor = dash_visit(started_at: clock(13), visitor: "another", city: "faq zeta")
-    dash_page_view(visitor, path: "/faq/zeta", at: clock(13))
+    dash_landing("/faq/zeta", at: clock(13), visitor: "another", city: "faq zeta")
 
     group = search("faq ", limit: 2).find { |candidate| candidate.key == "city" }
 
@@ -146,10 +136,7 @@ RSpec.describe AhoyDashboard::FacetSearchQuery do
   it "does all cross-dimension analytics in one statement" do
     built_scope = scope
     statements = []
-    subscriber = lambda do |_name, _start, _finish, _id, payload|
-      statements << payload[:sql] if payload[:name] != "SCHEMA" && payload[:sql].match?(/(?:from|join) "?ahoy_(?:visits|events)/i)
-    end
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+    statements = captured_sql(/(?:from|join) "?ahoy_(?:visits|events)/i, cached: true) do
       described_class.call(scope: built_scope, term: "faq")
     end
 

@@ -4,15 +4,7 @@ module AhoyDashboard
 
   module SearchConsole
 
-    class StoredSpan
-      attr_reader :first, :last, :rows
-
-      def initialize(first:, last:, rows:)
-        @first = first
-        @last = last
-        @rows = rows
-      end
-
+    StoredSpan = Data.define(:first, :last, :rows) do
       def any?
         first.present?
       end

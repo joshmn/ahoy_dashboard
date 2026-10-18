@@ -1,23 +1,17 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Pinned summary cache reuse" do
   let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
-  around do |example|
-    original_cache = Rails.cache
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    travel_to(now) { example.run }
-  ensure
-    Rails.cache = original_cache
-  end
+  include_context "with a memory cache"
+
+  around { |example| travel_to(now) { example.run } }
 
   before do
     [-2.days, -1.day, -1.hour].each_with_index do |offset, index|
-      visit = dash_visit(started_at: now + offset, visitor: "reader-#{index % 2}", country: index.even? ? "US" : "CA")
-      dash_page_view(visit, path: index.even? ? "/first" : "/second")
+      dash_landing(index.even? ? "/first" : "/second", at: now + offset, visitor: "reader-#{index % 2}", country: index.even? ? "US" : "CA")
     end
   end
 
@@ -35,14 +29,7 @@ RSpec.describe "Pinned summary cache reuse" do
   end
 
   def aggregate_count
-    statements = []
-    subscriber = lambda do |*, payload|
-      statements << true if !payload[:cached] && payload[:sql].include?("grouping sets")
-    end
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
-      AhoyDashboard.visit.uncached { yield }
-    end
-    statements.size
+    captured_sql("grouping sets") { AhoyDashboard.visit.uncached { yield } }.size
   end
 
   it "reuses a fresh headline without another current-range aggregate" do
@@ -102,16 +89,14 @@ RSpec.describe "Pinned summary cache reuse" do
     summary
     travel_to(now + 29.seconds)
     summary
-    visit = dash_visit(started_at: now, visitor: "new-reader")
-    dash_page_view(visit, path: "/new")
+    dash_landing("/new", at: now, visitor: "new-reader")
     travel_to(now + 31.seconds)
 
     expect(counted.total).to eq(3)
   end
 
   it "keeps a pinned card's previous-period comparison independent" do
-    previous = dash_visit(started_at: now - 40.days, visitor: "previous-reader")
-    dash_page_view(previous, path: "/previous")
+    dash_landing("/previous", at: now - 40.days, visitor: "previous-reader")
     saved = create(:dash_saved_query, pinned: false, params: {period: "30d", filters: "none"})
     summary(form(comparison: "year_over_year"))
     cached = AhoyDashboard::PinnedQuestionsQuery.call(questions: [saved])

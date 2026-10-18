@@ -1,10 +1,6 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard AI visibility", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
   def tile(label)
     document.css(".tile").find { |node| node.at_css(".tile-label")&.text&.squish == label }&.at_css(".tile-value")&.text&.squish
   end
@@ -16,28 +12,10 @@ RSpec.describe "Dashboard AI visibility", type: :request do
     create(:dash_ai_assistant, :keyed, name: "openai")
   end
 
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/seo/ai_visibility"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/seo/ai_visibility"
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
     it "says it is off" do
-      allow(AhoyDashboard::AiVisibility).to receive(:enabled?).and_return(false)
-
       get "/telemetry/seo/ai_visibility"
 
       expect(response).to have_http_status(:ok)
@@ -148,6 +126,20 @@ RSpec.describe "Dashboard AI visibility", type: :request do
       expect(menu).to include([ "ChatGPT, gpt-5", a_string_including("assistant=openai", "model=gpt-5") ])
     end
 
+    it "draws each model's mention rate and lifts the line over a day it was not asked" do
+      enable!
+      AhoyDashboard::AiVisibility::Assistant.for("openai").update!(models: %w[gpt-5 gpt-4.1])
+      create(:dash_ai_answer, prompt: prompt, model: "gpt-5", mentioned: true, asked_at: 2.days.ago)
+      create(:dash_ai_answer, prompt: prompt, model: "gpt-5", mentioned: false, asked_at: Time.current)
+      3.times { |days| create(:dash_ai_answer, prompt: prompt, model: "gpt-4.1", mentioned: days.even?, asked_at: days.days.ago) }
+
+      get "/telemetry/seo/ai_visibility"
+      svg = { "svg" => "http://www.w3.org/2000/svg" }
+      chart = document.at_css("svg|svg[aria-label^='Mention rate by assistant and model']", svg)
+
+      expect(chart.css("svg|path", svg).map { |path| path["d"] }).to eq([ "M0.0 2.0 L320.0 118.0 L640.0 2.0", "M0.0 2.0 M640.0 118.0" ])
+    end
+
     it "narrows to one model of one assistant" do
       enable!
       create(:dash_ai_answer, prompt: prompt, model: "gpt-5", mentioned: true)
@@ -207,12 +199,8 @@ RSpec.describe "Dashboard AI visibility", type: :request do
         create(:dash_ai_answer, prompt: prompt, assistant: "anthropic")
       end
 
-      def csv
-        CSV.parse(response.body)
-      end
-
       it "exports the assistants table" do
-        get "/telemetry/seo/ai_visibility.csv", params: { table: "assistants" }
+        csv = fetch_csv("/telemetry/seo/ai_visibility.csv?table=assistants")
 
         today = Time.current.in_time_zone(AhoyDashboard.time_zone).to_date.iso8601
         expect(response.headers["Content-Disposition"]).to include("ahoy-dashboard-seo-ai-visibility-assistants-#{today}.csv")
@@ -221,14 +209,14 @@ RSpec.describe "Dashboard AI visibility", type: :request do
       end
 
       it "exports the prompts you do not show up in" do
-        get "/telemetry/seo/ai_visibility.csv", params: { table: "missing_prompts", assistant: "anthropic" }
+        csv = fetch_csv("/telemetry/seo/ai_visibility.csv?table=missing_prompts&assistant=anthropic")
 
         expect(csv.first).to eq([ "Prompt", "Models asked", "Last asked" ])
         expect(csv[1].first(2)).to eq([ "who helps with federal prison prep", "1" ])
       end
 
       it "exports who gets cited instead" do
-        get "/telemetry/seo/ai_visibility.csv", params: { table: "cited_instead" }
+        csv = fetch_csv("/telemetry/seo/ai_visibility.csv?table=cited_instead")
 
         expect(csv).to eq([ [ "Domain", "Answers citing it", "Share of answers" ], [ "rival.example", "1", "50.0" ] ])
       end

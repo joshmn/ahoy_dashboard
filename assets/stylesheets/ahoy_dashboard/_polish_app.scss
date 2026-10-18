@@ -1,4 +1,3 @@
-// ---------- settings shell ----------
 .sec > .page-head {
   margin-bottom: 4px;
 }
@@ -19,9 +18,7 @@
 
 .set-row-link {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include text-truncate;
   font-weight: 500;
   color: var(--t1);
   text-decoration: none;
@@ -33,39 +30,27 @@
   text-underline-offset: 3px;
 }
 
-.set-card-text {
-  margin: 0;
-  padding: 12px 14px 14px;
-  font-size: $font-size-md;
-  line-height: 1.55;
-  color: var(--t2);
-}
-
 .f-label {
   font-size: $font-size-md;
   font-weight: 500;
   color: var(--t2);
 }
 
-// ---------- goal form ----------
 .goal-form:has(#goal_kind_pageview:checked) .gf-event,
 .goal-form:has(#goal_kind_custom_event:checked) .gf-path {
   display: none;
 }
 
-// ---------- funnel form ----------
 .fs-add {
   margin: 0 0 2px 30px;
 }
 
-// ---------- saved question form ----------
 .sq-question {
   font-size: $font-size-lg;
   line-height: 1.5;
   color: var(--t1);
 }
 
-// ---------- alert rules ----------
 .al-name {
   display: block;
   font-weight: 500;
@@ -91,7 +76,6 @@
   margin-left: 0.5rem;
 }
 
-// ---------- jobs ----------
 .jr-name {
   display: flex;
   align-items: center;
@@ -125,7 +109,6 @@
   overflow-wrap: anywhere;
 }
 
-// ---------- google search console ----------
 .gsc-confirm-msg {
   font-size: $font-size-md;
   color: var(--t2);
@@ -168,7 +151,6 @@
   background: none;
 }
 
-// ---------- plain tables (search console rows, explore) ----------
 .set-table,
 .ex-table {
   font-size: $font-size-md;
@@ -186,10 +168,6 @@
   max-width: 360px;
 }
 
-// ---------- explore ----------
-// The question is two rows: what is being asked, then how the answer is drawn.
-// They used to be one wrapping line with the columns menu pushed right by
-// ms-auto, so at four filters it landed in the middle of the sentence.
 .ex-ask {
   display: flex;
   flex-direction: column;
@@ -205,9 +183,6 @@
   max-width: 100%;
 }
 
-// A connector and the control it introduces are one part, because the sentence
-// breaks between parts: "over" was ending a line with its date range starting
-// the next one.
 .ex-ask__part {
   display: inline-flex;
   align-items: center;
@@ -215,8 +190,6 @@
   min-width: 0;
 }
 
-// The filter list is the one part with no length limit, so it is the one part
-// allowed to break inside itself.
 .ex-ask__part--filters {
   flex-wrap: wrap;
 }
@@ -284,7 +257,6 @@
   text-underline-offset: 3px;
 }
 
-// ---------- realtime ----------
 .rt-count {
   display: flex;
   align-items: baseline;
@@ -293,7 +265,6 @@
   margin: 0 0 14px;
 }
 
-// ---------- ask ----------
 .ask-page > .alert {
   margin-bottom: 16px;
 }
@@ -303,7 +274,6 @@
   margin: 10px 12px 12px;
 }
 
-// ---------- track a keyword ----------
 .kw-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 288px;
@@ -347,7 +317,7 @@
   padding: 0 9px;
   border: 1px solid var(--border);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--secondary-fill);
   font-size: $font-size-md;
   color: var(--t2);
   text-decoration: none;
@@ -356,15 +326,13 @@
 
 .kw-chip:hover {
   border-color: var(--border-strong);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--hover);
   color: var(--t1);
 }
 
 .kw-chip-t {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include text-truncate;
 }
 
 .kw-tags {
@@ -389,9 +357,7 @@
 
 .kw-tag-t {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include text-truncate;
 }
 
 .kw-tag-x.btn-icon {
@@ -413,9 +379,6 @@
   align-items: center;
 }
 
-// The place row when there is a list to pick from. One control instead of two,
-// because what it holds is one place with a path rather than a country and a
-// string, and two fields could disagree about which country the city is in.
 .kw-place-pick {
   grid-template-columns: minmax(0, 1fr) 28px;
 }
@@ -453,24 +416,17 @@
 
 .kw-pick-t {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include text-truncate;
 }
 
 .kw-pick-t.nil {
   color: var(--t3);
 }
 
-// Where the next place starts from, shown in front of the blank it is waiting
-// for: "Illinois, United States" then "Pick a place". Somebody adding a second
-// city should be able to see they are still inside the same state.
 .kw-pick-ctx {
   flex: none;
   max-width: 55%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include text-truncate;
   color: var(--t3);
 }
 
@@ -619,18 +575,6 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-// ---------- the place picker ----------
-// A row is two controls: the name picks the place, the chevron opens what is
-// inside it. A state is both, and a row that only did one of them would make
-// half the tree unreachable.
-// The popover's own scroller, which is what this borrows, has no padding of its
-// own, so its scrollbar landed on top of the chevron that opens a place. The
-// gutter is reserved rather than overlaid, and the row keeps a little of its
-// own clearance for the browsers that overlay it anyway.
-//
-// It is also taller than a popover. 302px is right for something hanging off a
-// button; this is a dialog with 60vh to spend, and a list of 240 countries in a
-// third of it is a lot of scrolling.
 .pl-sc {
   max-height: min(48vh, 440px);
   scrollbar-gutter: stable;
@@ -649,16 +593,12 @@
 }
 
 .pl-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include text-truncate;
 }
 
 .pl-in {
   margin-left: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include text-truncate;
   font-size: $font-size-sm;
   color: var(--t3);
 }
@@ -689,10 +629,6 @@
   }
 }
 
-// ---------- importing a list ----------
-// Same two column shape as tracking one keyword, because it is the same
-// decision at a different size: pick the searches on the left, see what they
-// cost on the right, and never scroll past the button.
 .kwi-block {
   display: flex;
   flex-direction: column;
@@ -736,9 +672,6 @@
   margin-left: auto;
 }
 
-// The whole reason the page was unreadable: a hundred and fifty rows pushed
-// every setting and the button below the fold. The list scrolls inside itself
-// and the rest of the form stays where it is.
 .kwi-list {
   display: flex;
   flex-direction: column;
@@ -761,7 +694,6 @@
   padding-top: 8px;
 }
 
-// ---------- page group preview ----------
 .grp-preview {
   display: flex;
   flex-direction: column;
@@ -816,9 +748,7 @@
 
 .grp-path {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @include text-truncate;
   font-family: var(--mono);
   color: var(--t1);
 }
@@ -833,8 +763,6 @@
   color: var(--t3);
 }
 
-// The way into the whole list. Underlined because it is the one row in the box
-// that does something, and nothing else about a row says it is a control.
 .grp-more-open.btn-link {
   --bs-btn-padding-x: 0;
   --bs-btn-padding-y: 0;
@@ -849,8 +777,6 @@
   text-decoration-color: currentcolor;
 }
 
-// Inside the dialog the box is the whole panel, so it drops the edge it needs
-// under the field and lets the panel's own scroll carry the rows.
 .grp-list-all {
   border: 0;
 }

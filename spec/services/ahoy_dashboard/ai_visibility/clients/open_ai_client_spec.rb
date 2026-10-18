@@ -2,20 +2,15 @@ require "rails_helper"
 
 RSpec.describe AhoyDashboard::AiVisibility::Clients::OpenAiClient do
   let(:endpoint) { "https://api.openai.com/v1/responses" }
-  let(:transport) { AhoyDashboard::LLM::Transport.new(sleeper: ->(_seconds) { }) }
-  let(:client) { described_class.new(api_key: "sk-test", model: "gpt-4.1", transport: transport) }
-
-  def frame(data)
-    "event: #{data["type"]}\ndata: #{JSON.generate(data)}\n\n"
-  end
+  let(:client) { described_class.new(api_key: "sk-test", model: "gpt-4.1", transport: quiet_transport) }
 
   def streamed(response, finished: "response.completed")
     items = Array(response["output"]).each_with_index.map do |item, index|
-      frame("type" => "response.output_item.done", "output_index" => index, "item" => item)
+      openai_frame("type" => "response.output_item.done", "output_index" => index, "item" => item)
     end
 
-    frame("type" => "response.created", "response" => response.merge("output" => [])) + items.join +
-      frame("type" => finished, "response" => response)
+    openai_frame("type" => "response.created", "response" => response.merge("output" => [])) + items.join +
+      openai_frame("type" => finished, "response" => response)
   end
 
   let(:payload) do
@@ -39,7 +34,8 @@ RSpec.describe AhoyDashboard::AiVisibility::Clients::OpenAiClient do
   it "asks with web search on and reads the text and its cited links in order" do
     stub = stub_request(:post, endpoint)
       .with(headers: { "Authorization" => "Bearer sk-test" },
-            body: { model: "gpt-4.1", input: "best consultant?", tools: [ { type: "web_search" } ], stream: true }.to_json)
+            body: { model: "gpt-4.1", input: "best consultant?", tools: [ { type: "web_search" } ], store: false,
+                    stream: true }.to_json)
       .to_return(status: 200, body: streamed(payload))
 
     reply = client.ask("best consultant?")

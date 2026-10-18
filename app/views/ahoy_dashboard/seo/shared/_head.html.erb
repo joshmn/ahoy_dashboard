@@ -1,13 +1,14 @@
+<% prefix = local_assigns.fetch(:id_prefix, "tm-seo") %>
 <% actions = capture do %>
   <%= local_assigns[:controls] %>
 
   <% if presenter.show_sites? && local_assigns.fetch(:sites, true) %>
-    <%= dash_link_menu(id: "tm-seo-site", icon: :globe,
+    <%= dash_link_menu(id: "#{prefix}-site", icon: :globe,
           label: presenter.site_label, section: "Site", items: presenter.site_options) %>
   <% end %>
 
   <% if presenter.show_tags? %>
-    <%= dash_link_menu(id: "tm-seo-tag", icon: :tag,
+    <%= dash_link_menu(id: "#{prefix}-tag", icon: :tag,
           label: presenter.tag_menu.label, section: "Tag", items: presenter.tag_menu.items) %>
   <% end %>
 
@@ -16,9 +17,10 @@
   <% end %>
 
   <% if local_assigns.fetch(:period, true) %>
-    <%= dash_link_menu(id: "tm-seo-period", icon: :cal,
-          label: presenter.range_label, section: "Date range", items: presenter.period_options) %>
+    <%= seo_period_menu(presenter, id: "#{prefix}-period") %>
   <% end %>
+
+  <%= local_assigns[:trailing] %>
 <% end %>
 
 <%= dash_page_head kicker: local_assigns[:kicker],

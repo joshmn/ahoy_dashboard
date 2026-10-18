@@ -1,10 +1,6 @@
 module AhoyDashboard
-  class RankKeywordsController < AhoyDashboard::BaseController
-    include AhoyDashboard::SeoRange
-    include AhoyDashboard::CsvRenderable
-    include AhoyDashboard::SeoInstallGate
-
-    requires_installed :serp
+  class RankKeywordsController < AhoyDashboard::Seo::BaseController
+    skip_before_action :set_sites, :set_tag
 
     def show
       return redirect_to(rankings_path(query.to_query)) if params[:keyword].blank? && params[:q].to_s.strip.blank?
@@ -19,6 +15,10 @@ module AhoyDashboard
     end
 
     private
+
+    def surface_key
+      "rankings"
+    end
 
     def canonical_path
       rank_keyword_path(request.query_parameters.except("q", "keyword").merge("keyword" => @keyword.id))

@@ -1,7 +1,4 @@
 module AhoyDashboard
-  # The saved questions somebody pinned, as cards under the chart.
-  #
-  # Its own resource and frame. Singular: there is one strip.
   class PinnedQuestionsController < AhoyDashboard::BaseController
     FRAME = "dash_pinned_questions".freeze
 

@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp::Adapters::SearchApiAdapter do
   subject(:adapter) { described_class.new }
@@ -13,7 +12,7 @@ RSpec.describe AhoyDashboard::Serp::Adapters::SearchApiAdapter do
   end
 
   it "refuses to search with no key rather than calling with a blank one" do
-    allow(AhoyDashboard::Serp).to receive(:credential).with(:searchapi, :api_key).and_return(nil)
+    searchapi_configured!(api_key: nil)
 
     expect { described_class.new.search(query: query) }
       .to raise_error(AhoyDashboard::Serp::AuthError, /no searchapi key/)

@@ -1,9 +1,6 @@
 <%= dash_card element: :section, class: "journey", "aria-label": presenter.title do %>
   <%= dash_card_header presenter.title, element: :header do %>
 
-<%# The trail, and how much of the entry is left. With nothing picked it says
-    what the columns are for instead, because a bar with one hint in it reads
-    better than a bar with nothing. %>
     <div class="j-crumb">
       <% if presenter.any_chain? %>
         <% if presenter.elided? %>
@@ -36,8 +33,6 @@
           locals: { presenter: presenter } %>
 
     <% if presenter.ended? %>
-<%# The walk is over, so the last thing on the row is a number rather than
-    another list. %>
       <div class="j-col j-endc">
         <div class="j-col-hd">
           <div class="j-step">End</div>

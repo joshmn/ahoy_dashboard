@@ -1,39 +1,21 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Asynchronous dashboard panels", type: :request do
   let(:now) { Time.utc(2026, 8, 11, 14, 30) }
-  let(:document) { Nokogiri::HTML5(response.body) }
 
-  around do |example|
-    previous_cache = Rails.cache
-    previous_adapter = AhoyDashboard::Dashboards::SnapshotRefreshJob.queue_adapter
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    AhoyDashboard::Dashboards::SnapshotRefreshJob.queue_adapter = ActiveJob::QueueAdapters::TestAdapter.new
-    travel_to(now) { example.run }
-  ensure
-    Rails.cache = previous_cache
-    AhoyDashboard::Dashboards::SnapshotRefreshJob.queue_adapter = previous_adapter
-    AhoyDashboard::Current.reset
-  end
+  include_context "with a test snapshot queue"
+
+  around { |example| travel_to(now) { example.run } }
 
   before do
     sign_in create(:user, :admin)
-    visit = dash_visit(started_at: now - 1.day, visitor: "original", country: "US")
-    dash_page_view(visit, path: "/original")
-  end
-
-  def statements
-    result = []
-    capture = lambda { |*args| result << args.last[:sql] unless args.last[:cached] }
-    ActiveSupport::Notifications.subscribed(capture, "sql.active_record") { yield }
-    result
+    dash_landing("/original", at: now - 1.day, visitor: "original", country: "US")
   end
 
   def summary(**params)
-    get "/telemetry/dashboard/summary", params: params, headers: { "Tm-Frame" => "dash_summary" }
+    get_frame("/telemetry/dashboard/summary", "dash_summary", params: params)
   end
 
   def visitor_count
@@ -41,7 +23,7 @@ RSpec.describe "Asynchronous dashboard panels", type: :request do
   end
 
   def prepare_snapshot
-    AhoyDashboard::Preferences.write(:site, precomputed_dashboard: true)
+    precompute_dashboard!
     AhoyDashboard::Dashboards::SnapshotRefreshService.call(force: true)
   end
 
@@ -61,7 +43,7 @@ RSpec.describe "Asynchronous dashboard panels", type: :request do
   end
 
   it "does not read selected-range aggregates or all-time minimums for the shell" do
-    sql = statements { get "/telemetry" }
+    sql = captured_sql { get "/telemetry" }
 
     expect(sql.grep(/grouping sets|tm_visits|tm_journey|MIN\(.*started_at|COUNT\(\*\).*ahoy_visits/i)).to be_empty
   end
@@ -79,16 +61,15 @@ RSpec.describe "Asynchronous dashboard panels", type: :request do
   end
 
   it "does not compute journey or breakdown queries in the summary" do
-    sql = statements { summary }
+    sql = captured_sql { summary }
 
     expect(sql.grep(/tm_journey|step_value|GROUP BY.*country/i)).to be_empty
   end
 
   it "enqueues a missing opted-in snapshot without building every panel synchronously" do
-    AhoyDashboard::Preferences.write(:site, precomputed_dashboard: true)
+    precompute_dashboard!
     summary
-    query = AhoyDashboard::QueryForm.from_params({ period: "30d", filters: "none" })
-    key = AhoyDashboard::Dashboards::SnapshotKeyQuery.call(query: query)
+    key = default_snapshot_key
     jobs = AhoyDashboard::Dashboards::SnapshotRefreshJob.queue_adapter.enqueued_jobs
 
     expect([visitor_count, AhoyDashboard::Dashboards::SnapshotStore.read(key: key), jobs.length]).to eq(["1", nil, 1])
@@ -96,7 +77,7 @@ RSpec.describe "Asynchronous dashboard panels", type: :request do
 
   it "reads an existing snapshot summary without loading unrelated panel definitions" do
     prepare_snapshot
-    sql = statements { summary }
+    sql = captured_sql { summary }
 
     expect(sql.grep(/\ASELECT "ahoy_dashboard_(funnels|goals|saved_queries)"/i)).to be_empty
   end
@@ -110,8 +91,7 @@ RSpec.describe "Asynchronous dashboard panels", type: :request do
 
   it "uses live filtered summary values instead of an unfiltered snapshot" do
     prepare_snapshot
-    visit = dash_visit(started_at: now, visitor: "canadian", country: "CA")
-    dash_page_view(visit, path: "/canadian")
+    dash_landing("/canadian", at: now, visitor: "canadian", country: "CA")
     summary(filters: [{ dimension: "country", operator: "is", value: "CA" }])
 
     expect([visitor_count, document.at_css("#dash-snapshot-freshness")]).to eq(["1", nil])
@@ -125,9 +105,9 @@ RSpec.describe "Asynchronous dashboard panels", type: :request do
   end
 
   it "shares cached page counts across the independent report and journey requests" do
-    sql = statements do
-      get "/telemetry/reports/pages", headers: { "Tm-Frame" => "report_pages" }
-      get "/telemetry/journey", headers: { "Tm-Frame" => "dash_journey" }
+    sql = captured_sql do
+      get_frame("/telemetry/reports/pages", "report_pages")
+      get_frame("/telemetry/journey", "dash_journey")
     end
 
     expect(sql.grep(/grouping sets.*step_value|GROUP BY.*step_value/i).length).to eq(1)
@@ -135,21 +115,11 @@ RSpec.describe "Asynchronous dashboard panels", type: :request do
 
   it "does not substitute snapshot rows when a report tab changes" do
     prepare_snapshot
-    get "/telemetry/reports/pages", params: { tab: "entry_pages" }, headers: { "Tm-Frame" => "report_pages" }
+    get_frame("/telemetry/reports/pages", "report_pages", params: { tab: "entry_pages" })
 
     expect(document.at_css("#report_pages a[aria-current='true']").text).to include("Entry")
   end
 
-  it "renders the optional feature installation state inside its own frame" do
-    connection = AhoyDashboard::Record.connection
-    connection.execute("ALTER TABLE ahoy_dashboard_google_accounts RENAME TO async_missing_google_accounts")
-    connection.schema_cache.clear!
-    get "/telemetry/search_console", headers: { "Tm-Frame" => "report_search_console" }
-
-    expect(document.at_css("#report_search_console").text).to include("Not installed yet")
-  ensure
-    connection.schema_cache.clear! if connection
-  end
   it "makes summary controls navigate the whole dashboard rather than replacing one frame" do
     summary
 
@@ -158,8 +128,7 @@ RSpec.describe "Asynchronous dashboard panels", type: :request do
   end
 
   it "keeps hidden-traffic navigation outside the summary frame" do
-    AhoyDashboard::Exclusion.create!(name: "Hidden country",
-      filters: [{ "dimension" => "country", "operator" => "is", "value" => "US" }])
+    dash_exclusion("Hidden country", [ "country", "is", "US" ])
     summary
     links = document.css("#dash_summary a").select { |element| ["Show them", "Manage"].include?(element.text.strip) }
 
@@ -167,7 +136,7 @@ RSpec.describe "Asynchronous dashboard panels", type: :request do
   end
 
   it "does not queue unusable snapshot builds when the host cache is disabled" do
-    AhoyDashboard::Preferences.write(:site, precomputed_dashboard: true)
+    precompute_dashboard!
     Rails.cache = ActiveSupport::Cache::NullStore.new
     summary
 

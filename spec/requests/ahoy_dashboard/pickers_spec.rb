@@ -1,38 +1,15 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard picker", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
   def traffic!
-    first = dash_visit(started_at: now - 1.day, visitor: "a", country: "US")
-    dash_page_view(first, path: "/going-in/faq", at: now - 1.day)
+    first = dash_landing("/going-in/faq", at: now - 1.day, visitor: "a", country: "US")
     dash_goal(first, "site_searched", at: now - 1.day, query: "thomson")
 
-    second = dash_visit(started_at: now - 1.day, visitor: "b", country: "CA")
-    dash_page_view(second, path: "/resources", at: now - 1.day)
-  end
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/picker"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is closed to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/picker"
-
-      expect(response).to have_http_status(:not_found)
-    end
+    dash_landing("/resources", at: now - 1.day, visitor: "b", country: "CA")
   end
 
   describe "as an admin" do
@@ -47,8 +24,6 @@ RSpec.describe "Dashboard picker", type: :request do
         expect(document.css("[data-facet]")).to be_present
       end
 
-      # A goal is not filtered by a browser, and a segment is not defined by an
-      # event name, so the two scopes offer different facets off one registry.
       it "offers a different set per scope" do
         get "/telemetry/picker", params: { scope: "goal" }
         goal = document.css("[data-facet]").map { |item| item["data-facet"] }
@@ -119,8 +94,6 @@ RSpec.describe "Dashboard picker", type: :request do
       end
     end
 
-    # Neither of these is a dimension, so neither has a visitor to count. They
-    # come back with no number rather than a zero.
     describe "the facets that are not dimensions" do
       before { traffic! }
 
@@ -148,8 +121,6 @@ RSpec.describe "Dashboard picker", type: :request do
       end
     end
 
-    # This URL is built by JavaScript and gets edited by hand. Every one of these
-    # has to answer rather than raise.
     it "falls back rather than erroring on nonsense" do
       traffic!
 
@@ -169,18 +140,24 @@ RSpec.describe "Dashboard picker", type: :request do
 
     it "reads the range it was asked for" do
       traffic!
+      dash_landing("/long-ago", at: now - 20.days, visitor: "c")
 
       get "/telemetry/picker", params: { scope: "filter", facet: "page", period: "7d" }
+      values = document.css("[data-value]").map { |item| item["data-value"] }
 
       expect(response).to have_http_status(:ok)
+      expect(values).to include("/going-in/faq", "/resources")
+      expect(values).not_to include("/long-ago")
+
+      get "/telemetry/picker", params: { scope: "filter", facet: "page" }
+
+      expect(document.css("[data-value]").map { |item| item["data-value"] }).to include("/long-ago")
     end
   end
 
   describe "on the forms that open it" do
     before { sign_in create(:user, :admin) }
 
-    # The segment form uses the dashboard's filter component instead: its values
-    # are filter values and it already has a control for those.
     it "stays off the segment form, which has the filter component" do
       get "/telemetry/settings/segments/new"
 

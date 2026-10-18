@@ -1,20 +1,7 @@
 module AhoyDashboard
-  # The cards under the chart. A card is a title and a set of tabs, and a tab is
-  # a dimension plus the columns to show for it, so the reports controller is one
-  # controller rather than five.
   class Report
     include ActiveModel::Model
 
-    # The same rows counted a different way: one tab, one question, and a choice
-    # of which dimension the grouping runs on. Which options a tab offers is
-    # decided by what its own data can answer, which is why the entry pages tab
-    # can offer a full URL and the top pages tab cannot: a page view records
-    # request.path and no host, and the landing page is a whole URL.
-    #
-    # The first option is the one the tab opens on, so its dimension_key has to
-    # be the tab's own. label_column and detail_metrics are per option because
-    # neither the heading nor the columns survive a change of grouping: a
-    # controller cannot be asked how far down its pages were read.
     Breakdown = Data.define(:key, :label, :dimension_key, :label_column, :detail_metrics) do
       def initialize(detail_metrics: nil, **rest)
         super(detail_metrics: detail_metrics, **rest)
@@ -25,11 +12,6 @@ module AhoyDashboard
       end
     end
 
-    # dimension_key may be a callable, for a tab that points at whichever
-    # dimension the operator configured rather than one written down here. The
-    # properties tab is the reason: which custom property it opens on depends on
-    # AhoyDashboard::Property, which is rows, not code. Read it through
-    # #resolved_dimension_key, never off the member directly.
     Tab = Data.define(:key, :label, :dimension_key, :metrics, :detail_metrics, :label_column,
                       :breakdowns) do
       def initialize(breakdowns: [], **rest)
@@ -56,22 +38,12 @@ module AhoyDashboard
         Array(breakdowns)
       end
 
-      # Same shape as Report#tab: a key nobody registered is somebody editing the
-      # URL, and the answer is the option the card opens on rather than a 500.
-      # nil when the tab offers no choice at all.
       def breakdown(wanted = nil)
         return if breakdown_options.empty?
 
         breakdown_options.find { |candidate| candidate.key == wanted.to_s } || breakdown_options.first
       end
 
-      # Which option the card is actually grouping by, read back off the dimension
-      # rather than off the param it arrived as. #resolve folds an option's values
-      # into the tab and keeps no record of which one it was, and deriving it from
-      # the dimension is the only reading that cannot disagree with the rows on
-      # screen: a hand-edited or foreign value ticks the option the card fell back
-      # to instead of one it is not showing. The picker and every link built off
-      # the card read this, so they cannot drift apart.
       def active_breakdown
         return if breakdown_options.empty?
 
@@ -79,10 +51,6 @@ module AhoyDashboard
           breakdown_options.first
       end
 
-      # A card's own dimension overrides folded back into the tab, so everything
-      # downstream reads one object rather than resolving the grouping a second
-      # way of its own. That is what keeps the heading, the columns, the details
-      # modal and the CSV export agreeing with the card in front of somebody.
       def resolve(breakdown: nil, property: nil)
         for_breakdown(breakdown).for_property(property)
       end
@@ -98,9 +66,6 @@ module AhoyDashboard
         )
       end
 
-      # A property name is a raw query string parameter, so it goes through the
-      # registry rather than into the tab: a name that is not a property name
-      # leaves the card on the key the allowlist opens it with.
       def for_property(name)
         return self unless property_tab? && name.is_a?(String) && name.present?
 
@@ -114,9 +79,6 @@ module AhoyDashboard
       end
     end
 
-    # Clicking a row filters the whole dashboard, and these cards answer a
-    # narrower question once it is filtered: a country is only interesting for
-    # its regions. Deepest step first, so a region filter beats a country one.
     DRILLDOWNS = {
       "locations" => [ [ "region", "cities" ], [ "country", "regions" ] ],
       "sources" => [ [ "source", "referrers" ], [ "channel", "sources" ] ]
@@ -124,10 +86,6 @@ module AhoyDashboard
 
     CARD_ORDER = %w[sources pages locations devices behaviours].freeze
 
-    # The dashboard pulls this one out of the grid loop and renders it after the
-    # funnels, so goals and properties read last: a conversion only means something
-    # once you know where people came from and what they looked at. It stays in
-    # CARD_ORDER because the export menu iterates the whole set.
     BEHAVIOURS = "behaviours".freeze
 
     CARD_METRICS = %w[visitors].freeze
@@ -163,10 +121,6 @@ module AhoyDashboard
                 metrics: CARD_METRICS, detail_metrics: SESSION_METRICS, label_column: "Referrer")
       ]),
 
-      # Scroll depth and time on page are on the top pages tab only. The exit page
-      # dimension reads a column off a join that carries no events, so it can only
-      # answer them with a blank, and the entry page is a property of the session
-      # rather than of the reading.
       new(key: "pages", title: "Top pages", default_tab: "pages", wide: true, tabs: [
         Tab.new(key: "pages", label: "Top pages", dimension_key: "page",
                 metrics: CARD_METRICS,
@@ -175,15 +129,8 @@ module AhoyDashboard
                 breakdowns: [
                   Breakdown.new(key: "path", label: "Path", dimension_key: "page",
                                 label_column: "Page url"),
-                  # The same paths with the operator's page group rules applied.
-                  # A breakdown rather than a toggle of its own, because that is
-                  # what it is: another reading of this card's own dimension,
-                  # beside the two already here.
                   Breakdown.new(key: "grouped", label: "Grouped", dimension_key: "page_group",
                                 label_column: "Page group"),
-                  # The engagement event carries a path and nothing else, so how
-                  # far down a controller's pages were read is a question it
-                  # cannot answer and the columns come off rather than read zero.
                   Breakdown.new(key: "controller", label: "Rails controller",
                                 dimension_key: "controller", label_column: "Rails controller",
                                 detail_metrics: %w[visitors pageviews bounce_rate])
@@ -241,16 +188,12 @@ module AhoyDashboard
     RESERVED_PREFIXES = %w[funnel_].freeze
 
     class << self
-      def all
-        ALL + registry.values
-      end
-
-      def card_order
-        CARD_ORDER
-      end
-
       def cards
         CARD_ORDER.map { |key| INDEX.fetch(key) } + registry.values
+      end
+
+      def grid_cards
+        cards.reject { |report| report.key == BEHAVIOURS }
       end
 
       def find(key)

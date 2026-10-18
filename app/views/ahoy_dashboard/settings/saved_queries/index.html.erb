@@ -1,82 +1,66 @@
 <% content_for :title, "Saved queries" %>
 <% content_for :dash_settings_section, "saved_queries" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Saved queries",
-          lede: "Questions saved from Explore. Opening one runs it again on today's data.",
-          actions: capture {
-            dash_button "Open Explore", explore_path, tone: :primary, data: { tm_frame: "_top" }
-          } %>
+<%= dash_page_head title: "Saved queries",
+      lede: "Questions saved from Explore. Opening one runs it again on today's data.",
+      actions: dash_button("Open Explore", explore_path, tone: :primary, data: { tm_frame: "_top" }) %>
 
-    <%= dash_card do %>
-      <% if @records.any? %>
-        <%= dash_card_header "#{@records.size} #{"question".pluralize(@records.size)}" do %>
-          <span class="g-hint">
-            Up to <%= AhoyDashboard::SavedQuery::MAX_PINNED %> pinned questions show on the dashboard, in list order
-          </span>
-        <% end %>
-
-        <%= dash_table label: "Saved queries", cols: "minmax(0, 1fr) minmax(0, 1.3fr) 96px 56px 64px" do %>
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Question</th>
-              <th scope="col">Pinned</th>
-              <th scope="col"><span class="visually-hidden">Order</span></th>
-              <th scope="col"><span class="visually-hidden">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @records.each_with_index do |question, index| %>
-              <% if @confirming == question.id.to_s %>
-                <% message = capture do %>Delete <b><%= question.name %></b>? Your data is not affected.<% end %>
-                <%= dash_table_confirm message, span: 5, cancel: settings_saved_queries_path do %>
-                  <%= dash_button_to "Delete", settings_saved_query_path(question), method: :delete, tone: :danger %>
-                <% end %>
-              <% else %>
-                <tr>
-                  <td>
-                    <span class="t-main">
-                      <%= dash_icon(:bookmark, size: 13, class_name: "gi") %>
-                      <%= link_to question.name, explore_path(question.to_query),
-                            class: "text-truncate", data: { tm_frame: "_top" } %>
-                    </span>
-                  </td>
-
-                  <td class="t-when"><%= question.sentence %></td>
-
-                  <td>
-                    <%= dash_badge question.pinned? ? "Pinned" : "Not pinned", tone: question.pinned? ? :success : :neutral %>
-                  </td>
-
-                  <td class="row-actions">
-                    <%= dash_icon_button_to :chevron_up, settings_saved_query_path(question),
-                          label: "Move #{question.name} up the list",
-                          method: :patch, params: { saved_query: { nudge: "up" } },
-                          disabled: index.zero? %>
-                    <%= dash_icon_button_to :chevron_down, settings_saved_query_path(question),
-                          label: "Move #{question.name} down the list",
-                          method: :patch, params: { saved_query: { nudge: "down" } },
-                          disabled: index == @records.size - 1 %>
-                  </td>
-
-                  <td class="row-actions">
-                    <%= dash_icon_button :gear, label: "Edit #{question.name}",
-                          url: edit_settings_saved_query_path(question), title: "Edit" %>
-                    <%= dash_icon_button :close, label: "Delete #{question.name}",
-                          url: settings_saved_queries_path(confirm: question.id), tone: :danger, title: "Delete" %>
-                  </td>
-                </tr>
-              <% end %>
-            <% end %>
-          </tbody>
-        <% end %>
-      <% else %>
-        <%= dash_empty title: "Nothing saved yet",
-              hint: "Build a question in Explore and press Save.",
-              action: { label: "Open Explore", url: explore_path, data: { tm_frame: "_top" } } %>
-      <% end %>
+<%= dash_card do %>
+  <% if @records.any? %>
+    <%= dash_card_header "#{@records.size} #{"question".pluralize(@records.size)}" do %>
+      <span class="g-hint">
+        Up to <%= AhoyDashboard::SavedQuery::MAX_PINNED %> pinned questions show on the dashboard, in list order
+      </span>
     <% end %>
-  </section>
-</div>
+
+    <%= dash_table label: "Saved queries", cols: "minmax(0, 1fr) minmax(0, 1.3fr) 96px 56px 64px" do %>
+      <thead>
+        <tr>
+          <th scope="col">Name</th>
+          <th scope="col">Question</th>
+          <th scope="col">Pinned</th>
+          <th scope="col"><span class="visually-hidden">Order</span></th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @records.each_with_index do |question, index| %>
+          <% if confirming?(question) %>
+            <%= dash_delete_confirm question.name, "Your data is not affected.",
+                  url: settings_saved_query_path(question), cancel: settings_saved_queries_path, span: 5 %>
+          <% else %>
+            <tr>
+              <td>
+                <span class="t-main">
+                  <%= dash_icon(:bookmark, size: 13, class_name: "gi") %>
+                  <%= link_to question.name, explore_path(question.to_query),
+                        class: "text-truncate", data: { tm_frame: "_top" } %>
+                </span>
+              </td>
+
+              <td class="t-when"><%= question.sentence %></td>
+
+              <td>
+                <%= dash_badge question.pinned? ? "Pinned" : "Not pinned", tone: question.pinned? ? :success : :neutral %>
+              </td>
+
+              <td class="row-actions">
+                <%= dash_move_buttons settings_saved_query_path(question), name: question.name, param: :saved_query,
+                      index: index, count: @records.size %>
+              </td>
+
+              <td class="row-actions">
+                <%= dash_edit_button question.name, edit_settings_saved_query_path(question) %>
+                <%= dash_delete_button question.name, settings_saved_queries_path(confirm: question.id) %>
+              </td>
+            </tr>
+          <% end %>
+        <% end %>
+      </tbody>
+    <% end %>
+  <% else %>
+    <%= dash_empty title: "Nothing saved yet",
+          hint: "Build a question in Explore and press Save.",
+          action: { label: "Open Explore", url: explore_path, data: { tm_frame: "_top" } } %>
+  <% end %>
+<% end %>

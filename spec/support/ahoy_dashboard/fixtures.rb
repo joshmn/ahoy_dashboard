@@ -22,6 +22,10 @@ module AhoyDashboardFixtures
     create(:ahoy_visit, started_at: started_at, **attributes)
   end
 
+  def dash_landing(path = "/", at:, visitor: nil, **visit_attributes)
+    dash_visit(started_at: at, visitor: visitor, **visit_attributes).tap { |visit| dash_page_view(visit, path: path) }
+  end
+
   def dash_page_view(visit, path: "/", at: nil, **properties)
     create(
       :ahoy_event,
@@ -41,6 +45,23 @@ module AhoyDashboardFixtures
       time: at || visit.started_at,
       properties: properties.transform_keys(&:to_s)
     )
+  end
+
+  def dash_engagement(visit, depth:, time: 0, path: "/a", at: nil, **properties)
+    attributes = { path: path, scroll_depth: depth }
+    attributes[:engagement_time] = time unless time.nil?
+    dash_goal(visit, AhoyDashboard::ENGAGEMENT, at: at, **attributes.merge(properties))
+  end
+
+  def dash_entry(dimension: "country", operator: "is", value: "US", group: nil, block: nil)
+    { "dimension" => dimension, "operator" => operator, "value" => value, "group" => group, "block" => block }.compact
+  end
+
+  def dash_exclusion(name, *conditions, enabled: true)
+    filters = conditions.map do |dimension, operator, value, group|
+      dash_entry(dimension: dimension, operator: operator, value: value, group: group)
+    end
+    AhoyDashboard::Exclusion.create!(name: name, enabled: enabled, filters: filters)
   end
 
   def dash_scope(range:, filters: AhoyDashboard::Filters.new([]), include_crawlers: false, include_internal: false)
@@ -77,7 +98,6 @@ end
 
 RSpec.configure do |config|
   config.include AhoyDashboardFixtures
-  config.include ActiveSupport::Testing::TimeHelpers
 
   config.around do |example|
     dimensions = AhoyDashboard::Dimension.registry.dup

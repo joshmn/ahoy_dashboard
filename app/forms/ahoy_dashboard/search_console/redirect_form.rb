@@ -1,7 +1,9 @@
 module AhoyDashboard
   module SearchConsole
     class RedirectForm < AhoyDashboard::Form
-      attribute :redirect_uri, :string
+      LABELS = { redirect_uri: "Redirect URL" }.freeze
+
+      attribute :redirect_uri, TRIMMED
 
       validate :redirect_uri_readable
 
@@ -9,12 +11,8 @@ module AhoyDashboard
         new(redirect_uri: Preferences.read(:search_console, :redirect_uri))
       end
 
-      def self.human_attribute_name(attribute, options = {})
-        attribute.to_sym == :redirect_uri ? "Redirect URL" : super
-      end
-
-      def redirect_uri
-        super().to_s.strip.presence
+      def preferences
+        { search_console: { redirect_uri: redirect_uri } }
       end
 
       private

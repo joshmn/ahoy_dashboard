@@ -8,13 +8,19 @@ module AhoyDashboard
     FILL_LOCKS = Array.new(64) { Mutex.new }.freeze
 
     class << self
-      def fetch(key:, connection:)
+      def fetch(key:, connection:, expires_in: ScopeQuery::TOTAL_TTL)
         cache_key = self.key(key: key, connection: connection)
-        # Read inside the lock: Rails' request-local cache can remember a miss
-        # even after another thread has populated the shared cache store.
         FILL_LOCKS[cache_key.hash % FILL_LOCKS.length].synchronize do
-          AhoyDashboard.cache.fetch(cache_key, expires_in: ScopeQuery::TOTAL_TTL) { yield }
+          AhoyDashboard.cache.fetch(cache_key, expires_in: expires_in) { yield }
         end
+      end
+
+      def pluck(relation:, columns:, connection: relation.connection)
+        fetch(key: relation.reselect(*columns).to_sql, connection: connection) { relation.pluck(*columns) }
+      end
+
+      def select_rows(sql:, connection:)
+        fetch(key: sql, connection: connection) { connection.select_rows(sql) }
       end
 
       def write(key:, value:, connection:)

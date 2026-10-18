@@ -1,8 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsole::RefreshTokenService do
-  let(:token_url) { AhoyDashboard::SearchConsole::TOKEN_URL }
   let(:account) { create(:dash_google_account, :expired, access_token: "stale", refresh_token: "rt-1") }
 
   it "makes no call while the integration is off in test" do
@@ -32,7 +30,6 @@ RSpec.describe AhoyDashboard::SearchConsole::RefreshTokenService do
       expect(account.expires_at).to be_within(5.seconds).of(3599.seconds.from_now)
     end
 
-    # The refresh response carries no refresh token, and that is normal.
     it "keeps the working refresh token when the answer has none" do
       stub_token
 

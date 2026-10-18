@@ -1,17 +1,11 @@
 module AhoyDashboard
   module Settings
-    # The manual pull. Enqueued rather than run inline: seven days of paged
-    # requests is not something to hold a browser open for, and the nightly job
-    # does the identical work.
-    class SearchConsoleSyncsController < AhoyDashboard::BaseController
+    class SearchConsoleSyncsController < AhoyDashboard::Settings::BaseController
       requires_installed :search_console
 
       def create
-        account = GoogleAccount.current
-
-        return refuse(SearchConsole.unavailable_reason) unless SearchConsole.enabled?
-        return refuse("Connect Google first.") unless account&.connected?
-        return refuse("Pick a property first.") unless account.property_selected?
+        refusal = SearchConsole.sync_refusal
+        return refuse(refusal) if refusal
 
         SearchConsole::IngestJob.perform_later
 

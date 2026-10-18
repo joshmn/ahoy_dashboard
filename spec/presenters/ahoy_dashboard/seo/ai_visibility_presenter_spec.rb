@@ -14,10 +14,7 @@ RSpec.describe AhoyDashboard::Seo::AiVisibilityPresenter do
     create(:dash_ai_assistant, :keyed, models: %w[gpt-5 gpt-4.1])
     allow(AhoyDashboard::AiVisibility).to receive(:remaining).and_return(3)
     shown = presenter
-    sql = []
-    subscriber = ->(_name, _started, _finished, _id, payload) { sql << payload[:sql] if payload[:sql].match?(/\ASELECT/) }
-
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+    sql = captured_sql(/\ASELECT/, cached: true) do
       expect(shown.run_reason).to eq("A run needs 6 requests and 3 are left this month.")
       expect(shown.run_confirm).to include("6 paid requests")
       expect(shown.setup_notice).to be_nil

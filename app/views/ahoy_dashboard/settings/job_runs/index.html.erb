@@ -1,105 +1,95 @@
 <% content_for :title, "Jobs" %>
 <% content_for :dash_settings_section, "job_runs" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Jobs",
-          lede: "Background work the dashboard runs on a schedule. Each job starts on its own when it is due." %>
+<%= dash_page_head title: "Jobs",
+      lede: "Background work the dashboard runs on a schedule. Each job starts on its own when it is due." %>
 
-    <% if @presenter.never_run? %>
-      <%= dash_notice "Nothing has run yet.",
-            detail: "Schedule the ahoy_dashboard tick job to run every 15 minutes and these start on their own." %>
+<% if @presenter.never_run? %>
+  <%= dash_notice "Nothing has run yet.",
+        detail: "Schedule the ahoy_dashboard tick job to run every 15 minutes and these start on their own." %>
+<% end %>
+
+<%= dash_card do %>
+  <%= dash_card_header "Schedule" do %>
+    <% if @presenter.any_failed? %>
+      <%= dash_badge "Something failed", tone: :danger %>
     <% end %>
+  <% end %>
 
-    <%= dash_card do %>
-      <%= dash_card_header "Schedule" do %>
-        <% if @presenter.any_failed? %>
-          <%= dash_badge "Something failed", tone: :danger %>
+  <%= dash_table label: "Schedule", cols: "minmax(220px, 1.6fr) minmax(150px, 1fr) 96px 132px 132px 72px" do %>
+    <thead>
+      <tr>
+        <th scope="col">Job</th>
+        <th scope="col">Runs</th>
+        <th scope="col">State</th>
+        <th scope="col">Last started</th>
+        <th scope="col">Last finished</th>
+        <th scope="col"><span class="visually-hidden">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @presenter.rows.each do |row| %>
+        <% why = "jr-why-#{row.key}" %>
+        <tr>
+          <td>
+            <div class="jr-job">
+              <div class="jr-name" title="<%= row.key %>">
+                <%= link_to row.name, settings_job_run_path(row.key), class: "set-row-link" %>
+                <% if row.due? %>
+                  <%= dash_badge "Due", tone: :kind %>
+                <% end %>
+              </div>
+
+              <% if row.about && !row.blocker %>
+                <p class="jr-why"><%= row.about %></p>
+              <% end %>
+
+              <% if row.blocker %>
+                <p class="jr-why" id="<%= why %>">
+                  <%= row.blocker.reason %>
+                  <% if row.blocker.fix %>
+                    <%= link_to "Set it up", public_send(row.blocker.fix), data: { tm_frame: "_top" } %>
+                  <% end %>
+                </p>
+                <% if row.blocker.not_installed? && row.blocker.commands.any? %>
+                  <pre class="mb-0"><code><%= safe_join(row.blocker.commands, "\n") %></code></pre>
+                <% end %>
+              <% end %>
+            </div>
+          </td>
+
+          <td class="t-when"><%= row.cadence %></td>
+
+          <td>
+            <%= dash_badge row.label, tone: row.tone %>
+          </td>
+
+          <td class="t-when"><%= dash_ago(row.started_at) %></td>
+
+          <td class="t-when"><%= dash_ago(row.finished_at, never: row.ever? ? "Still running" : "Never") %></td>
+
+          <td class="row-actions row-actions-visible">
+            <% if row.on? %>
+              <%= dash_button_to "Run", settings_job_run_run_path(row.key), method: :post,
+                    title: "Run now. The next scheduled run counts from now." %>
+            <% else %>
+              <%= dash_button "Run", disabled: true, "aria-describedby": why %>
+            <% end %>
+          </td>
+        </tr>
+
+        <% if row.failed? && row.error %>
+          <tr class="jr-error">
+            <td colspan="6">
+              <div>
+                <span class="small text-body-tertiary">Last error</span>
+                <code><%= row.error %></code>
+              </div>
+            </td>
+          </tr>
         <% end %>
       <% end %>
+    </tbody>
+  <% end %>
+<% end %>
 
-      <%= dash_table label: "Schedule", cols: "minmax(220px, 1.6fr) minmax(150px, 1fr) 96px 132px 132px 72px" do %>
-        <thead>
-          <tr>
-            <th scope="col">Job</th>
-            <th scope="col">Runs</th>
-            <th scope="col">State</th>
-            <th scope="col">Last started</th>
-            <th scope="col">Last finished</th>
-            <th scope="col"><span class="visually-hidden">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @presenter.rows.each do |row| %>
-            <% why = "jr-why-#{row.key}" %>
-            <tr>
-              <td>
-                <div class="jr-job">
-                  <div class="jr-name" title="<%= row.key %>">
-                    <%= link_to row.name, settings_job_run_path(row.key), class: "set-row-link" %>
-                    <% if row.due? %>
-                      <%= dash_badge "Due", tone: :kind %>
-                    <% end %>
-                  </div>
-
-                  <% if row.about && !row.blocker %>
-                    <p class="jr-why"><%= row.about %></p>
-                  <% end %>
-
-                  <% if row.blocker %>
-                    <p class="jr-why" id="<%= why %>">
-                      <%= row.blocker.reason %>
-                      <% if row.blocker.fix %>
-                        <%= link_to "Set it up", public_send(row.blocker.fix), data: { tm_frame: "_top" } %>
-                      <% end %>
-                    </p>
-                    <% if row.blocker.not_installed? && row.blocker.commands.any? %>
-                      <pre class="mb-0"><code><%= safe_join(row.blocker.commands, "\n") %></code></pre>
-                    <% end %>
-                  <% end %>
-                </div>
-              </td>
-
-              <td class="t-when"><%= row.cadence %></td>
-
-              <td>
-                <%= dash_badge row.label, tone: row.tone %>
-              </td>
-
-              <td class="t-when"><%= dash_ago(row.started_at) %></td>
-
-              <td class="t-when">
-                <% if row.finished_at %>
-                  <%= dash_ago(row.finished_at) %>
-                <% else %>
-                  <%= row.ever? ? "Still running" : "Never" %>
-                <% end %>
-              </td>
-
-              <td class="row-actions row-actions-visible">
-                <% if row.on? %>
-                  <%= dash_button_to "Run", settings_job_run_run_path(row.key), method: :post,
-                        title: "Run now. The next scheduled run counts from now." %>
-                <% else %>
-                  <%= dash_button "Run", disabled: true, "aria-describedby": why %>
-                <% end %>
-              </td>
-            </tr>
-
-            <% if row.failed? && row.error %>
-              <tr class="jr-error">
-                <td colspan="6">
-                  <div>
-                    <span class="small text-body-tertiary">Last error</span>
-                    <code><%= row.error %></code>
-                  </div>
-                </td>
-              </tr>
-            <% end %>
-          <% end %>
-        </tbody>
-      <% end %>
-    <% end %>
-
-  </section>
-</div>

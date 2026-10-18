@@ -1,16 +1,6 @@
 import { Controller } from "../runtime/controllers.js"
-
-// The filter dialog.
-//
-// The box across the top holds the filters being built, one token per group,
-// and at most one dimension the box is scoped to. Typing searches every value
-// until a dimension is picked off the rail, or named with a colon the way
-// "country:" names Country, and then it narrows that dimension's list.
-//
-// Nothing here changes the page behind it. The filters live in this
-// controller until Apply, which is one navigation to the destination with all
-// of them on it, or, feeding a form, one event the form's own controller
-// takes them from.
+import { getFragment } from "../runtime/fetch.js"
+import { plural } from "../runtime/text.js"
 
 const DEBOUNCE_MS = 200
 const MINIMUM_TERM = 2
@@ -22,10 +12,6 @@ const FULL_KEY = "ahoy_dashboard.filter_modal.full"
 
 const normalize = (text) => String(text || "").toLowerCase().replace(/[^a-z0-9]/g, "")
 
-// The cut dash_row_label makes, so a value in the box shortens the way the same
-// value does in the list under it: the head gives way and the tail stays, from
-// the last slash when that is short enough, because the end of a path or a url
-// is usually the part that tells two of them apart.
 const SPLIT_OVER = 24
 const SPLIT_TAIL = 16
 const SPLIT_TAIL_MAX = 24
@@ -62,9 +48,6 @@ export default class extends Controller {
     }
     this.element.addEventListener("dash--modal:open", this.onOpen)
 
-    // The layout's modal controller shows and hides the dialog, from a click,
-    // from the shortcut, from anywhere. Watching the dialog's own hidden
-    // attribute is the one place all of those meet.
     this.watcher = new MutationObserver(() => this.visibility())
     this.watcher.observe(this.element, { attributes: true, attributeFilter: ["hidden"] })
     this.shown = !this.element.hidden
@@ -80,9 +63,6 @@ export default class extends Controller {
     this.contentsRequest?.abort()
   }
 
-  // A form page carries one dialog and the dashboard another, and each only
-  // answers the openers that belong to it. An opener inside a filters field
-  // belongs to the dialog in that field; every other opener to the page's.
   ownsOpener(opener) {
     const field = opener.closest("[data-controller~='dash--filters']")
 
@@ -123,14 +103,8 @@ export default class extends Controller {
     this.retryTarget.hidden = true
 
     try {
-      const response = await fetch(this.contentsValue, {
-        signal: request.signal,
-        credentials: "same-origin",
-        headers: { Accept: "text/html", "Tm-Frame": "tm-filter-controls" },
-      })
-      if (!response.ok || response.redirected) throw new Error("Filters could not be loaded")
-
-      const document = new DOMParser().parseFromString(await response.text(), "text/html")
+      const html = await getFragment(this.contentsValue, { frame: "tm-filter-controls", signal: request.signal })
+      const document = new DOMParser().parseFromString(html, "text/html")
       const content = document.querySelector("#tm-filter-modal .modal-content")
       if (!content?.querySelector("[data-dash--filter-modal-target='input']")) throw new Error("Filter controls are missing")
 
@@ -170,8 +144,6 @@ export default class extends Controller {
     this.openedBefore = true
   }
 
-  // Full screen
-
   expand(event) {
     event?.preventDefault()
 
@@ -208,8 +180,6 @@ export default class extends Controller {
       return
     }
   }
-
-  // Typing and the rail
 
   box(event) {
     const target = event.target
@@ -282,16 +252,10 @@ export default class extends Controller {
     this.render()
   }
 
-  // The keys the box answers on its own. The layout's modal controller has the
-  // rest: the arrows through the rows, Enter on the marked one, Tab kept in the
-  // dialog, and Escape out of it once there is nothing smaller to undo.
   key(event) {
     const input = this.inputTarget
     const empty = input.value === ""
 
-    // Backspace takes off whatever sits last in the box: a value in the
-    // dimension being built, then the dimension itself, then the filters
-    // before it.
     if (event.key === "Backspace" && empty) {
       const building = this.building()
 
@@ -335,9 +299,6 @@ export default class extends Controller {
     }
   }
 
-  // Enter with nothing marked. Matching a part takes what was typed; matching
-  // a whole value takes the best match for it, so "chr" and Enter is Chrome
-  // rather than a filter on the three letters.
   defaultRow() {
     const rows = Array.from(this.element.querySelectorAll(ROW))
     const typed = rows.find((row) => "typed" in row.dataset)
@@ -350,8 +311,6 @@ export default class extends Controller {
     event.preventDefault()
     event.stopImmediatePropagation()
   }
-
-  // Picking
 
   pick(event) {
     event.preventDefault()
@@ -370,7 +329,7 @@ export default class extends Controller {
     if (at) {
       const [group, index] = at
       group.filters.splice(index, 1)
-      if (!group.filters.length) this.groups.splice(this.groups.indexOf(group), 1)
+      this.prune(group)
       return
     }
 
@@ -430,7 +389,7 @@ export default class extends Controller {
     if (!group || Number.isNaN(position)) return
 
     group.filters.splice(position, 1)
-    if (!group.filters.length) this.groups.splice(this.groups.indexOf(group), 1)
+    this.prune(group)
 
     this.render()
     this.inputTarget.focus()
@@ -438,29 +397,28 @@ export default class extends Controller {
 
   dropFrom(group) {
     group.filters.pop()
-    if (!group.filters.length) this.groups.splice(this.groups.indexOf(group), 1)
+    this.prune(group)
 
     this.render()
   }
 
-  // The groups the scoped dimension is building: its own dimension under the
-  // operator the box is set to. They are said inside the scope rather than as
-  // tokens beside it, so what is being picked reads as one thing.
+  prune(group) {
+    if (!group.filters.length) this.groups.splice(this.groups.indexOf(group), 1)
+  }
+
   building() {
     if (!this.scope) return []
 
-    return this.groups.filter((group) => group.filters.length > 0 && group.filters.every((each) =>
-      each.dimension === this.scope.dimension && each.operator === this.operator
-    ))
+    return this.groups.filter((group) =>
+      this.uniformOn(group, this.scope.dimension) && group.filters[0].operator === this.operator
+    )
   }
 
   clear(event) {
     event?.preventDefault()
 
-    if (this.locked) {
-      this.groups = []
-    } else {
-      this.groups = []
+    this.groups = []
+    if (!this.locked) {
       this.scope = null
       this.operator = DEFAULT_OPERATOR
       this.inputTarget.value = ""
@@ -470,8 +428,6 @@ export default class extends Controller {
     this.render()
     this.inputTarget.focus()
   }
-
-  // Leaving
 
   apply(event) {
     event?.preventDefault()
@@ -490,8 +446,6 @@ export default class extends Controller {
     window.location.assign(url.pathname + url.search)
   }
 
-  // The same shape Filters#to_param writes: the three keys of a filter in
-  // order, and a group index only on a filter that shares its group.
   append(params) {
     params.delete("filters")
     if (!this.groups.length) {
@@ -508,8 +462,6 @@ export default class extends Controller {
       })
     })
   }
-
-  // The right-hand side
 
   async load() {
     clearTimeout(this.timer)
@@ -562,9 +514,6 @@ export default class extends Controller {
     this.tokensTarget.hidden = items.length === 1 && this.scope === null
   }
 
-  // Built as the kit's badge: the tone a filter wears on the bar. A group says
-  // its dimension and how it matches once, then each value as a chip of its
-  // own that comes off on its own, the way the bar draws the same group.
   token(group, index) {
     const item = element("li", "badge bg-primary-subtle text-primary-emphasis border border-primary-subtle d-inline-flex flex-wrap align-items-center gap-1 mw-100 fm-token")
     const first = group.filters[0]
@@ -664,17 +613,14 @@ export default class extends Controller {
     const count = this.groups.reduce((sum, group) => sum + group.filters.length, 0)
 
     if (this.collectValue) {
-      this.statusTarget.textContent = count ? `${count} ${count === 1 ? "value" : "values"} picked` : "Nothing picked yet"
+      this.statusTarget.textContent = count ? `${count} ${plural(count, "value")} picked` : "Nothing picked yet"
     } else {
-      this.statusTarget.textContent = count ? `${count} ${count === 1 ? "filter" : "filters"}` : "No filters"
+      this.statusTarget.textContent = count ? `${count} ${plural(count, "filter")}` : "No filters"
     }
 
     this.clearTarget.hidden = count === 0
   }
 
-  // Which rows are in the box already, and how many filters each dimension on
-  // the rail holds. Read off the elements every time, because the frame swaps
-  // its rows out under this controller on every keystroke.
   mark() {
     const operator = this.scope ? this.operator : DEFAULT_OPERATOR
 
@@ -700,8 +646,6 @@ export default class extends Controller {
       link.toggleAttribute("aria-current", current)
     })
   }
-
-  // Helpers
 
   words(operator) {
     return this.operatorsValue[operator] || operator

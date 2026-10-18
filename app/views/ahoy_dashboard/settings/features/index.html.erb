@@ -1,69 +1,65 @@
 <% content_for :title, "Features" %>
 <% content_for :dash_settings_section, "features" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Features",
-          lede: "What this dashboard does beyond counting visits. Anything that costs money per request stays off until you switch it on." %>
+<%= dash_page_head title: "Features",
+      lede: "What this dashboard does beyond counting visits. Anything that costs money per request stays off until you switch it on." %>
 
-    <%= dash_card do %>
-      <%= dash_table label: "Features", cols: "minmax(0, 1fr) 120px 190px" do %>
-        <thead>
-          <tr>
-            <th scope="col">Feature</th>
-            <th scope="col">State</th>
-            <th scope="col"><span class="visually-hidden">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @features.each do |feature| %>
-            <% state = feature.state %>
-            <% need = feature.need if state == :needs_setup %>
-            <tr id="feature-<%= feature.name %>">
-              <td>
-                <span class="t-main"><b><%= feature.label %></b></span>
-                <p class="small text-body-secondary mb-0 mt-1"><%= feature.detail %></p>
-                <% if state == :not_installed %>
-                  <div class="mt-2">
-                    <%= render "ahoy_dashboard/shared/feature_state", state: feature.install_state %>
-                  </div>
-                <% elsif need %>
-                  <%= dash_notice "Not set up yet.", detail: need.reason, tone: :warning, class: "mt-2 mb-0",
-                        action: (need.fix && dash_button("Set it up", public_send(need.fix))) %>
-                <% end %>
-              </td>
+<%= dash_card do %>
+  <%= dash_table label: "Features", cols: "minmax(0, 1fr) 120px 190px" do %>
+    <thead>
+      <tr>
+        <th scope="col">Feature</th>
+        <th scope="col">State</th>
+        <th scope="col"><span class="visually-hidden">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @features.each do |feature| %>
+        <% state = feature.state %>
+        <% need = feature.need if state == :needs_setup %>
+        <tr id="feature-<%= feature.name %>">
+          <td>
+            <span class="t-main"><b><%= feature.label %></b></span>
+            <p class="small text-body-secondary mb-0 mt-1"><%= feature.detail %></p>
+            <% if state == :not_installed %>
+              <div class="mt-2">
+                <%= render "ahoy_dashboard/shared/feature_state", state: feature.install_state %>
+              </div>
+            <% elsif need %>
+              <%= dash_notice "Not set up yet.", detail: need.reason, tone: :warning, class: "mt-2 mb-0",
+                    action: (need.fix && dash_button("Set it up", public_send(need.fix))) %>
+            <% end %>
+          </td>
 
-              <td>
-                <% case state %>
-                <% when :on %>
-                  <%= dash_badge "On", tone: :success %>
-                <% when :needs_setup %>
-                  <%= dash_badge "Needs setup", tone: :warning %>
-                <% when :off %>
-                  <%= dash_badge "Off" %>
-                <% else %>
-                  <%= dash_badge AhoyDashboard::FeatureState::BADGE, tone: :warning %>
-                <% end %>
-              </td>
+          <td>
+            <% case state %>
+            <% when :on %>
+              <%= dash_badge "On", tone: :success %>
+            <% when :needs_setup %>
+              <%= dash_badge "Needs setup", tone: :warning %>
+            <% when :off %>
+              <%= dash_badge "Off" %>
+            <% else %>
+              <%= dash_badge AhoyDashboard::FeatureState::BADGE, tone: :warning %>
+            <% end %>
+          </td>
 
-              <td class="row-actions row-actions-visible">
-                <% if (section = feature.settings_section) %>
-                  <%= dash_button "Settings", section.path %>
-                <% end %>
-                <% if feature.on? %>
-                  <%= dash_button_to "Turn off", settings_feature_path(feature.name), method: :patch,
-                        params: { enabled: "0" }, "aria-label": "Turn off #{feature.label}" %>
-                <% elsif feature.installed? %>
-                  <%= dash_button_to "Turn on", settings_feature_path(feature.name), method: :patch,
-                        params: { enabled: "1" }, tone: :primary, "aria-label": "Turn on #{feature.label}" %>
-                <% else %>
-                  <%= dash_unavailable "Turn on", reason: "#{feature.label} is not installed in this app yet." %>
-                <% end %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
+          <td class="row-actions row-actions-visible">
+            <% if (section = feature.settings_section) %>
+              <%= dash_button "Settings", section.path %>
+            <% end %>
+            <% if feature.on? %>
+              <%= dash_button_to "Turn off", settings_feature_path(feature.name), method: :patch,
+                    params: { enabled: "0" }, "aria-label": "Turn off #{feature.label}" %>
+            <% elsif feature.installed? %>
+              <%= dash_button_to "Turn on", settings_feature_path(feature.name), method: :patch,
+                    params: { enabled: "1" }, tone: :primary, "aria-label": "Turn on #{feature.label}" %>
+            <% else %>
+              <%= dash_unavailable "Turn on", reason: "#{feature.label} is not installed in this app yet." %>
+            <% end %>
+          </td>
+        </tr>
       <% end %>
-    <% end %>
-  </section>
-</div>
+    </tbody>
+  <% end %>
+<% end %>

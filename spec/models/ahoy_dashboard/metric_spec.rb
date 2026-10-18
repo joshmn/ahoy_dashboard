@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Metric do
   it "lists the top stats in plausible's order, with scroll depth after them" do

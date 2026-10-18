@@ -1,7 +1,5 @@
 module AhoyDashboard
   class ChatDecorator < AhoyDashboard::Decorator
-    # What the empty thread offers. Three, because a list of ten reads as a menu
-    # to work through rather than as an example of the kind of thing to ask.
     PICKS = [
       "Which pages lost visitors this month?",
       "Where is the traffic coming from?",

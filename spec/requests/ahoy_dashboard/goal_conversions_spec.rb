@@ -1,36 +1,14 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard goal conversions", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
   def converted!(name: "site_searched", visitors: 2)
     visitors.times do |index|
-      visit = dash_visit(started_at: now - 1.day, visitor: "visitor-#{index}")
-      dash_page_view(visit, path: "/going-in/faq", at: now - 1.day)
+      visit = dash_landing("/going-in/faq", at: now - 1.day, visitor: "visitor-#{index}")
       dash_goal(visit, name, at: now - 1.day, query: "thomson")
-    end
-  end
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/goal_conversions"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is closed to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/goal_conversions"
-
-      expect(response).to have_http_status(:not_found)
     end
   end
 
@@ -44,7 +22,7 @@ RSpec.describe "Dashboard goal conversions", type: :request do
       expect(response.body).to include("Add a goal to get started")
       expect(response.body).to include("New goal", AhoyDashboard::Engine.routes.url_helpers.new_settings_goal_path)
       expect(response.body).not_to include("Click a goal to filter")
-      expect(Nokogiri::HTML5(response.body).at_css(".g-head")).to be_nil
+      expect(document.at_css(".g-head")).to be_nil
     end
 
     it "renders a row per goal with its three numbers" do
@@ -60,8 +38,6 @@ RSpec.describe "Dashboard goal conversions", type: :request do
       expect(row.css(".g-num").first.text.strip).to eq("2")
     end
 
-    # A goal that was defined and never fired is an answer, not an absence, so it
-    # keeps its row and reads zero.
     it "keeps a row for a goal that has never fired" do
       create(:dash_goal, event_name: "never_happened", display_name: "Never")
 
@@ -94,8 +70,6 @@ RSpec.describe "Dashboard goal conversions", type: :request do
         expect(row["data-tm-frame"]).to eq("_top")
       end
 
-      # The row is the control both ways: the one already applied takes itself
-      # off rather than being applied a second time.
       it "takes the filter off again when it is the one applied" do
         get "/telemetry/goal_conversions",
             params: { filters: [ { dimension: "goal", operator: "is", value: "Searched" } ] }
@@ -131,12 +105,14 @@ RSpec.describe "Dashboard goal conversions", type: :request do
 
     it "prints the money beside the name only for a goal that carries a currency" do
       create(:dash_goal, event_name: "site_searched", display_name: "Searched", currency: "USD")
+      create(:dash_goal, event_name: "consult_booked", display_name: "Booked")
       converted!
+      converted!(name: "consult_booked")
 
       get "/telemetry/goal_conversions"
+      money = document.css(".g-list .g-row").map { |row| [ row.at_css(".nm").text.strip, row.at_css(".g-rev")&.text&.strip ] }
 
-      expect(document.at_css(".g-list .g-row")).to be_present
-      expect(document.css(".g-rev").size).to be <= 1
+      expect(money.to_h).to eq("Searched" => "$0.00", "Booked" => nil)
     end
 
     it "prints revenue as money, the way Explore does" do
@@ -166,10 +142,19 @@ RSpec.describe "Dashboard goal conversions", type: :request do
     it "carries the range it was asked for" do
       create(:dash_goal, event_name: "site_searched", display_name: "Searched")
       converted!
+      earlier = dash_landing("/going-in/faq", at: now - 20.days, visitor: "earlier")
+      dash_goal(earlier, "site_searched", at: now - 20.days, query: "thomson")
 
       get "/telemetry/goal_conversions", params: { period: "7d" }
+      row = document.at_css(".g-list .g-row")
 
       expect(response).to have_http_status(:ok)
+      expect(row.css(".g-num").first.text.strip).to eq("2")
+      expect(row["href"]).to include("period=7d")
+
+      get "/telemetry/goal_conversions"
+
+      expect(document.at_css(".g-list .g-row .g-num").text.strip).to eq("3")
     end
   end
 end

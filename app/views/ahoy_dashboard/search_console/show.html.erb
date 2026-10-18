@@ -1,9 +1,3 @@
-<% if @details %>
-  <%= dash_frame_tag @presenter.frame_id do %>
-    <%= render "ahoy_dashboard/search_console/details", presenter: @presenter %>
-  <% end %>
-<% else %>
-  <%= dash_frame_tag @presenter.frame_id do %>
-    <%= render "ahoy_dashboard/search_console/card", presenter: @presenter %>
-  <% end %>
+<%= dash_frame_tag @presenter.frame_id do %>
+  <%= render "ahoy_dashboard/search_console/#{@details ? "details" : "card"}", presenter: @presenter %>
 <% end %>

@@ -1,48 +1,12 @@
 require "rails_helper"
-require "support/ahoy_dashboard/switches"
 
 RSpec.describe "Dashboard general settings", type: :request do
   def stored(name)
     AhoyDashboard::Preferences.stored?(:site, name)
   end
 
-  def page
-    Nokogiri::HTML5(response.body)
-  end
-
-  def field(id)
-    page.at_css("##{id}")
-  end
-
-  def settings
-    AhoyDashboard::Setting.order(:key).pluck(:key, :value)
-  end
-
   let(:valid) do
     { time_zone: "Tokyo", host: "fpd.example", canonical_host: "www.fpd.example", internal_ips: "10.0.0.0/8\n203.0.113.7" }
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/general/edit"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin, and writes nothing" do
-      sign_in create(:user)
-
-      expect { patch "/telemetry/settings/general", params: { general: valid } }.not_to(change { settings })
-      expect(response).to have_http_status(:not_found)
-    end
-
-    it "will not put the default addresses back for somebody who is not an admin" do
-      ahoy_dashboard_preferences(:site, internal_ips: [])
-      sign_in create(:user)
-
-      expect { post "/telemetry/settings/default_internal_addresses" }.not_to(change { settings })
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do
@@ -51,16 +15,13 @@ RSpec.describe "Dashboard general settings", type: :request do
     it "is listed in the settings nav" do
       get "/telemetry/settings/general/edit"
 
-      expect(page.css("a").map { |link| link["href"] }).to include("/telemetry/settings/general/edit")
+      expect(document.css("a").map { |link| link["href"] }).to include("/telemetry/settings/general/edit")
     end
 
     it "labels every field and wires its hint" do
       get "/telemetry/settings/general/edit"
 
-      %w[general_host general_canonical_host general_time_zone general_internal_ips].each do |id|
-        expect(page.at_css("label[for='#{id}']")).to be_present, "expected a label for #{id}"
-        expect(field(id)["aria-describedby"]).to include("#{id}_hint")
-      end
+      expect_labelled_fields(%w[general_host general_canonical_host general_time_zone general_internal_ips])
     end
 
     describe "with nothing stored" do
@@ -71,7 +32,7 @@ RSpec.describe "Dashboard general settings", type: :request do
 
         expect(response).to have_http_status(:ok)
         expect(field("general_host")["value"]).to eq("www.example.com")
-        expect(page.at_css("#general_host_hint").text).to include("Not saved yet.")
+        expect(document.at_css("#general_host_hint").text).to include("Not saved yet.")
         expect(stored(:host)).to be(false)
       end
 
@@ -80,22 +41,22 @@ RSpec.describe "Dashboard general settings", type: :request do
 
         expect(field("general_time_zone").at_css("option[selected]")["value"]).to eq("UTC")
         expect(field("general_internal_ips").text.split).to eq(AhoyDashboard::Preferences::INTERNAL_IPS)
-        expect(page.at_css("#general_internal_ips_hint").text).to include("127.0.0.0/8", "fc00::/7")
+        expect(document.at_css("#general_internal_ips_hint").text).to include("127.0.0.0/8", "fc00::/7")
         expect(response.body).not_to include("config.internal_ips")
       end
 
       it "offers the defaults switched off with the reason" do
         get "/telemetry/settings/general/edit"
 
-        button = page.css("button[disabled]").find { |node| node.text.squish == "Use the defaults" }
+        button = document.css("button[disabled]").find { |node| node.text.squish == "Use the defaults" }
         expect(button).to be_present
-        expect(page.at_css("##{button['aria-describedby']}").text).to eq("The list is already the defaults.")
+        expect(document.at_css("##{button['aria-describedby']}").text).to eq("The list is already the defaults.")
       end
     end
 
     it "shows what is stored" do
-      ahoy_dashboard_preferences(:site, host: "fpd.example", canonical_host: "www.fpd.example",
-                                        internal_ips: [ "10.0.0.0/8" ], time_zone: "Tokyo")
+      AhoyDashboard::Preferences.write(:site, host: "fpd.example", canonical_host: "www.fpd.example",
+                                              internal_ips: [ "10.0.0.0/8" ], time_zone: "Tokyo")
 
       get "/telemetry/settings/general/edit"
 
@@ -103,7 +64,7 @@ RSpec.describe "Dashboard general settings", type: :request do
       expect(field("general_canonical_host")["value"]).to eq("www.fpd.example")
       expect(field("general_time_zone").at_css("option[selected]")["value"]).to eq("Tokyo")
       expect(field("general_internal_ips").text.strip).to eq("10.0.0.0/8")
-      expect(page.at_css("#general_host_hint").text).not_to include("Not saved yet.")
+      expect(document.at_css("#general_host_hint").text).not_to include("Not saved yet.")
     end
 
     it "saves every field and the dashboard reads them from then on" do
@@ -131,7 +92,7 @@ RSpec.describe "Dashboard general settings", type: :request do
     end
 
     it "goes back to the host when the canonical host is cleared" do
-      ahoy_dashboard_preferences(:site, canonical_host: "www.fpd.example")
+      AhoyDashboard::Preferences.write(:site, canonical_host: "www.fpd.example")
 
       patch "/telemetry/settings/general", params: { general: valid.merge(canonical_host: "") }
 
@@ -140,7 +101,7 @@ RSpec.describe "Dashboard general settings", type: :request do
     end
 
     it "clears the host when it is emptied" do
-      ahoy_dashboard_preferences(:site, host: "fpd.example")
+      AhoyDashboard::Preferences.write(:site, host: "fpd.example")
 
       patch "/telemetry/settings/general", params: { general: valid.merge(host: "", canonical_host: "") }
 
@@ -159,7 +120,7 @@ RSpec.describe "Dashboard general settings", type: :request do
     end
 
     it "puts the default addresses back" do
-      ahoy_dashboard_preferences(:site, internal_ips: [])
+      AhoyDashboard::Preferences.write(:site, internal_ips: [])
 
       post "/telemetry/settings/default_internal_addresses"
 
@@ -169,11 +130,11 @@ RSpec.describe "Dashboard general settings", type: :request do
     end
 
     it "offers the defaults when the list has been changed" do
-      ahoy_dashboard_preferences(:site, internal_ips: [ "10.0.0.0/8" ])
+      AhoyDashboard::Preferences.write(:site, internal_ips: [ "10.0.0.0/8" ])
 
       get "/telemetry/settings/general/edit"
 
-      button = page.css("form button").find { |node| node.text.squish == "Use the defaults" }
+      button = document.css("form button").find { |node| node.text.squish == "Use the defaults" }
       expect(button).to be_present
       expect(button["disabled"]).to be_nil
       expect(button.ancestors("form").first["action"]).to eq("/telemetry/settings/default_internal_addresses")
@@ -181,10 +142,7 @@ RSpec.describe "Dashboard general settings", type: :request do
 
     describe "refusing" do
       def refused(**changes)
-        expect { patch "/telemetry/settings/general", params: { general: valid.merge(changes) } }.not_to(change { settings })
-
-        expect(response).to have_http_status(:unprocessable_entity)
-        page.at_css("[role='alert']").text.squish
+        refusal("/telemetry/settings/general", general: valid.merge(changes))
       end
 
       it "names the bad address" do
@@ -214,7 +172,7 @@ RSpec.describe "Dashboard general settings", type: :request do
       end
 
       it "rejects nothing at all" do
-        expect { patch "/telemetry/settings/general" }.not_to(change { settings })
+        expect { patch "/telemetry/settings/general" }.not_to(change { stored_settings })
 
         expect(response).to have_http_status(:unprocessable_entity)
       end

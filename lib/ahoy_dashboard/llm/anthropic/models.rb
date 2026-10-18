@@ -6,6 +6,7 @@ module AhoyDashboard
         NO_SAMPLING = /\Aclaude-(opus-4-[7-9]|opus-[5-9]|sonnet-[5-9]|fable|mythos)/
         DEFAULT_FALLBACKS = /\Aclaude-(opus-5(\z|-\d{8}\z)|fable-5)/
         SHORT_OUTPUT = /\Aclaude-(3|opus-4-0|opus-4-1|opus-4-2025|sonnet-4-0|sonnet-4-2025)/
+        FILTERED_SEARCH = /\Aclaude-(opus-5|opus-4-[678]|sonnet-5|sonnet-4-6)(\z|-)/
 
         FALLBACK_BETA = "server-side-fallback-2026-07-01".freeze
         MAX_TOKENS = 64_000
@@ -27,6 +28,10 @@ module AhoyDashboard
 
         def max_tokens(model)
           model.to_s.match?(SHORT_OUTPUT) ? SHORT_MAX_TOKENS : MAX_TOKENS
+        end
+
+        def filtered_search?(model)
+          model.to_s.match?(FILTERED_SEARCH)
         end
       end
     end

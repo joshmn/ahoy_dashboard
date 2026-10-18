@@ -4,51 +4,43 @@
 <% label = AhoyDashboard::Settings::Display.serp_label(@name) %>
 <% free = AhoyDashboard::Serp.adapter_class(@name).cost_units(pages: 1).zero? %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: free ? "Use #{label.downcase}" : "Set up #{label}",
-          lede: if free
-                  "Made up rankings, so you can try rank tracking before paying for a provider. Nothing is charged, and none of it is real."
-                elsif @form.credential_keys.any?
-                  "Credentials are encrypted before they are stored."
-                end %>
+<%= dash_page_head title: free ? "Use #{label.downcase}" : "Set up #{label}",
+      lede: if free
+              "Made up rankings, so you can try rank tracking before paying for a provider. Nothing is charged, and none of it is real."
+            elsif @form.credential_keys.any?
+              "Credentials are encrypted before they are stored."
+            end %>
 
-    <%= dash_card do %>
-      <% if @removing %>
-        <%= render "ahoy_dashboard/settings/shared/remove_secret", secret: @removing,
-              url: settings_serp_provider_secret_path(@name, @removing.key),
-              cancel: edit_settings_serp_provider_path(@name) %>
-      <% end %>
+<%= dash_card do %>
+  <% if @removing %>
+    <%= render "ahoy_dashboard/settings/shared/remove_secret", secret: @removing,
+          url: settings_serp_provider_secret_path(@name, @removing.key),
+          cancel: edit_settings_serp_provider_path(@name) %>
+  <% end %>
 
-      <%= dash_form_with model: @form, scope: :serp_provider,
-            url: settings_serp_provider_path(@name), method: :patch,
-            card: true do |form| %>
-        <%= form.error_summary unlinked: [ :name ] %>
+  <%= dash_form_with model: @form, scope: :serp_provider,
+        url: settings_serp_provider_path(@name), method: :patch,
+        card: true do |form| %>
+    <%= form.error_summary unlinked: [ :name ] %>
 
-        <% @secrets.each_value do |secret| %>
-          <%= form.password_field secret.key, label: AhoyDashboard::Settings::Display.credential_label(secret.key), mono: true,
-                hint: secret.hint, id: "serp_provider_credentials_#{secret.key}", name: "serp_provider[credentials][#{secret.key}]",
-                value: nil, autocomplete: "off",
-                append: (if secret.stored?
-                           dash_button "Remove", edit_settings_serp_provider_path(@name, remove: secret.key, anchor: "remove-secret"),
-                             size: :md, aria: { label: "Remove the stored #{secret.label}" }
-                         end) %>
-        <% end %>
-
-        <% if free %>
-          <%= form.hidden_field :monthly_cap_units %>
-        <% else %>
-          <%= form.number_field :monthly_cap_units, label: "Monthly cap", min: 0,
-                hint: "The most searches to run in a calendar month. 0 means no cap." %>
-        <% end %>
-
-        <%= form.fieldset :active, label: "Use this one" do %>
-          <%= form.switch :active, label: (free ? "Use sample data for rank checks" : "Run rank checks through #{label}"),
-                hint: "Only one provider is active at a time." %>
-        <% end %>
-
-        <%= form.actions "Save provider", cancel: settings_serp_providers_path %>
-      <% end %>
+    <% @secrets.each_value do |secret| %>
+      <%= render "ahoy_dashboard/settings/shared/secret_field", form: form, secret: secret,
+            label: AhoyDashboard::Settings::Display.credential_label(secret.key),
+            remove_url: edit_settings_serp_provider_path(@name, remove: secret.key, anchor: "remove-secret") %>
     <% end %>
-  </section>
-</div>
+
+    <% if free %>
+      <%= form.hidden_field :monthly_cap_units %>
+    <% else %>
+      <%= form.number_field :monthly_cap_units, label: "Monthly cap", min: 0,
+            hint: "The most searches to run in a calendar month. 0 means no cap." %>
+    <% end %>
+
+    <%= form.fieldset :active, label: "Use this one" do %>
+      <%= form.switch :active, label: (free ? "Use sample data for rank checks" : "Run rank checks through #{label}"),
+            hint: "Only one provider is active at a time." %>
+    <% end %>
+
+    <%= form.actions "Save provider", cancel: settings_serp_providers_path %>
+  <% end %>
+<% end %>

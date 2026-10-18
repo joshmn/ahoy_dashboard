@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe AhoyDashboard::Alerts::Catalogue do
   it "gives every rule its own class and a group" do
@@ -57,13 +56,12 @@ RSpec.describe AhoyDashboard::Alerts::Catalogue do
 
     it "calls every rule available with everything installed" do
       expect(described_class.available).to eq(described_class.all)
-      expect(described_class.unavailable_keys).to be_empty
     end
 
     it "calls a rule unavailable once its source's tables are gone" do
       uninstall_ahoy_dashboard(:serp)
 
-      expect(described_class.unavailable_keys)
+      expect(described_class.keys - described_class.available.map(&:key))
         .to contain_exactly("lost_from_results", "off_page_one", "big_drop", "overtaken", "overview_appeared", "citation_lost")
       expect(described_class.find("spend_near_cap")).to be_available
     end

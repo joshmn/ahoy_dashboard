@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp::Adapters::SerpApiAdapter do
   subject(:adapter) { described_class.new }
@@ -18,7 +17,7 @@ RSpec.describe AhoyDashboard::Serp::Adapters::SerpApiAdapter do
     end
 
     it "refuses to search with no key rather than calling with a blank one" do
-      allow(AhoyDashboard::Serp).to receive(:credential).with(:serpapi, :api_key).and_return(nil)
+      serpapi_configured!(api_key: nil)
 
       expect { described_class.new.search(query: query) }
         .to raise_error(AhoyDashboard::Serp::AuthError, /no serpapi key/)
@@ -149,6 +148,21 @@ RSpec.describe AhoyDashboard::Serp::Adapters::SerpApiAdapter do
       stub_request(:get, %r{serpapi\.com}).to_timeout
 
       expect { adapter.search(query: query) }.to raise_error(AhoyDashboard::Serp::Error, /request failed/)
+    end
+
+    it "asks once more after a read timeout and no more than that" do
+      stub_request(:get, %r{serpapi\.com}).to_raise(Net::ReadTimeout)
+
+      expect { adapter.search(query: query) }.to raise_error(AhoyDashboard::Serp::Error, /serpapi request failed: Net::ReadTimeout/)
+      expect(a_request(:get, %r{serpapi\.com})).to have_been_made.twice
+    end
+
+    [ EOFError, Errno::EHOSTUNREACH, Errno::EPIPE, OpenSSL::SSL::SSLError ].each do |failure|
+      it "turns #{failure} into its own error so the run is not left pending" do
+        stub_request(:get, %r{serpapi\.com}).to_raise(failure)
+
+        expect { adapter.search(query: query) }.to raise_error(AhoyDashboard::Serp::Error, /serpapi request failed: #{failure}/)
+      end
     end
   end
 end

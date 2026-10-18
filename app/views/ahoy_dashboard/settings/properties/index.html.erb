@@ -1,127 +1,115 @@
 <% content_for :title, "Custom properties" %>
 <% content_for :dash_settings_section, "properties" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Custom properties",
-          lede: "Event properties you can group and filter by. Adding one does not start collecting it.",
-          actions: capture {
-            dash_button "Add property", "#tm-add-property", tone: :primary, icon: :plus
-          } %>
+<%= dash_page_head title: "Custom properties",
+      lede: "Event properties you can group and filter by. Adding one does not start collecting it.",
+      actions: dash_button("Add property", "#tm-add-property", tone: :primary, icon: :plus) %>
 
-    <%= dash_card do %>
-      <% if @properties.any? %>
-        <%= dash_card_header "#{@properties.size} #{"property".pluralize(@properties.size)}" %>
+<%= dash_card do %>
+  <% if @properties.any? %>
+    <%= dash_card_header "#{@properties.size} #{"property".pluralize(@properties.size)}" %>
 
-        <%= dash_table label: "Custom properties", cols: "minmax(0, 1fr) minmax(0, 1fr) 96px 56px 64px" do %>
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Key</th>
-              <th scope="col">Dashboard</th>
-              <th scope="col"><span class="visually-hidden">Order</span></th>
-              <th scope="col"><span class="visually-hidden">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @properties.each_with_index do |property, index| %>
-              <tr>
-                <td>
-                  <span class="t-main">
-                    <%= dash_icon(:layers, size: 13, class_name: "gi") %>
-                    <b><%= property.name %></b>
-                  </span>
-                </td>
+    <%= dash_table label: "Custom properties", cols: "minmax(0, 1fr) minmax(0, 1fr) 96px 56px 64px" do %>
+      <thead>
+        <tr>
+          <th scope="col">Name</th>
+          <th scope="col">Key</th>
+          <th scope="col">Dashboard</th>
+          <th scope="col"><span class="visually-hidden">Order</span></th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @properties.each_with_index do |property, index| %>
+          <tr>
+            <td>
+              <span class="t-main">
+                <%= dash_icon(:layers, size: 13, class_name: "gi") %>
+                <b><%= property.name %></b>
+              </span>
+            </td>
 
-                <td><span class="t-mono"><%= property.key %></span></td>
+            <td><span class="t-mono"><%= property.key %></span></td>
 
-                <td>
-                  <%= dash_badge property.enabled? ? "Shown" : "Not shown", tone: property.enabled? ? :success : :neutral %>
-                </td>
+            <td>
+              <%= dash_badge property.enabled? ? "Shown" : "Not shown", tone: property.enabled? ? :success : :neutral %>
+            </td>
 
-                <td class="row-actions">
-                  <%= dash_icon_button_to :chevron_up, settings_property_path(property),
-                        label: "Move #{property.key} up the list",
-                        method: :patch, params: { property: { nudge: "up" } },
-                        disabled: index.zero? %>
-                  <%= dash_icon_button_to :chevron_down, settings_property_path(property),
-                        label: "Move #{property.key} down the list",
-                        method: :patch, params: { property: { nudge: "down" } },
-                        disabled: index == @properties.size - 1 %>
-                </td>
+            <td class="row-actions">
+              <%= dash_move_buttons settings_property_path(property), name: property.key, param: :property,
+                    index: index, count: @properties.size %>
+            </td>
 
-                <td class="row-actions">
-                  <%= dash_icon_button_to property.enabled? ? :check : :plus, settings_property_path(property),
-                        label: "#{property.enabled? ? "Stop showing" : "Show"} #{property.key} on the dashboard",
-                        method: :patch, params: { property: { enabled: !property.enabled? } },
-                        title: property.enabled? ? "Hide on the dashboard" : "Show on the dashboard" %>
-                  <%= dash_icon_button_to :close, settings_property_path(property),
-                        label: "Delete #{property.key}", tone: :danger,
-                        method: :delete, title: "Delete from the list",
-                        confirm: "Delete #{property.key}?" %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
+            <td class="row-actions">
+              <%= dash_icon_button_to property.enabled? ? :check : :plus, settings_property_path(property),
+                    label: "#{property.enabled? ? "Stop showing" : "Show"} #{property.key} on the dashboard",
+                    method: :patch, params: { property: { enabled: !property.enabled? } },
+                    title: property.enabled? ? "Hide on the dashboard" : "Show on the dashboard" %>
+              <%= dash_icon_button_to :close, settings_property_path(property),
+                    label: "Delete #{property.key}", tone: :danger,
+                    method: :delete, title: "Delete from the list",
+                    confirm: "Delete #{property.key}?" %>
+            </td>
+          </tr>
         <% end %>
-      <% else %>
-        <%= dash_empty title: "Nothing on the list yet",
-              hint: (@found.any? ? "Add a key from the data below, or type one in." : "No properties turned up on recent events. Type a key below to add one.") %>
-      <% end %>
+      </tbody>
     <% end %>
+  <% else %>
+    <%= dash_empty title: "Nothing on the list yet",
+          hint: (@found.any? ? "Add a key from the data below, or type one in." : "No properties turned up on recent events. Type a key below to add one.") %>
+  <% end %>
+<% end %>
 
-    <% if @found.any? || @properties.any? %>
-    <%= dash_card do %>
-      <%= dash_card_header "Found in your data" do %>
-        <span class="g-hint">Keys on recent events that are not on the list</span>
-      <% end %>
+<% if @found.any? || @properties.any? %>
+<%= dash_card do %>
+  <%= dash_card_header "Found in your data" do %>
+    <span class="g-hint">Keys on recent events that are not on the list</span>
+  <% end %>
 
-      <% if @found.any? %>
-        <%= dash_table label: "Keys found in your data", cols: "minmax(0, 1fr) 90px" do %>
-          <thead>
-            <tr>
-              <th scope="col">Key</th>
-              <th scope="col"><span class="visually-hidden">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @found.each do |key| %>
-              <tr>
-                <td><span class="t-mono"><%= key %></span></td>
+  <% if @found.any? %>
+    <%= dash_table label: "Keys found in your data", cols: "minmax(0, 1fr) 90px" do %>
+      <thead>
+        <tr>
+          <th scope="col">Key</th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @found.each do |key| %>
+          <tr>
+            <td><span class="t-mono"><%= key %></span></td>
 
-                <td class="row-actions row-actions-visible">
-                  <%= dash_button_to "Add", settings_properties_path, icon: :plus,
-                        params: { property: { key: key } },
-                        title: "Add it to the list",
-                        aria: { label: "Add #{key} to the list" } %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
+            <td class="row-actions row-actions-visible">
+              <%= dash_button_to "Add", settings_properties_path, icon: :plus,
+                    params: { property: { key: key } },
+                    title: "Add it to the list",
+                    aria: { label: "Add #{key} to the list" } %>
+            </td>
+          </tr>
         <% end %>
-      <% else %>
-        <%= dash_empty title: "Nothing new", compact: true,
-              hint: "Every key on recent events is already on the list." %>
-      <% end %>
+      </tbody>
     <% end %>
+  <% else %>
+    <%= dash_empty title: "Nothing new", compact: true,
+          hint: "Every key on recent events is already on the list." %>
+  <% end %>
+<% end %>
+<% end %>
+
+<%= dash_card id: "tm-add-property" do %>
+  <%= dash_form_with model: @form, scope: :property, url: settings_properties_path,
+        method: :post, card: true do |form| %>
+    <h2 class="fs-6 fw-semibold mb-0">Add a property</h2>
+
+    <%= form.grid do %>
+      <%= form.text_field :key, label: "Key", mono: true,
+            hint: "Spelled exactly as on the event, capitals included.",
+            autocomplete: "off", placeholder: "plan" %>
+
+      <%= form.text_field :label, label: "Name", optional: true,
+            hint: "Defaults to a tidied up version of the key." %>
     <% end %>
 
-    <%= dash_card id: "tm-add-property" do %>
-      <%= dash_form_with model: @form, scope: :property, url: settings_properties_path,
-            method: :post, card: true do |form| %>
-        <h2 class="fs-6 fw-semibold mb-0">Add a property</h2>
-
-        <%= form.grid do %>
-          <%= form.text_field :key, label: "Key", mono: true,
-                hint: "Spelled exactly as on the event, capitals included.",
-                autocomplete: "off", placeholder: "plan" %>
-
-          <%= form.text_field :label, label: "Name", optional: true,
-                hint: "Defaults to a tidied up version of the key." %>
-        <% end %>
-
-        <%= form.actions "Add property" %>
-      <% end %>
-    <% end %>
-  </section>
-</div>
+    <%= form.actions "Add property" %>
+  <% end %>
+<% end %>

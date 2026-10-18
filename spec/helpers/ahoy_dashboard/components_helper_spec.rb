@@ -460,8 +460,8 @@ RSpec.describe AhoyDashboard::ComponentsHelper, type: :helper do
   end
 
   describe "#dash_menu" do
-    it "wires a toggle to the panel it opens, with whatever sits beside the panel outside it" do
-      markup = html(helper.dash_menu(id: "tm-period", label: "Last 7 days", icon: :cal, after: "<p id=dialogs></p>".html_safe,
+    it "wires a toggle to the panel it opens" do
+      markup = html(helper.dash_menu(id: "tm-period", label: "Last 7 days", icon: :cal,
                                      data: { tm_picker: "period" }) { "Items" })
       menu = markup.at_css("[data-controller='dash--menu']")
       button = menu.at_css("button#tm-period-button")
@@ -474,7 +474,6 @@ RSpec.describe AhoyDashboard::ComponentsHelper, type: :helper do
       expect(button["aria-pressed"]).to be_nil
       expect([ panel["aria-labelledby"], panel["data-dash--menu-target"], panel.text ])
         .to eq(%w[tm-period-button panel Items])
-      expect(menu.at_css("#dialogs").parent).to eq(menu)
     end
 
     it "says whether a tab toggle holds the view showing, and takes a name of its own" do
@@ -559,22 +558,6 @@ RSpec.describe AhoyDashboard::ComponentsHelper, type: :helper do
       item = html(helper.dash_menu_item(nil, "/?country=US") { "United States" }).at_css("a")
 
       expect([ item.text, item["href"] ]).to eq([ "United States", "/?country=US" ])
-    end
-  end
-
-  describe "#dash_nav_menu" do
-    it "is a nav item whose links are menu targets, with the current page marked" do
-      item = html(helper.dash_nav_menu(id: "tm-set-group-0", label: "Traffic",
-                                       items: [ { label: "Goals", url: "/goals", active: true, data: { tm_frame: "_top" } },
-                                                { label: "Funnels", url: "/funnels" } ])).at_css("li")
-      toggle = item.at_css("a#tm-set-group-0-button")
-      links = item.css("#tm-set-group-0 a")
-
-      expect([ item["data-controller"], toggle["role"], toggle["aria-controls"], toggle.text ])
-        .to eq(%w[dash--menu button tm-set-group-0 Traffic])
-      expect(links.map { |link| [ link.text, link["href"], link["aria-current"], link["data-dash--menu-target"] ] })
-        .to eq([ [ "Goals", "/goals", "page", "item" ], [ "Funnels", "/funnels", nil, "item" ] ])
-      expect(links.first["data-tm-frame"]).to eq("_top")
     end
   end
 

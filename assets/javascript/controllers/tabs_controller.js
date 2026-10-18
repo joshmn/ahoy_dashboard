@@ -1,20 +1,12 @@
 import { Controller } from "../runtime/controllers.js"
+import { modified, wrap } from "../runtime/keys.js"
 
 export default class extends Controller {
-  static values = { frame: String }
-
-  // The tabs are real links inside the card's own frame, so the frame is
-  // already the mechanism. This marks the tab pressed straight away rather
-  // than leaving it dead until the frame comes back.
   select(event) {
     const tab = event.currentTarget
 
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button > 0) return
+    if (modified(event) || event.button > 0) return
 
-    // The design marks the tab in front of you with aria-pressed and nothing
-    // else. Bootstrap's own .active would be three classes deep and would beat
-    // the design's rule, which is how the current tab ended up wearing
-    // Bootstrap's pill instead of the design's.
     this.tabs.forEach((candidate) => {
       const active = candidate === tab
 
@@ -26,19 +18,6 @@ export default class extends Controller {
         candidate.removeAttribute("aria-current")
       }
     })
-
-    if (tab.closest("tm-frame")) return
-
-    const frame = this.frame
-    const href = tab.getAttribute("href")
-    if (!frame || !href) return
-
-    event.preventDefault()
-
-    // A frame that already finished is done and skips the fetch when the src is
-    // reassigned, so the completed flag comes off first.
-    frame.removeAttribute("complete")
-    frame.src = href
   }
 
   navigate(event) {
@@ -51,7 +30,7 @@ export default class extends Controller {
     if (step) {
       event.preventDefault()
       const at = tabs.indexOf(document.activeElement)
-      const next = at === -1 ? 0 : (at + step + tabs.length) % tabs.length
+      const next = at === -1 ? 0 : wrap(at, step, tabs.length)
       tabs[next].focus()
       return
     }
@@ -67,11 +46,5 @@ export default class extends Controller {
 
   get tabs() {
     return Array.from(this.element.querySelectorAll(".nav-link"))
-  }
-
-  get frame() {
-    if (this.hasFrameValue && this.frameValue) return document.getElementById(this.frameValue)
-
-    return this.element.closest("tm-frame")
   }
 }

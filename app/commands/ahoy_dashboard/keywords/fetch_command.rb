@@ -17,7 +17,7 @@ module AhoyDashboard
         return broadcast(:disabled) unless Keywords.enabled?
 
         @adapter = Keywords.adapter
-        return broadcast(:unsupported, adapter.provider_name) unless adapter.keywords?
+        return broadcast(:unsupported, adapter.provider_name) unless adapter.class.keywords?
         return broadcast(:refused, Keywords.refusal_message(:unconfigured)) unless Keywords.configured?
         return broadcast(:saved, saved.maximum(:fetched_at)) if !refresh && saved.exists?
         return broadcast(:capped, record) unless spend.reserve
@@ -27,7 +27,7 @@ module AhoyDashboard
         spend.settle(adapter.units_used, used: true)
 
         broadcast(:ok, Outcome.new(seed: seed, location: location, language: language, written: written, units: adapter.units_used))
-      rescue Serp::AuthError, Serp::QuotaError => e
+      rescue Serp::QuotaError => e
         broken(e)
         broadcast(:rate_limited, e.message)
       rescue Serp::Error => e
@@ -55,7 +55,6 @@ module AhoyDashboard
       end
 
       def broken(error)
-        @spend&.settle(adapter&.units_used)
         record&.record_error!(error.message)
       end
 

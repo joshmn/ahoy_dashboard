@@ -33,6 +33,10 @@ RSpec.describe AhoyDashboard::Alerts::DigestPresenter do
       expect(presenter(events: events.first(1)).headline).to eq("1 alert")
     end
 
+    it "groups the thousands in a big count, the way the traffic email does" do
+      expect(presenter(events: events, total: 1_204).subject).to eq("Alerts for Sep 18: 1,204 alerts")
+    end
+
     it "sums up the severities" do
       expect(presenter(events: events).summary).to eq("1 high, 1 medium.")
     end
@@ -48,13 +52,11 @@ RSpec.describe AhoyDashboard::Alerts::DigestPresenter do
     it "reads the time-zone setting once for all email rows" do
       daily = presenter(events: events)
       AhoyDashboard::Preferences.forget
-      reads = []
-      subscriber = ->(_name, _started, _finished, _id, payload) { reads << payload[:sql] if payload[:sql].include?('FROM "ahoy_dashboard_settings"') }
-
-      groups = ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { daily.groups }
+      groups = nil
+      reads = setting_reads { groups = daily.groups }
 
       expect(groups.flat_map(&:rows).map(&:at)).to eq([ "4:15 AM", "9:30 PM" ])
-      expect(reads.size).to eq(1)
+      expect(reads).to eq(1)
     end
 
     it "dates the rows rather than timing them on a weekly email" do

@@ -1,8 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard filter form", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
@@ -11,7 +10,7 @@ RSpec.describe "Dashboard filter form", type: :request do
   let(:applied) { [ { dimension: "page", operator: "is", value: "/alpha" } ] }
 
   def form
-    Nokogiri::HTML5(response.body).at_css("form[data-controller~='dash--filter']")
+    document.at_css("form[data-controller~='dash--filter']")
   end
 
   describe "changing a filter that is applied" do
@@ -76,19 +75,8 @@ RSpec.describe "Dashboard filter form", type: :request do
     end
 
     it "fetches the category's initial option lists in one aggregate statement" do
-      visit = dash_visit(started_at: now - 1.hour, utm_source: "newsletter", utm_medium: "email")
-      dash_page_view(visit)
-      statements = []
-      subscriber = lambda do |*, payload|
-        next if payload[:name] == "SCHEMA" || payload[:cached]
-        next unless payload[:sql].match?(/\bgroup by\b/i)
-
-        statements << payload[:sql]
-      end
-
-      ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
-        get "/telemetry/filters/new", params: { category: "utm" }
-      end
+      dash_landing(at: now - 1.hour, utm_source: "newsletter", utm_medium: "email")
+      statements = captured_sql(/\bgroup by\b/i) { get "/telemetry/filters/new", params: { category: "utm" } }
 
       expect(response).to have_http_status(:ok)
       expect(statements.size).to eq(1)
@@ -121,8 +109,7 @@ RSpec.describe "Dashboard filter form", type: :request do
 
     def countries!
       %w[US CA DE].each_with_index do |country, index|
-        visit = dash_visit(started_at: now - 1.hour + index.minutes, visitor: country, country: country)
-        dash_page_view(visit, path: "/alpha", at: now - 1.hour + index.minutes)
+        dash_landing("/alpha", at: now - 1.hour + index.minutes, visitor: country, country: country)
       end
     end
 

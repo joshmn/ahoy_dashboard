@@ -1,17 +1,14 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard keyword research", type: :request do
-  let(:document) { Nokogiri::HTML5(response.body) }
-
   before do
     sign_in create(:user, :admin)
     allow(AhoyDashboard::Keywords).to receive(:enabled?).and_return(true)
   end
 
   def saved_idea(query, provider: "fake", seed: "visiting", location: "us", language: "en")
-    AhoyDashboard::KeywordIdea.create!(seed: seed, query: query, location: location, language: language, volume: 100,
-                                       provider: provider, fetched_at: 1.day.ago)
+    create(:dash_keyword_idea, seed: seed, query: query, location: location, language: language, volume: 100,
+           provider: provider, fetched_at: 1.day.ago)
   end
 
   def research_path(**params)
@@ -204,8 +201,8 @@ RSpec.describe "Dashboard keyword research", type: :request do
     end
 
     it "keeps the place and language on the easy wins filter" do
-      AhoyDashboard::KeywordIdea.create!(seed: "visiting", query: "visiting hours uk", location: "gb", language: "en",
-                                         volume: 500, difficulty: 10, provider: "fake", fetched_at: 1.day.ago)
+      create(:dash_keyword_idea, seed: "visiting", query: "visiting hours uk", location: "gb", language: "en",
+             volume: 500, difficulty: 10, provider: "fake", fetched_at: 1.day.ago)
 
       get "/telemetry/seo/keyword_research", params: { seed: "visiting", location: "gb", language: "en" }
 
@@ -222,10 +219,7 @@ RSpec.describe "Dashboard keyword research", type: :request do
 
     it "keeps Look up disabled with the reason beside it" do
       get "/telemetry/seo/keyword_research"
-      button = document.css("button[disabled][aria-describedby]").find { |node| node.text.strip == "Look up" }
-
-      expect(button).to be_present
-      expect(document.at_css("##{button['aria-describedby']}").text).to include("DataForSEO has no credentials set.")
+      expect(disabled_button_reason("Look up")).to include("DataForSEO has no credentials set.")
     end
 
     it "refuses the lookup instead of queueing a job that fails" do

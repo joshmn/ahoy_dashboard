@@ -1,9 +1,13 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::JobRunEntry do
+  def execute(job = AhoyDashboard::Serp::DispatchJob.new, &block)
+    AhoyDashboard::Scheduling::ExecutionService.call(job: job, &block)
+  end
+
   describe "what a run leaves behind" do
     it "logs a run that finished" do
-      AhoyDashboard::JobRun.around("serp_dispatch") { :done }
+      execute { :done }
 
       entry = described_class.recent.first
       expect(entry).to have_attributes(key: "serp_dispatch", status: "ok", error: nil)
@@ -11,8 +15,7 @@ RSpec.describe AhoyDashboard::JobRunEntry do
     end
 
     it "logs a run that raised, with the whole error" do
-      expect { AhoyDashboard::JobRun.around("serp_dispatch") { raise ArgumentError, "no good" } }
-        .to raise_error(ArgumentError)
+      expect { execute { raise ArgumentError, "no good" } }.to raise_error(ArgumentError)
 
       entry = described_class.recent.first
       expect(entry.status).to eq("failed")
@@ -20,13 +23,14 @@ RSpec.describe AhoyDashboard::JobRunEntry do
     end
 
     it "logs every run rather than overwriting the last one" do
-      2.times { AhoyDashboard::JobRun.around("serp_dispatch") { :done } }
+      2.times { execute { :done } }
 
       expect(described_class.where(key: "serp_dispatch").count).to eq(2)
     end
 
     it "logs nothing for a job with no key" do
-      expect { AhoyDashboard::JobRun.around(nil) { :done } }.not_to change(described_class, :count)
+      expect { execute(AhoyDashboard::Serp::Keywords::CheckJob.new(1, "us")) { :done } }
+        .not_to change(described_class, :count)
     end
   end
 
@@ -45,7 +49,7 @@ RSpec.describe AhoyDashboard::JobRunEntry do
   it "does not stop a job when the log cannot be written" do
     allow(described_class).to receive(:create!).and_raise(ActiveRecord::StatementInvalid, "no table")
 
-    expect(AhoyDashboard::JobRun.around("serp_dispatch") { :done }).to eq(:done)
+    expect(execute { :done }).to eq(:done)
     expect(AhoyDashboard::JobRun.for("serp_dispatch").status).to eq("ok")
   end
 

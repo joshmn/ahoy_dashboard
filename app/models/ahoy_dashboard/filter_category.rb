@@ -1,13 +1,4 @@
 module AhoyDashboard
-  # The dialogs a filter chip reopens to. A category is a named group of related
-  # dimensions, which is coarser than Dimension::GROUPS: Source is one dialog
-  # with three rows, because source, channel and referrer are the same question
-  # asked three ways and somebody who wants one of them wants the other two in
-  # reach.
-  #
-  # Every filterable dimension belongs to exactly one category. A dimension that
-  # is in none of them cannot be filtered from the UI at all, which is what
-  # spec/models/ahoy_dashboard/filter_category_spec.rb pins.
   class FilterCategory
     include ActiveModel::Model
 
@@ -17,10 +8,6 @@ module AhoyDashboard
 
     attr_reader :key, :label, :heading
 
-    # dimensions may be a callable, for a category whose rows are rows in a table
-    # rather than a written list. The custom properties are the reason: the
-    # allowlist changes the moment somebody edits it in settings and cannot be
-    # frozen into the registry at boot.
     def initialize(key:, label:, heading:, dimensions:)
       @key = key
       @label = label
@@ -59,9 +46,6 @@ module AhoyDashboard
       new(key: "crawler", label: "Crawler", heading: "Behaviour", dimensions: %w[crawler]),
       new(key: "browsed", label: "Viewed a page", heading: "Behaviour", dimensions: %w[browsed]),
 
-      # Empty until a host app calls AhoyDashboard::Dimension.register. Surfaced
-      # the same way the properties category is: a category with nothing in
-      # it just doesn't show up in the menu, per .surfaced below.
       new(key: "custom", label: "Custom", heading: "Behaviour",
           dimensions: -> { AhoyDashboard::Dimension.registry.keys })
     ].freeze
@@ -69,13 +53,6 @@ module AhoyDashboard
     INDEX = ALL.index_by(&:key).freeze
 
     class << self
-      def all
-        ALL
-      end
-
-      # A category with nothing in it is a menu item that opens an empty form.
-      # The properties category is the one this happens to: it holds whatever the
-      # allowlist holds, which on a fresh install is nothing.
       def surfaced
         ALL.select { |category| category.dimension_keys.any? }
       end
@@ -98,8 +75,6 @@ module AhoyDashboard
         INDEX[key.to_s]
       end
 
-      # Which category a dimension belongs to, so a filter already on the bar can
-      # be opened back up in the form that made it.
       def for_dimension(dimension_key)
         wanted = dimension_key.to_s
 

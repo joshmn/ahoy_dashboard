@@ -1,61 +1,57 @@
 <% content_for :title, "Edit a funnel" %>
 <% content_for :dash_settings_section, "funnels" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Edit #{@funnel.name}",
-          lede: "Changes apply to the whole history, not just from now on." %>
+<%= dash_page_head title: "Edit #{@funnel.name}",
+      lede: "Changes apply to the whole history, not just from now on." %>
 
-    <% steps = funnel_steps %>
+<% steps = funnel_steps %>
 
-    <% if steps.any? %>
-      <%= dash_card do %>
-        <%= dash_card_header "Order" do %>
-          <span class="g-hint">Moving a step saves right away</span>
-        <% end %>
-
-        <%= dash_table label: "Steps", cols: "32px minmax(0, 1fr) minmax(0, 1fr) 56px" do %>
-          <thead>
-            <tr>
-              <th scope="col"><span class="visually-hidden">Number</span></th>
-              <th scope="col">Step</th>
-              <th scope="col">Matches</th>
-              <th scope="col"><span class="visually-hidden">Order</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% steps.each_with_index do |step, index| %>
-              <tr>
-                <td><span class="fn-n" aria-hidden="true"><%= index + 1 %></span></td>
-
-                <td><span class="t-main"><b><%= step.name %></b></span></td>
-
-                <td>
-                  <span class="t-mono">
-                    <%= step.goal.pageview? ? step.goal.path_pattern : step.goal.event_name %>
-                  </span>
-                </td>
-
-                <td class="row-actions row-actions-visible">
-                  <%= dash_icon_button_to :chevron_up, settings_funnel_path(@funnel),
-                        label: "Move #{step.name} earlier in #{@funnel.name}",
-                        method: :patch, params: { funnel: { step_nudge: "#{step.id}:up" } },
-                        disabled: index.zero? %>
-                  <%= dash_icon_button_to :chevron_down, settings_funnel_path(@funnel),
-                        label: "Move #{step.name} later in #{@funnel.name}",
-                        method: :patch, params: { funnel: { step_nudge: "#{step.id}:down" } },
-                        disabled: index == steps.size - 1 %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        <% end %>
-      <% end %>
+<% if steps.any? %>
+  <%= dash_card do %>
+    <%= dash_card_header "Order" do %>
+      <span class="g-hint">Moving a step saves right away</span>
     <% end %>
 
-    <%= dash_card do %>
-      <%= render "ahoy_dashboard/settings/funnels/form",
-            url: settings_funnel_path(@funnel), method: :patch, submit_label: "Save changes" %>
+    <%= dash_table label: "Steps", cols: "32px minmax(0, 1fr) minmax(0, 1fr) 56px" do %>
+      <thead>
+        <tr>
+          <th scope="col"><span class="visually-hidden">Number</span></th>
+          <th scope="col">Step</th>
+          <th scope="col">Matches</th>
+          <th scope="col"><span class="visually-hidden">Order</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% steps.each_with_index do |step, index| %>
+          <tr>
+            <td><span class="fn-n" aria-hidden="true"><%= index + 1 %></span></td>
+
+            <td><span class="t-main"><b><%= step.name %></b></span></td>
+
+            <td>
+              <span class="t-mono">
+                <%= AhoyDashboard::GoalDecorator.new(step.goal).matcher %>
+              </span>
+            </td>
+
+            <td class="row-actions row-actions-visible">
+              <%= dash_icon_button_to :chevron_up, settings_funnel_path(@funnel),
+                    label: "Move #{step.name} earlier in #{@funnel.name}",
+                    method: :patch, params: { funnel: { step_nudge: "#{step.id}:up" } },
+                    disabled: index.zero? %>
+              <%= dash_icon_button_to :chevron_down, settings_funnel_path(@funnel),
+                    label: "Move #{step.name} later in #{@funnel.name}",
+                    method: :patch, params: { funnel: { step_nudge: "#{step.id}:down" } },
+                    disabled: index == steps.size - 1 %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
     <% end %>
-  </section>
-</div>
+  <% end %>
+<% end %>
+
+<%= dash_card do %>
+  <%= render "ahoy_dashboard/settings/funnels/form",
+        url: settings_funnel_path(@funnel), method: :patch, submit_label: "Save changes" %>
+<% end %>

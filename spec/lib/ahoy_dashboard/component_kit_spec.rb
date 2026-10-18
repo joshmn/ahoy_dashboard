@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/component_kit"
 
 RSpec.describe "Dashboard component kit" do
   before(:context) do

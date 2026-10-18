@@ -1,25 +1,10 @@
 require "rails_helper"
 
-# The place picker on the keyword forms. It is optional twice over: off in the
-# host's settings, and off until the list has actually been built. Either way
-# the form falls back to the country select and the typed city it has always
-# had, and the wire format never changes, so a keyword saved through the picker
-# is the same row as a keyword typed in by hand.
 RSpec.describe "Dashboard keyword places", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
-  def place(name, code:, parent: nil, kind: "city", children: 0)
-    create(:dash_place, code: code, name: name, label: name.split(",").first, parent_code: parent,
-                        country_code: "us", kind: kind, depth: name.split(",").size - 1,
-                        children_count: children)
-  end
-
   def catalogue!
-    place("United States", code: 2840, kind: "country", children: 1)
-    place("Illinois,United States", code: 21147, parent: 2840, kind: "state", children: 1)
-    place("Chicago,Illinois,United States", code: 101, parent: 21147)
+    dash_place("United States", code: 2840, kind: "country", children: 1)
+    dash_place("Illinois,United States", code: 21147, parent: 2840, kind: "state", children: 1)
+    dash_place("Chicago,Illinois,United States", code: 101, parent: 21147)
   end
 
   def switch(on)
@@ -72,8 +57,6 @@ RSpec.describe "Dashboard keyword places", type: :request do
       expect(document.css("##{opener['data-tm-place']}")).to be_present
     end
 
-    # What the row already holds is where the picker opens, and where adding
-    # another place starts from.
     it "carries the place a keyword already has, and its parent" do
       catalogue!
       keyword = create(:dash_serp_keyword, locations: [ "city:us:Chicago,Illinois,United States" ])
@@ -108,8 +91,6 @@ RSpec.describe "Dashboard keyword places", type: :request do
       expect(document.css("#tm-places")).to be_present
     end
 
-    # The whole point of not changing the wire format: a picked place saves
-    # through the same params a typed one always did.
     it "saves a picked place as the location the adapters already want" do
       catalogue!
       site = create(:dash_serp_site)

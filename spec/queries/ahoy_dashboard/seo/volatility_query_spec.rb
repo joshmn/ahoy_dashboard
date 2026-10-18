@@ -1,8 +1,6 @@
 require "rails_helper"
 
 RSpec.describe AhoyDashboard::Seo::VolatilityQuery do
-  include ActiveSupport::Testing::TimeHelpers
-
   let(:zone) { AhoyDashboard.time_zone }
   let(:now) { zone.local(2026, 8, 10, 12) }
   let(:range) { (now - 7.days).beginning_of_day..now.end_of_day }
@@ -96,5 +94,19 @@ RSpec.describe AhoyDashboard::Seo::VolatilityQuery do
     page!(zone.local(2026, 8, 10, 9), links("same"))
 
     expect(presenter(described_class.call(range: range)).tiles.second.label).to eq("Today")
+  end
+
+  it "leaves out a place the keyword no longer searches, the way Rankings does" do
+    page!(zone.local(2026, 8, 8, 9), links("before"))
+    page!(zone.local(2026, 8, 9, 9), links("after"))
+    [ zone.local(2026, 8, 8, 9), zone.local(2026, 8, 9, 9) ].each_with_index do |at, index|
+      run = create(:dash_serp_run, keyword: keyword, location: "gb", checked_at: at)
+      links("gb-#{index}").each_with_index { |link, place| create(:dash_serp_result, run: run, link: link, position: place + 1) }
+    end
+
+    comparisons = described_class.call(range: range).comparisons
+
+    expect(comparisons.map(&:location)).to eq(%w[us])
+    expect(comparisons.first.query).to eq(keyword.query)
   end
 end

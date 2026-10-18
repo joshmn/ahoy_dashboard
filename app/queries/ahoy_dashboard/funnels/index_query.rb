@@ -4,14 +4,10 @@ module AhoyDashboard
 
   module Funnels
 
-    class IndexQuery
+    class IndexQuery < AhoyDashboard::Query
       PAGE_SIZE = 4
 
-      class << self
-        def call(**options)
-          new(**options).call
-        end
-      end
+      Page = Data.define(:readings, :total, :page, :pages)
 
       def initialize(query:, page: nil)
         @query = query

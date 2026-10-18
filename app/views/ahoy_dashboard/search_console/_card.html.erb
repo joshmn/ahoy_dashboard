@@ -1,7 +1,7 @@
 <%= dash_card element: :section,
       class: class_names("panel panel--gsc h-100", "panel--bare" => presenter.unconfigured?),
       "aria-labelledby": "tm-card-search_console-title",
-      data: { controller: "dash--tabs", "dash--tabs-frame-value": AhoyDashboard::SearchConsolePresenter::FRAME } do %>
+      data: { controller: "dash--tabs" } do %>
   <%= dash_card_header presenter.title, id: "tm-card-search_console-title", element: :header do %>
     <% unless presenter.unconfigured? %>
       <%= dash_tabs presenter.tabs.map { |option| { label: option.label, url: option.path, current: option.active? } },

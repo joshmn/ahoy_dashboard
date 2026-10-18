@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Dashboards::SnapshotPayload do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
   let(:query) { AhoyDashboard::QueryForm.from_params({ period: "30d", filters: "none" }) }
   let(:reading) { AhoyDashboard::Dashboards::ShowQuery.call(query: query) }
   let(:payload) { JSON.parse(JSON.generate(described_class.dump(reading: reading))) }
@@ -16,13 +15,13 @@ RSpec.describe AhoyDashboard::Dashboards::SnapshotPayload do
   around { |example| travel_to(now) { example.run } }
 
   before do
-    visit = dash_visit(started_at: now - 1.day, visitor: "snapshot visitor", country: "US", browser: "Firefox")
-    dash_page_view(visit, path: "/start", at: now - 1.day)
+    visit = dash_landing("/start", at: now - 1.day, visitor: "snapshot visitor", country: "US", browser: "Firefox")
     dash_page_view(visit, path: "/finish", at: now - 1.day + 2.minutes)
     funnel.funnel_steps.each_with_index do |step, index|
       dash_goal(visit, step.goal.event_name, at: now - 1.day + (index + 3).minutes)
     end
     create(:dash_search_console_row, date: now.to_date - 2, query: "snapshot query")
+    create(:dash_search_console_keyword, date: now.to_date - 2, query: "snapshot query")
     create(:dash_search_console_total, date: now.to_date - 2)
     create(:dash_search_console_day, date: now.to_date - 2)
   end
@@ -56,7 +55,16 @@ RSpec.describe AhoyDashboard::Dashboards::SnapshotPayload do
   end
 
   it "retains Search Console readings and precise inclusive time boundaries" do
+    expect(reading.search_console.queries.map(&:label)).to eq([ "snapshot query" ])
     expect(restored.search_console).to eq(reading.search_console)
+  end
+
+  it "still loads a Search Console reading stored with the live dates it no longer writes" do
+    stored = payload.deep_dup
+    stored["search_console"]["live_dates"] = []
+
+    expect(described_class.load(payload: stored, computed_at: now, realtime: 42).search_console)
+      .to eq(reading.search_console)
   end
 
   it "retains pinned numeric sparklines and precise inclusive time boundaries" do

@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Dimension do
   describe "the registry" do
@@ -82,10 +81,6 @@ RSpec.describe AhoyDashboard::Dimension do
       expect(described_class.find_by_key("page")).to eq(described_class.find("page"))
     end
 
-    # Most dimensions are both a way to group and a way to narrow. The ones that
-    # are only a way to group say so, and page_group is the one that does today:
-    # its values are the page dimension's folded, so offering it would put the
-    # same paths on the menu twice under two names.
     it "offers every filterable dimension to the filter dialog, and only those" do
       offered = described_class.filterable.map(&:key)
 
@@ -97,7 +92,7 @@ RSpec.describe AhoyDashboard::Dimension do
     end
 
     it "adds the allowlisted properties to the filter dialog" do
-      AhoyDashboard::Property.create!(key: "facility_id")
+      create(:dash_property, key: "facility_id")
 
       expect(described_class.filterable.map(&:key)).to include("prop:facility_id")
     end
@@ -161,9 +156,6 @@ RSpec.describe AhoyDashboard::Dimension do
     end
   end
 
-  # ahoy_visits.landing_page is the only full URL either table holds. The path
-  # dimension is a stripped copy of it, so these two read what the stripping
-  # threw away and there is nothing else in the schema they could come from.
   describe "the landing page dimensions" do
     def read(key, landing_page)
       create(:ahoy_visit, landing_page: landing_page)
@@ -193,8 +185,6 @@ RSpec.describe AhoyDashboard::Dimension do
       expect(read("entry_host", "https://Federalprisondude.COM/")).to eq("federalprisondude.com")
     end
 
-    # A relative landing page has no host in it to read, and reporting its path
-    # as a hostname would invent one.
     it "reads nothing out of a landing page with no scheme on it" do
       expect(read("entry_host", "/resources")).to be_nil
       expect(read("entry_host", "")).to be_nil
@@ -205,9 +195,6 @@ RSpec.describe AhoyDashboard::Dimension do
       expect(read("entry_host", nil)).to be_nil
     end
 
-    # Both expressions carry literal question marks, which is the trap
-    # Sql::ENTRY_PATH already documents: a positional bind counts them as
-    # placeholders and raises before the query is built.
     it "filters on a value without the question marks in it eating the bind" do
       create(:ahoy_visit, landing_page: "https://vouch.federalprisondude.com/quiet-harbor-8412?x=1")
       create(:ahoy_visit, landing_page: "https://federalprisondude.com/")
@@ -227,7 +214,7 @@ RSpec.describe AhoyDashboard::Dimension do
     end
 
     it "builds a case expression over the defined goals" do
-      AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "site_searched")
+      create(:dash_goal, event_name: "site_searched")
 
       sql = described_class.find("goal").sql.to_s
 
@@ -235,21 +222,12 @@ RSpec.describe AhoyDashboard::Dimension do
       expect(sql).to include("then 'site_searched'")
     end
 
-    # The registry entry is frozen at boot, so a lookup that reused it would
-    # keep serving the expression from before the goal existed.
     it "picks up a goal added after the registry was loaded" do
       expect(described_class.find("goal").sql.to_s).to eq("null::text")
 
-      AhoyDashboard::Goal.create!(kind: :pageview, path_pattern: "/thanks")
+      create(:dash_goal, :pageview, path_pattern: "/thanks")
 
       expect(described_class.find("goal").sql.to_s).to include("/thanks")
-    end
-
-    it "orders the case by position, so the first match wins predictably" do
-      AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "second", position: 2)
-      AhoyDashboard::Goal.create!(kind: :custom_event, event_name: "first", position: 1)
-
-      expect(described_class.find("goal").sql.to_s.index("first")).to be < described_class.find("goal").sql.to_s.index("second")
     end
   end
 

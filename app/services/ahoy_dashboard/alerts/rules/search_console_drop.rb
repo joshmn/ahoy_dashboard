@@ -7,7 +7,8 @@ module AhoyDashboard
         latches!
 
         def findings
-          return [] unless (drop = percent_drop) && drop >= threshold
+          drop = weekly_drop
+          return [] unless drop && drop >= threshold
 
           [ finding(subject: SUBJECT, reading: weeks.ends_on.iso8601,
                     headline: "#{metric_label.capitalize} fell #{drop}%",
@@ -16,8 +17,7 @@ module AhoyDashboard
         end
 
         def cleared
-          drop = percent_drop
-          return [] if drop.nil? || drop >= threshold / 2.0
+          return [] unless drop_recovered?(weekly_drop)
 
           [ SUBJECT ]
         end
@@ -36,10 +36,10 @@ module AhoyDashboard
           weeks.previous.public_send(metric)
         end
 
-        def percent_drop
-          return nil if weeks.nil? || previous.zero?
+        def weekly_drop
+          return nil if weeks.nil?
 
-          ((previous - current) * 100.0 / previous).floor
+          percent_drop(previous: previous, current: current)
         end
       end
     end

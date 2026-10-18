@@ -1,12 +1,3 @@
-<%# One applied filter, said the same way everywhere it appears: the dimension,
-    how it is matched, the value, and the way off the bar. The dashboard and a
-    composed question both render this, because they had drifted into saying the
-    same filter two different ways, and the explore side had put the whole
-    sentence into the value slot, where a 200px clamp cut it mid URL.
-
-    destination is which surface applying lands back on, absent meaning the
-    dashboard. carried is whatever that surface holds that the query string does
-    not, so a filter reopened from a composed question comes back to it. %>
 <% destination = local_assigns[:destination] %>
 <% carried = local_assigns.fetch(:carried, {}) %>
 <% compact = local_assigns.fetch(:compact, false) %>

@@ -2,13 +2,7 @@
 
 module AhoyDashboard
 
-  class ChartAnnotationsQuery
-    class << self
-      def call(**options)
-        new(**options).call
-      end
-    end
-
+  class ChartAnnotationsQuery < AhoyDashboard::Query
     def initialize(range:, bucket: :day)
       @range = range
       chosen = bucket.to_sym unless bucket.nil?
@@ -19,6 +13,10 @@ module AhoyDashboard
       grouped.values.flatten
     end
 
+    private
+
+    attr_reader :range, :bucket
+
     def grouped
       return {} unless Installation.table?(Annotation.table_name)
 
@@ -27,14 +25,8 @@ module AhoyDashboard
         .transform_values { |found| found.first(Annotation::PER_BUCKET) }
     end
 
-    private
-
-    attr_reader :range, :bucket
-
     def records
       relation = Annotation.between(range.begin, range.end)
-      # Ruby preserves both offsets of a repeated DST hour; SQL timezone
-      # truncation merges them, so intraday buckets retain their Ruby cap.
       return relation.order(:happened_at, :id).to_a unless Sql::Buckets::DATES.include?(bucket)
 
       expression = Sql::Buckets.sql("#{Annotation.table_name}.happened_at", bucket)

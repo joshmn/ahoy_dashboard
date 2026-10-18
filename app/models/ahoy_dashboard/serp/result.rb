@@ -37,6 +37,19 @@ module AhoyDashboard
         ai_overview.cites?(domain, match_subdomains: match_subdomains)
       end
 
+      def check_attributes_for(site)
+        rank = rank_for(site.domain, match_subdomains: site.match_subdomains)
+        source = ai_overview.source_for(site.domain, match_subdomains: site.match_subdomains)
+
+        {
+          position: rank&.position, page: rank&.page, url: rank&.link,
+          ai_overview_present: ai_overview.shown?,
+          ai_overview_cited: ai_overview.shown? && source.present?,
+          ai_overview_citation_position: source ? ai_overview.sources.index(source) + 1 : nil,
+          ai_overview_source_count: ai_overview.sources.size
+        }
+      end
+
       def domains
         organic.map(&:domain).select { |value| value }
       end

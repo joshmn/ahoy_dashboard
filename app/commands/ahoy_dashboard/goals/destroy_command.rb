@@ -5,21 +5,25 @@ module AhoyDashboard
         @goal = goal
       end
 
-      # A goal a funnel is built on cannot be deleted: the foreign key restricts,
-      # so this arrives as InvalidForeignKey rather than as a validation. Naming the
-      # funnels is the whole point of catching it, because otherwise the refusal
-      # tells somebody they cannot do a thing without saying what is stopping them.
       def call
+        return broadcast(:in_use, goal, funnel_names) if goal.funnel_steps.exists?
+
         goal.destroy!
 
         broadcast(:ok, goal)
-      rescue ActiveRecord::InvalidForeignKey
+      rescue ActiveRecord::StatementInvalid => error
+        raise unless restricted?(error)
+
         broadcast(:in_use, goal, funnel_names)
       end
 
       private
 
       attr_reader :goal
+
+      def restricted?(error)
+        error.is_a?(ActiveRecord::InvalidForeignKey) || error.cause.is_a?(PG::RestrictViolation)
+      end
 
       def funnel_names
         AhoyDashboard::Funnel.where(id: goal.funnel_steps.select(:funnel_id)).order(:position, :id).pluck(:name)

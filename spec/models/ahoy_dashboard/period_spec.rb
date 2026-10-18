@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Period do
   let(:zone) { AhoyDashboard.time_zone }
@@ -111,8 +110,6 @@ RSpec.describe AhoyDashboard::Period do
       expect(range.end).to be_within(1.second).of(zone.local(2026, 8, 10, 5))
     end
 
-    # This is a URL people edit by hand, so a broken custom range has to land
-    # somewhere sane rather than raising in front of them.
     it "falls back to thirty days on a custom range it cannot parse" do
       [
         {},
@@ -132,8 +129,6 @@ RSpec.describe AhoyDashboard::Period do
       end
     end
 
-    # Everything downstream buckets and labels in this zone. A range built in
-    # UTC moves every boundary five or six hours and nothing else notices.
     it "computes in the telemetry time zone" do
       expect(range_for("day").begin.time_zone).to eq(AhoyDashboard.time_zone)
       expect(range_for("day").end.time_zone).to eq(AhoyDashboard.time_zone)

@@ -1,29 +1,24 @@
 module AhoyDashboard
   module Settings
-    class SearchConsolePropertiesController < AhoyDashboard::BaseController
+    class SearchConsolePropertiesController < AhoyDashboard::Settings::BaseController
       requires_installed :search_console
 
       before_action :set_account!
       before_action :set_stored
 
       def edit
-        @sites = sites
-        @form = SearchConsole::PropertyForm.new(
-          choices: @sites.map(&:url), property_uri: @account.property_uri
-        )
+        @form = SearchConsole::PropertyForm.new(sites: sites, property_uri: @account.property_uri)
       rescue SearchConsole::Error => e
         redirect_to settings_google_connection_path, alert: unreachable(e)
       end
 
       def update
-        @sites = sites
-        @form = SearchConsole::PropertyForm.new(choices: @sites.map(&:url), **property_params)
+        @form = SearchConsole::PropertyForm.new(sites: sites, **property_params)
 
         SearchConsole::Properties::SelectCommand.call(account: @account, form: @form) do
           on(:ok) { redirect_to settings_google_connection_path, notice: "Search Console property saved." }
           on(:switched) { |_account, days| redirect_to settings_google_connection_path, notice: switched_notice(days) }
-          on(:invalid) { render :edit, status: :unprocessable_entity }
-          on(:missing) { redirect_to settings_google_connection_path, alert: "Connect Google first." }
+          on(:invalid) { render :edit, status: 422 }
         end
       rescue SearchConsole::Error => e
         redirect_to settings_google_connection_path, alert: unreachable(e)
@@ -44,8 +39,6 @@ module AhoyDashboard
         @stored_days = @stored_property ? SearchConsoleTotal.distinct.count(:date) : 0
       end
 
-      # Asked for on the way in and again on the way out, so a property that has
-      # gone away since the page was drawn cannot be saved.
       def sites
         SearchConsole::SitesService.call(account: @account)
       end

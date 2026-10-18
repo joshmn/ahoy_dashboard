@@ -34,11 +34,6 @@ RSpec.describe AhoyDashboard::Seo::SearchConsoleEmptyState do
   it "renders prepared historical coverage without reading the database" do
     create(:dash_search_console_row, date: Date.new(2026, 1, 2))
     state
-    statements = []
-    subscriber = ->(*args) { statements << args.last[:sql] if args.last[:sql].match?(/\ASELECT/) }
-
-    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") { state.call }
-
-    expect(statements).to be_empty
+    expect(captured_sql(/\ASELECT/, cached: true) { state.call }).to be_empty
   end
 end

@@ -5,6 +5,8 @@ module AhoyDashboard
 
       Result = Data.define(:keyword, :site, :range, :location, :locations, :points, :current,
                            :previous, :best, :worst, :run) do
+        include Placed
+
         def any?
           points.any?
         end
@@ -21,10 +23,6 @@ module AhoyDashboard
           return nil if position.nil? || previous&.position.nil?
 
           previous.position - position
-        end
-
-        def place
-          Location.parse(location)
         end
 
         def overviews
@@ -69,8 +67,7 @@ module AhoyDashboard
       def rows
         return [] if site.nil?
 
-        SerpCheck.where(keyword_id: keyword.id, site_id: site.id, location: chosen,
-                        status: SerpCheck.statuses[:success])
+        SerpCheck.success.where(keyword_id: keyword.id, site_id: site.id, location: chosen)
           .in_range(range)
           .chronological
           .to_a

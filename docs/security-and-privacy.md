@@ -33,7 +33,7 @@ Keys typed on the settings screens (rank tracking provider keys, assistant keys,
 - A stored key can be removed from its own settings screen. See [Removing a stored secret](#removing-a-stored-secret).
 - Keys are only ever entered on a settings screen. The dashboard doesn't read them from environment variables, Rails credentials or the initializer.
 
-Changing `secret_key_base` makes every stored secret unreadable. So does changing `config.active_support.key_generator_hash_digest_class`, or loading a database dump into an app with a different `secret_key_base`. Nothing raises. The keys read as missing and Google reads as not connected. To recover, re-enter each key on its settings screen and reconnect Google.
+Changing `secret_key_base` makes every stored secret unreadable. So does loading a database dump into an app with a different `secret_key_base`. Changing your app's own encryption defaults doesn't: the dashboard always writes with AES-GCM and Marshal whatever `use_authenticated_message_encryption` and `message_serializer` say, and still reads a secret written under a `key_generator_hash_digest_class` of SHA1 or SHA256, either setting of `use_authenticated_message_encryption`, and a `message_serializer` of `:marshal` or one of the JSON ones. A secret written under any other setting, such as a MessagePack serializer, reads only while that setting stays. Nothing raises. The keys read as missing and Google reads as not connected. To recover, re-enter each key on its settings screen and reconnect Google.
 
 The dashboard uses its own encryption rather than Active Record encryption so that installing it doesn't change how the rest of your app handles keys.
 
@@ -53,7 +53,7 @@ Out of the box, nothing leaves except site icons (see below). Each other outboun
 
 ### Site icons
 
-To show a referrer's icon, your server asks `icons.duckduckgo.com` for `/ip3/<domain>.ico`, sending the domain name and a User-Agent of `<your site host> favicon proxy`, built from the host on Settings, General (`ahoy_dashboard favicon proxy` when no host is set). It only asks for domains that have referred a visit to your site, caches each answer (30 days for an icon, a day for none, 10 minutes after a failure), and takes nothing bigger than 64 KB. The browser never contacts DuckDuckGo.
+To show a referrer's icon, your server asks `icons.duckduckgo.com` for `/ip3/<domain>.ico`, sending the domain name and a User-Agent of `ahoy_dashboard/<version> (<your site host>)`, built from the host on Settings, General (just `ahoy_dashboard/<version>` when no host is set). Search Console and search provider requests carry the same User-Agent. It only asks for domains that have referred a visit to your site in the last 90 days, caches each answer (30 days for an icon, a day for none, 10 minutes after a failure), and takes nothing bigger than 64 KB. The browser never contacts DuckDuckGo.
 
 DuckDuckGo learns the list of sites that link to you, one domain at a time, from your server's address. Turn it off by switching off Site icons on Settings, Features. It's the one feature that starts on.
 
@@ -82,7 +82,9 @@ Every question asked in Ask sends the model provider:
 
 It doesn't send raw visits or events, visitor tokens, or anything about the person asking. It does send whatever values your dimensions hold, so if your app registers an IP address dimension, IP addresses can be in a tool result.
 
-With LM Studio on its default endpoint, `http://localhost:1234/v1`, it all stays on that machine. Change the endpoint and it goes wherever that points. See [Assistant](assistant.md).
+When the reader sends back its reasoning with an answer, as DeepSeek does, that reasoning is stored on the answer in your database and sent back with the conversation, but only to the same reader at the same endpoint. Opening a provider's page on Settings, Assistant sends its stored key to that provider's `/models` list, at the endpoint saved with the key, to suggest models. Redirects aren't followed, so the key goes nowhere else.
+
+With OpenAI-compatible on its default endpoint, `http://localhost:1234/v1`, it all stays on that machine. Change the endpoint and it goes wherever that points. See [Assistant](assistant.md).
 
 ### AI visibility
 

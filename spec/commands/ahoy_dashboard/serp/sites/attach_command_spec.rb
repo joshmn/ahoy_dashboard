@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp::Sites::AttachCommand do
   let(:keyword) { create(:dash_serp_keyword) }

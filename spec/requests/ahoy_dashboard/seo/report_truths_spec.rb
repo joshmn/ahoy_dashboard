@@ -1,17 +1,11 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard seo report truths", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:site) { create(:dash_serp_site, name: "Us", domain: "example.com") }
 
   around { |example| travel_to(now) { example.run } }
   before { sign_in create(:user, :admin) }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   it "says no results page was saved on SERP features instead of calling the page plain" do
     keyword = create(:dash_serp_keyword, query: "fci thomson visiting")

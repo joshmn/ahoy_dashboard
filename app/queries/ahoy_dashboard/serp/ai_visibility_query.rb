@@ -42,7 +42,7 @@ module AhoyDashboard
       attr_reader :site, :range, :limit, :tag
 
       def scope
-        SerpCheck.where(site_id: site&.id, status: SerpCheck.statuses[:success]).in_range(range).for_tag(tag)
+        SerpCheck.success.where(site_id: site&.id).in_range(range).for_tag(tag)
           .at_current_places
       end
 

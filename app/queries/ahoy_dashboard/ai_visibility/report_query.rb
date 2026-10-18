@@ -113,11 +113,7 @@ module AhoyDashboard
       end
 
       def local_day
-        @local_day ||= begin
-          zone = ActiveRecord::Base.connection.quote(AhoyDashboard.time_zone.tzinfo.name)
-
-          Arel.sql("(asked_at at time zone 'UTC' at time zone #{zone})::date")
-        end
+        @local_day ||= Sql::Buckets.sql("#{Answer.table_name}.asked_at", :day)
       end
 
       def series

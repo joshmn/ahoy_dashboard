@@ -2,10 +2,11 @@ module AhoyDashboard
   module Settings
     class AssistantProviderRowPresenter
       NOT_CHOSEN = "Saved without Use this one, so the settings saved here are not used.".freeze
+      KEY_SOURCES = { stored: "Stored here", not_needed: "Not needed", missing: "Missing" }.freeze
 
       attr_reader :name, :record
 
-      def self.all(records: AssistantProvider.ordered.index_by(&:name))
+      def self.all(records: AssistantProvider.ordered.index_by { |provider| Assistant.reader_key(provider.name) })
         AssistantProvider::NAMES.map { |name| new(name: name, record: records[name]) }
       end
 
@@ -15,15 +16,15 @@ module AhoyDashboard
       end
 
       def reader
-        Assistant::READERS.fetch(name)
+        Assistant.reader_for(name)
       end
 
       def label
-        reader[:label]
+        reader.label
       end
 
-      def local?
-        reader[:local].present?
+      def key_optional?
+        reader.key_optional?
       end
 
       def in_use?
@@ -45,7 +46,7 @@ module AhoyDashboard
       end
 
       def model
-        chosen = in_use? ? Assistant.model_name : record&.model_name.presence || reader[:default_model]
+        chosen = in_use? ? Assistant.model_name : record&.model_name.presence || reader.default_model
 
         chosen.presence || "Not set"
       end
@@ -60,10 +61,10 @@ module AhoyDashboard
       end
 
       def key
-        return "Not needed" if local?
         return used_key if in_use?
+        return "Stored here" if record&.api_key.present?
 
-        record&.api_key.present? ? "Stored here" : "Missing"
+        key_optional? ? "Not needed" : "Missing"
       end
 
       def last_error
@@ -77,7 +78,7 @@ module AhoyDashboard
       private
 
       def used_key
-        Assistant.key_source == :stored ? "Stored here" : "Missing"
+        KEY_SOURCES.fetch(Assistant.key_source)
       end
 
       def saved_anything?

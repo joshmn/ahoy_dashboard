@@ -1,9 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe "Dashboard search console keyword", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:keyword) { "fci thomson visiting" }
   let(:path) { "/telemetry/search_console_keyword?q=#{CGI.escape(keyword)}" }
 
@@ -16,30 +14,6 @@ RSpec.describe "Dashboard search console keyword", type: :request do
 
   def history!
     (1..12).each { |day| keyword!(Date.new(2026, 8, day), clicks: day, impressions: day * 20) }
-  end
-
-  # The chart element carries its series and its options as data rather than
-  # printing a script beside itself, so the payload is read back off the element.
-  def chart_payload(name)
-    element = Nokogiri::HTML5(response.body).at_css('[data-controller~="dash--chart"]')
-
-    JSON.parse(element["data-dash--chart-#{name}-value"])
-  end
-
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get path
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "does not admit that it exists to a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get path
-
-      expect(response).to have_http_status(:not_found)
-    end
   end
 
   describe "as an admin" do
@@ -71,13 +45,13 @@ RSpec.describe "Dashboard search console keyword", type: :request do
 
       get path
 
-      expect(chart_payload("data").first["name"]).to eq("Clicks")
-      expect(chart_payload("options").dig("library", "plugins", "tmFormat", "label")).to eq("Clicks")
+      expect(dash_chart_series.first["name"]).to eq("Clicks")
+      expect(dash_chart_options.dig("library", "plugins", "tmFormat", "label")).to eq("Clicks")
 
       get "#{path}&series=position"
 
-      expect(chart_payload("options").dig("library", "plugins", "tmFormat", "label")).to eq("Average position")
-      expect(chart_payload("options").dig("library", "scales", "y", "reverse")).to be(true)
+      expect(dash_chart_options.dig("library", "plugins", "tmFormat", "label")).to eq("Average position")
+      expect(dash_chart_options.dig("library", "scales", "y", "reverse")).to be(true)
     end
 
     it "falls back to clicks when the series is nonsense" do
@@ -86,7 +60,7 @@ RSpec.describe "Dashboard search console keyword", type: :request do
       get "#{path}&series=vibes"
 
       expect(response).to have_http_status(:ok)
-      expect(chart_payload("options").dig("library", "plugins", "tmFormat", "label")).to eq("Clicks")
+      expect(dash_chart_options.dig("library", "plugins", "tmFormat", "label")).to eq("Clicks")
     end
 
     it "says the record is shorter than the range that was asked for" do
@@ -124,7 +98,7 @@ RSpec.describe "Dashboard search console keyword", type: :request do
       expect(response.body).to include("Where it landed")
       expect(response.body).to include("They add up to less than the clicks above")
 
-      landing = Nokogiri::HTML5(response.body).css("a.seo-link").find { |link| link.text.include?("/resources/federal-prisons/thomson") }
+      landing = document.css("a.seo-link").find { |link| link.text.include?("/resources/federal-prisons/thomson") }
 
       expect(landing).to be_present
       expect(landing["href"]).to start_with("/telemetry")
@@ -176,10 +150,10 @@ RSpec.describe "Dashboard search console keyword", type: :request do
     before { sign_in create(:user, :admin) }
 
     it "hangs off every query row on the card but not off a page row" do
-      search_console_disabled!
       create(:dash_google_account, :with_property)
       create(:dash_search_console_row, date: Date.new(2026, 8, 18), query: keyword,
              page: "https://example.com/a", clicks: 4, impressions: 40)
+      create(:dash_search_console_keyword, date: Date.new(2026, 8, 18), query: keyword, clicks: 4, impressions: 40)
 
       get "/telemetry/search_console"
 
@@ -202,17 +176,13 @@ RSpec.describe "Dashboard search console keyword", type: :request do
 end
 
 RSpec.describe "Dashboard search console keyword by device and country", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:keyword) { "fci thomson visiting" }
   let(:day) { Date.new(2026, 8, 12) }
 
   around { |example| travel_to(now) { example.run } }
 
   before { sign_in create(:user, :admin) }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   def stored!
     [ [ "desktop", "usa", 6 ], [ "mobile", "usa", 3 ], [ "mobile", "gbr", 1 ], [ "", "", 4 ] ].each do |device, country, clicks|

@@ -7,8 +7,10 @@ module AhoyDashboard
         def ask(text)
           require_key!
 
-          payload = post_json(ENDPOINT, body: { model: model, messages: [ { role: "user", content: text } ] },
-                                        headers: { "Authorization" => "Bearer #{api_key}" })
+          payload = asking do
+            transport.post(ENDPOINT, headers: { "Authorization" => "Bearer #{api_key}" },
+                                     body: { model: model, messages: [ { role: "user", content: text } ] })
+          end
 
           Reply.new(text: Array(payload["choices"]).first&.dig("message", "content").to_s,
                     sources: unique(sources_from(payload)),

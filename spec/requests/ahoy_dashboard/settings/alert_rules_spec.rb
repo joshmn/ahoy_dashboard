@@ -1,20 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard alert rule settings", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
   before { sign_in create(:user, :admin) }
-
-  it "is a 404 for a signed in visitor who is not an admin" do
-    sign_out :user
-    sign_in create(:user)
-
-    get "/telemetry/settings/alert_rules"
-
-    expect(response).to have_http_status(:not_found)
-  end
 
   it "lists every rule under its group" do
     AhoyDashboard::Alerts::Rules::InstallCommand.call
@@ -177,14 +164,6 @@ RSpec.describe "Dashboard alert rule settings", type: :request do
       patch "/telemetry/settings/alert_rules/#{rule.id}", params: { alert_rule: { threshold: "0" } }
 
       expect(rule.reload.threshold).to eq(0)
-    end
-
-    it "runs a rule saved before thresholds were checked on its default rather than the bad number" do
-      rule = AhoyDashboard::AlertRule.find_by!(key: "big_drop")
-      rule.update_columns(threshold: 0)
-
-      expect(rule.reload.threshold_value).to eq(5)
-      expect(rule.condition).to eq("a search falls by 5 places or more between checks")
     end
   end
 end

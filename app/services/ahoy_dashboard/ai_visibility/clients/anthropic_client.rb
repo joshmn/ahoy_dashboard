@@ -3,17 +3,10 @@ module AhoyDashboard
     module Clients
       class AnthropicClient < BaseClient
         API_BASE = "https://api.anthropic.com/v1".freeze
-        MAX_TOKENS = 64_000
         MAX_CONTINUATIONS = 3
         SEARCH = "web_search_20260209".freeze
         BASIC_SEARCH = "web_search_20250305".freeze
-        FILTERED_SEARCH_MODELS = /\Aclaude-(opus-5|opus-4-[678]|sonnet-5|sonnet-4-6)(\z|-)/
         MAX_SEARCHES = 5
-
-        def initialize(api_key:, model:, transport: nil)
-          super(api_key: api_key, model: model)
-          @transport = transport
-        end
 
         def ask(text)
           require_key!
@@ -23,9 +16,8 @@ module AhoyDashboard
           messages = [ { role: "user", content: text } ]
 
           (MAX_CONTINUATIONS + 1).times do
-            payload = request(messages)
-            raise Error, "claude declined to answer" if payload["stop_reason"] == "refusal"
-            raise Error, "claude's answer ran past #{MAX_TOKENS} tokens and was cut off" if payload["stop_reason"] == "max_tokens"
+            payload = asking { client.stream({ "model" => model, "max_tokens" => max_tokens, "tools" => [ tool ], "messages" => messages }) }
+            check!(payload)
 
             served ||= payload["model"]
             content.concat(Array(payload["content"]))
@@ -47,19 +39,23 @@ module AhoyDashboard
           "anthropic"
         end
 
-        def request(messages)
-          client.stream({ "model" => model, "max_tokens" => MAX_TOKENS, "tools" => [ tool ], "messages" => messages })
-        rescue LLM::Error => e
-          raise failure(e)
+        def check!(payload)
+          case LLM::Anthropic::Chat::STOPS[payload["stop_reason"].to_s]
+          when :refusal then raise Error, "claude declined to answer"
+          when :max_tokens then raise Error, "claude's answer ran past #{max_tokens} tokens and was cut off"
+          end
+        end
+
+        def max_tokens
+          LLM::Anthropic::Models.max_tokens(model)
         end
 
         def client
-          @client ||= LLM::Anthropic::Client.new(api_base: API_BASE, api_key: api_key, open_timeout: OPEN_TIMEOUT,
-                                               read_timeout: READ_TIMEOUT, transport: @transport)
+          @client ||= LLM::Anthropic::Client.new(api_base: API_BASE, api_key: api_key, transport: transport)
         end
 
         def tool
-          type = model.to_s.match?(FILTERED_SEARCH_MODELS) ? SEARCH : BASIC_SEARCH
+          type = LLM::Anthropic::Models.filtered_search?(model) ? SEARCH : BASIC_SEARCH
 
           { type: type, name: "web_search", max_uses: MAX_SEARCHES }
         end

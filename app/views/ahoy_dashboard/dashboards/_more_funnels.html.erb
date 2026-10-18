@@ -1,0 +1,6 @@
+<% if @presenter.more_funnels? %>
+  <div class="d-flex align-items-center justify-content-between mb-3" aria-label="More funnels">
+    <span class="text-body-secondary">Showing <%= @presenter.funnels.length %> of <%= @presenter.funnel_count %> funnels</span>
+    <%= dash_button "View all funnels", funnels_path(query.to_query), tone: :link %>
+  </div>
+<% end %>

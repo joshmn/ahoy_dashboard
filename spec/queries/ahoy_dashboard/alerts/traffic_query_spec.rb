@@ -1,10 +1,9 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe AhoyDashboard::Alerts::TrafficQuery do
   [ [ 2026, 9, 19 ], [ 2026, 11, 6 ] ].each do |year, month, day|
     it "preserves exclusive ends and distinct visitors across weekly windows on #{year}-#{month}-#{day}" do
-      now = AhoyDashboard.time_zone.local(year, month, day, 14, 30)
+      now = dash_time(year, month, day, 14, 30)
       finish = now.beginning_of_hour
       dash_page_view(dash_visit(started_at: now - 40.days))
       (0..4).each do |week|

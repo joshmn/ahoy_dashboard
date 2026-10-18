@@ -1,11 +1,5 @@
 module AhoyDashboard
   module LLM
-    # One conversation, and the tool loop around it.
-    #
-    # The loop is the whole point: the model answers with tool calls instead of
-    # text, we run them, put the results back in as tool messages and ask again,
-    # until it answers with words. MAX_ROUNDS is the stop, because a model that
-    # keeps calling the same tool should cost a bounded number of requests.
     class Chat
       MAX_ROUNDS = 8
       PARAGRAPH = "\n\n".freeze
@@ -16,7 +10,7 @@ module AhoyDashboard
       HISTORY_ID = "history_call_%d".freeze
       USAGE = %i[input_tokens output_tokens cache_read_tokens cache_write_tokens].freeze
 
-      Round = Struct.new(:text, :calls, :stop, :refusal_category, :wire,
+      Round = Struct.new(:text, :calls, :stop, :refusal_category, :wire, :reasoning,
                          :input_tokens, :output_tokens, :cache_read_tokens, :cache_write_tokens,
                          keyword_init: true)
 
@@ -54,16 +48,16 @@ module AhoyDashboard
         self
       end
 
-      def add_message(role:, content:, tool_calls: [])
+      def add_message(role:, content:, tool_calls: [], reasoning: nil)
         return push(kind: :user, text: content.to_s) if role.to_s == "user"
 
-        calls = Array(tool_calls).map { |call| replayed(call) }.select { |value| value }
+        calls = replays_calls? ? Array(tool_calls).map { |call| replayed(call) }.select { |value| value } : []
         if calls.any?
           push(kind: :assistant, text: "", calls: calls)
           push(kind: :results, results: calls.map { |call| { call: call, content: NOT_KEPT, error: false } })
         end
 
-        push(kind: :assistant, text: content.to_s, calls: [])
+        push(kind: :assistant, text: content.to_s, calls: [], reasoning: reasoning.to_s)
       end
 
       def ask(question, &on_chunk)
@@ -81,6 +75,10 @@ module AhoyDashboard
 
       def complete(final:, &emit)
         raise(NotImplementedError)
+      end
+
+      def replays_calls?
+        true
       end
 
       def push(entry)
@@ -101,6 +99,7 @@ module AhoyDashboard
       def run(&on_chunk)
         text = +""
         usage = USAGE.index_with(0)
+        reasoning = []
         stop = :end
 
         MAX_ROUNDS.times do |index|
@@ -113,6 +112,7 @@ module AhoyDashboard
           end
 
           text = joined(text, round.text)
+          reasoning << round.reasoning if round.reasoning.present?
           stop = round.stop
           break if round.calls.empty? || round.stop == :max_tokens || index == MAX_ROUNDS - 1
 
@@ -120,7 +120,7 @@ module AhoyDashboard
           answer_tools(round.calls)
         end
 
-        Message.new(content: text, stop_reason: stop, **usage)
+        Message.new(content: text, stop_reason: stop, reasoning: reasoning.join(PARAGRAPH), **usage)
       end
 
       def emitter(lead, on_chunk)

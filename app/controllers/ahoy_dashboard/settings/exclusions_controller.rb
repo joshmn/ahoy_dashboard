@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Settings
-    class ExclusionsController < AhoyDashboard::BaseController
+    class ExclusionsController < AhoyDashboard::Settings::BaseController
       before_action :set_exclusion, only: [ :edit, :update, :destroy ]
 
       def index
@@ -9,7 +9,6 @@ module AhoyDashboard
           filters: @exclusions.map { |exclusion| exclusion.to_blocks if exclusion.readable? }
         )
         @exclusions.zip(counts).each { |exclusion, count| exclusion.hidden_count = count }
-        @confirming = params[:confirm].presence
       end
 
       def new
@@ -21,10 +20,9 @@ module AhoyDashboard
         @form = AhoyDashboard::ExclusionForm.new(exclusion_params)
         return redraw(:new) if removing?
 
-        AhoyDashboard::Exclusions::CreateCommand.call(form: @form) do
+        AhoyDashboard::Records::SaveCommand.call(record: AhoyDashboard::Exclusion.new, form: @form) do
           on(:ok) { redirect_to settings_exclusions_path, notice: "Exclusion saved." }
           on(:invalid) { |form| rejected(form, :new) }
-          on(:duplicate) { |form| rejected(form, :new) }
         end
       end
 
@@ -37,15 +35,14 @@ module AhoyDashboard
         @form = AhoyDashboard::ExclusionForm.new(exclusion_params)
         return redraw(:edit) if removing?
 
-        AhoyDashboard::Exclusions::UpdateCommand.call(exclusion: @exclusion, form: @form) do
+        AhoyDashboard::Records::SaveCommand.call(record: @exclusion, form: @form) do
           on(:ok) { redirect_to settings_exclusions_path, notice: "Exclusion saved." }
-          on(:invalid) { |form| rejected(form, :edit) }
-          on(:duplicate) { |form| rejected(form, :edit) }
+          on(:invalid) { |form| rejected(form) }
         end
       end
 
       def destroy
-        AhoyDashboard::Exclusions::DestroyCommand.call(exclusion: @exclusion) do
+        AhoyDashboard::Records::DestroyCommand.call(record: @exclusion) do
           on(:ok) { redirect_to settings_exclusions_path, notice: "Exclusion deleted." }
         end
       end
@@ -67,11 +64,10 @@ module AhoyDashboard
         render template
       end
 
-      def rejected(form, template)
+      def rejected(form, template = :edit)
         @form = form
         preview
-
-        render template, status: :unprocessable_entity
+        super
       end
 
       def preview

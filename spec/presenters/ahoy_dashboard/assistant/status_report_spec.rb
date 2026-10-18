@@ -1,14 +1,8 @@
 require "rails_helper"
-require "rake"
-require "support/ahoy_dashboard/installation"
 
 RSpec.describe AhoyDashboard::Assistant::StatusReport do
   it "runs from bin/rails ahoy_dashboard:assistant without raising" do
-    Rails.application.load_tasks unless Rake::Task.task_defined?("ahoy_dashboard:assistant")
-    task = Rake::Task["ahoy_dashboard:assistant"]
-    task.reenable
-
-    expect { task.invoke }.to output(/^enabled: /).to_stdout
+    expect(run_dashboard_task("ahoy_dashboard:assistant")).to match(/^enabled: /)
   end
 
   it "says what it is set up with, and why it is not answering" do

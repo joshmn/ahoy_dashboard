@@ -1,22 +1,15 @@
 module AhoyDashboard
-  # The exit page is the last page view of a session, which no column records,
-  # so it is a distinct on over the visit ordered by time descending.
-  class ExitPagesQuery
+  class ExitPagesQuery < AhoyDashboard::Query
     ALIAS = "dash_exits".freeze
 
-    def self.call(**options)
-      new(**options).call
-    end
+    class << self
+      def join_sql(scope)
+        "left join (#{call(scope: scope).to_sql}) #{ALIAS} on #{ALIAS}.visit_id = ahoy_visits.id"
+      end
 
-    def self.join_sql(scope)
-      "left join (#{call(scope: scope).to_sql}) #{ALIAS} on #{ALIAS}.visit_id = ahoy_visits.id"
-    end
-
-    # A relation whose FROM is the derived table, so a filter can be applied to
-    # the exit path itself. AhoyDashboard.visit is only the carrier for the query: the
-    # FROM is replaced and nothing reads its columns.
-    def self.relation(source)
-      AhoyDashboard.visit.unscoped.from(Arel.sql("(#{new(source: source).call.to_sql}) #{ALIAS}"))
+      def relation(source)
+        AhoyDashboard.visit.unscoped.from(Arel.sql("(#{new(source: source).call.to_sql}) #{ALIAS}"))
+      end
     end
 
     def initialize(scope: nil, source: nil)

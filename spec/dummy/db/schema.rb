@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2026_10_10_153938) do
+ActiveRecord::Schema.define(version: 2026_10_10_153941) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -211,6 +211,7 @@ ActiveRecord::Schema.define(version: 2026_10_10_153938) do
     t.string "error_message"
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
+    t.jsonb "reasoning"
     t.index ["chat_id", "created_at"], name: "index_ahoy_dashboard_chat_messages_on_thread"
     t.index ["chat_id"], name: "index_ahoy_dashboard_chat_messages_on_chat"
   end
@@ -438,7 +439,6 @@ ActiveRecord::Schema.define(version: 2026_10_10_153938) do
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
     t.index ["date", "query", "page", "device", "country"], name: "index_ahoy_dashboard_search_console_rows_on_grain", unique: true
-    t.index ["date"], name: "index_ahoy_dashboard_search_console_rows_on_date"
     t.index ["query"], name: "index_ahoy_dashboard_search_console_rows_on_query"
   end
 
@@ -533,6 +533,7 @@ ActiveRecord::Schema.define(version: 2026_10_10_153938) do
     t.datetime "last_checked_at"
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
+    t.index "lower((query)::text), engine, device, language", name: "index_ahoy_dashboard_serp_keywords_on_folded_search", unique: true
     t.index ["enabled", "last_checked_at"], name: "index_ahoy_dashboard_serp_keywords_on_due"
     t.index ["query", "engine", "device", "language"], name: "index_ahoy_dashboard_serp_keywords_on_search", unique: true
     t.index ["tags"], name: "index_ahoy_dashboard_serp_keywords_on_tags", using: :gin
@@ -601,6 +602,7 @@ ActiveRecord::Schema.define(version: 2026_10_10_153938) do
     t.datetime "checked_at", null: false
     t.datetime "created_at", precision: 6, null: false
     t.datetime "updated_at", precision: 6, null: false
+    t.index ["checked_at"], name: "index_ahoy_dashboard_serp_runs_on_checked_at"
     t.index ["keyword_id", "location", "checked_at"], name: "index_ahoy_dashboard_serp_runs_on_series"
     t.index ["keyword_id"], name: "index_ahoy_dashboard_serp_runs_on_keyword"
     t.index ["query", "location", "checked_at"], name: "index_ahoy_dashboard_serp_runs_on_search"

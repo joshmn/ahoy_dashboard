@@ -2,100 +2,89 @@
 <% content_for :title, row.name %>
 <% content_for :dash_settings_section, "job_runs" %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head back: { url: settings_job_runs_path, label: "Jobs" }, title: row.name,
-          lede: (row.about unless row.blocker),
-          actions: (row.on? ?
-            dash_button_to("Run now", settings_job_run_run_path(row.key), method: :post, tone: :primary,
-                           title: "Run now. The next scheduled run counts from now.") :
-            dash_button("Run now", disabled: true, "aria-describedby": "jr-why-#{row.key}")) %>
+<%= dash_page_head back: { url: settings_job_runs_path, label: "Jobs" }, title: row.name,
+      lede: (row.about unless row.blocker),
+      actions: (row.on? ?
+        dash_button_to("Run now", settings_job_run_run_path(row.key), method: :post, tone: :primary,
+                       title: "Run now. The next scheduled run counts from now.") :
+        dash_button("Run now", disabled: true, "aria-describedby": "jr-why-#{row.key}")) %>
 
-    <% if row.blocker %>
-      <%= dash_notice (row.blocker.not_installed? ? "#{row.name} is not installed." : "#{row.name} is off."), id: "jr-why-#{row.key}",
-            detail: row.blocker.reason,
-            action: (dash_button("Set it up", public_send(row.blocker.fix), data: { tm_frame: "_top" }) if row.blocker.fix) %>
-      <% if row.blocker.not_installed? && row.blocker.commands.any? %>
-        <pre class="mb-3"><code><%= safe_join(row.blocker.commands, "\n") %></code></pre>
-      <% end %>
+<% if row.blocker %>
+  <%= dash_notice (row.blocker.not_installed? ? "#{row.name} is not installed." : "#{row.name} is off."), id: "jr-why-#{row.key}",
+        detail: row.blocker.reason,
+        action: (dash_button("Set it up", public_send(row.blocker.fix), data: { tm_frame: "_top" }) if row.blocker.fix) %>
+  <% if row.blocker.not_installed? && row.blocker.commands.any? %>
+    <pre class="mb-3"><code><%= safe_join(row.blocker.commands, "\n") %></code></pre>
+  <% end %>
+<% end %>
+
+<%= dash_card do %>
+  <%= dash_tiles label: "About this job", ruled: true, compact: true do %>
+    <%= dash_tile "State", dash_badge(row.label, tone: row.tone), status: true %>
+    <%= dash_tile "Runs", row.cadence, status: true %>
+    <%= dash_tile "Last started", dash_ago(row.started_at), status: true %>
+    <%= dash_tile "Last finished", dash_ago(row.finished_at, never: row.ever? ? "Still running" : "Never"), status: true %>
+    <% if row.next_at %>
+      <%= dash_tile "Next due", row.next_label, status: true %>
     <% end %>
+    <%= dash_tile "Times run", number_with_delimiter(row.runs) %>
+  <% end %>
 
-    <%= dash_card do %>
-      <%= dash_tiles label: "About this job", ruled: true, compact: true do %>
-        <%= dash_tile "State", dash_badge(row.label, tone: row.tone), status: true %>
-        <%= dash_tile "Runs", row.cadence, status: true %>
-        <%= dash_tile "Last started", (row.started_at ? dash_ago(row.started_at) : "Never"), status: true %>
-        <%= dash_tile "Last finished",
-              (row.finished_at ? dash_ago(row.finished_at) : (row.ever? ? "Still running" : "Never")), status: true %>
-        <% if row.next_at %>
-          <%= dash_tile "Next due", (row.due? ? "Now" : row.next_at.in_time_zone(AhoyDashboard.time_zone).strftime("%b %-d, %-l:%M %p")), status: true %>
-        <% end %>
-        <%= dash_tile "Times run", number_with_delimiter(row.runs) %>
+  <% if row.failed? && row.error %>
+    <div class="jr-last-error">
+      <%= dash_disclosure "Last error: #{row.error.lines.first.strip}", tone: :danger do %>
+        <pre><%= row.error %></pre>
       <% end %>
+    </div>
+  <% end %>
+<% end %>
 
-      <% if row.failed? && row.error %>
-        <div class="jr-last-error">
-          <%= dash_disclosure "Last error: #{row.error.lines.first.strip}", tone: :danger do %>
-            <pre><%= row.error %></pre>
-          <% end %>
-        </div>
-      <% end %>
-    <% end %>
+<%= dash_card element: :section, class: "mt-3 jr-log", id: "runs", aria: { labelledby: "jr-log-title" } do %>
+  <%= dash_card_header "Runs", id: "jr-log-title" do %>
+    <span class="g-hint">Newest first</span>
+  <% end %>
 
-    <%= dash_card element: :section, class: "mt-3 jr-log", id: "runs", aria: { labelledby: "jr-log-title" } do %>
-      <%= dash_card_header "Runs", id: "jr-log-title" do %>
-        <span class="g-hint">Newest first</span>
-      <% end %>
+  <% if !@presenter.log_ready? %>
+    <%= dash_empty title: "Run history is not set up yet",
+          hint: "Run your app's database migrations to start keeping a record of every run." %>
+  <% elsif @presenter.log.empty? %>
+    <%= dash_empty title: "No runs yet",
+          hint: "Each run shows up here when it starts, with how long it took and any error it hit." %>
+  <% else %>
+    <%= dash_table label: "Runs of #{row.name}", cols: "minmax(180px, 1fr) 120px 116px" do %>
+      <thead>
+        <tr>
+          <th scope="col">Started</th>
+          <th scope="col">Took</th>
+          <th scope="col">Result</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @presenter.log.each do |run| %>
+          <% label, tone = @presenter.result(run) %>
+          <tr>
+            <td class="t-when"><%= @presenter.started_label(run) %> <span class="text-body-tertiary">(<%= dash_ago(run.started_at) %>)</span></td>
+            <td class="t-when"><%= dash_value(@presenter.took(run)) %></td>
+            <td><%= dash_badge label, tone: tone %></td>
+          </tr>
 
-      <% if !@presenter.log_ready? %>
-        <%= dash_empty title: "Run history is not set up yet",
-              hint: "Run your app's database migrations to start keeping a record of every run." %>
-      <% elsif @presenter.log.empty? %>
-        <%= dash_empty title: "No runs yet",
-              hint: "Each run shows up here when it starts, with how long it took and any error it hit." %>
-      <% else %>
-        <%= dash_table label: "Runs of #{row.name}", cols: "minmax(180px, 1fr) 120px 116px" do %>
-          <thead>
-            <tr>
-              <th scope="col">Started</th>
-              <th scope="col">Took</th>
-              <th scope="col">Result</th>
+          <% if run.error.present? %>
+            <tr class="jr-error">
+              <td colspan="3">
+                <%= dash_disclosure run.error.lines.first.strip, tone: :danger do %>
+                  <pre><%= run.error %></pre>
+                <% end %>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            <% @presenter.log.each do |run| %>
-              <% label, tone = @presenter.result(run) %>
-              <tr>
-                <td class="t-when"><%= @presenter.started_label(run) %> <span class="text-body-tertiary">(<%= dash_ago(run.started_at) %>)</span></td>
-                <td class="t-when">
-                  <% if (took = @presenter.took(run)) %>
-                    <%= took %>
-                  <% else %>
-                    <span class="nil">&mdash;</span>
-                  <% end %>
-                </td>
-                <td><%= dash_badge label, tone: tone %></td>
-              </tr>
-
-              <% if run.error.present? %>
-                <tr class="jr-error">
-                  <td colspan="3">
-                    <%= dash_disclosure run.error.lines.first.strip, tone: :danger do %>
-                      <pre><%= run.error %></pre>
-                    <% end %>
-                  </td>
-                </tr>
-              <% end %>
-            <% end %>
-          </tbody>
+          <% end %>
         <% end %>
-
-        <% if @presenter.paged? %>
-          <%= dash_pager @presenter.page_label, label: "Pages of runs",
-                previous: (settings_job_run_path(row.key, page: @presenter.page - 1) if @presenter.page > 1),
-                following: (settings_job_run_path(row.key, page: @presenter.page + 1) if @presenter.page < @presenter.pages) %>
-        <% end %>
-      <% end %>
+      </tbody>
     <% end %>
-  </section>
-</div>
+
+    <% if @presenter.paged? %>
+      <%= dash_pager @presenter.page_label, label: "Pages of runs",
+            previous: (settings_job_run_path(row.key, page: @presenter.page - 1) if @presenter.page > 1),
+            following: (settings_job_run_path(row.key, page: @presenter.page + 1) if @presenter.page < @presenter.pages) %>
+    <% end %>
+  <% end %>
+<% end %>

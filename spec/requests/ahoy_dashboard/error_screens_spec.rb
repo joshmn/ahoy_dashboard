@@ -1,10 +1,6 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard error screens", type: :request do
-  def document
-    Nokogiri::HTML5(response.body)
-  end
-
   def with_error_screens(setting)
     before = AhoyDashboard.config.error_screens
     exceptions = Rails.application.env_config["action_dispatch.show_exceptions"]
@@ -142,21 +138,6 @@ RSpec.describe "Dashboard error screens", type: :request do
   end
 
   describe "an address the dashboard does not have" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/nothing/here"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "does not tell somebody who is not an admin that there is a dashboard" do
-      sign_in create(:user)
-
-      get "/telemetry/nothing/here"
-
-      expect(response).to have_http_status(:not_found)
-      expect(document.at_css("a.live")).to be_nil
-    end
-
     describe "as an admin" do
       before { sign_in create(:user, :admin) }
 

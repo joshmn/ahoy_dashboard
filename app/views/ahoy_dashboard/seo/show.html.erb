@@ -3,7 +3,7 @@
 <%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "seo", site: @site } do %>
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false %>
 
-  <% if @presenter.search_console? %>
+  <% if @presenter.search_console_data? %>
     <% search_console = @presenter.search_console %>
 
     <%= dash_card element: :section, class: "seo-chart-card", "aria-label": "Google search",
@@ -49,9 +49,7 @@
                         <% if row.label.blank? %>
                           <span class="nil"><%= AhoyDashboard::SearchConsole::ANONYMIZED_QUERY %></span>
                         <% else %>
-                          <%= link_to search_console.keyword_path(row.label), class: "seo-link min-w-0", data: { tm_frame: "_top" } do %>
-                            <%= seo_label(row.label) %>
-                          <% end %>
+                          <%= seo_link(row.label, search_console.keyword_path(row.label)) %>
                         <% end %>
                       </div>
                     </td>
@@ -104,14 +102,7 @@
       </div>
     </div>
   <% elsif !@presenter.search_console_installed? %>
-    <%= dash_card element: :section, "aria-label": "Google search" do %>
-      <%= dash_card_header "Google search" do %>
-        <%= dash_badge @presenter.search_console_state.badge, tone: :warning %>
-      <% end %>
-      <div class="p-3">
-        <%= render "ahoy_dashboard/shared/feature_state", state: @presenter.search_console_state %>
-      </div>
-    <% end %>
+    <%= render "ahoy_dashboard/seo/feature_card", title: "Google search", state: @presenter.search_console_state %>
   <% elsif !@presenter.setup? || @presenter.connected? %>
     <%= dash_card do %>
       <%= dash_card_header "Google search" %>
@@ -120,14 +111,7 @@
   <% end %>
 
   <% if !@presenter.rankings_installed? %>
-    <%= dash_card element: :section, class: "mt-3", "aria-label": "Rank tracking" do %>
-      <%= dash_card_header "Rank tracking" do %>
-        <%= dash_badge @presenter.rankings_state.badge, tone: :warning %>
-      <% end %>
-      <div class="p-3">
-        <%= render "ahoy_dashboard/shared/feature_state", state: @presenter.rankings_state %>
-      </div>
-    <% end %>
+    <%= render "ahoy_dashboard/seo/feature_card", title: "Rank tracking", state: @presenter.rankings_state, card_class: "mt-3" %>
   <% elsif @presenter.rankings? %>
     <%= dash_card class: "mt-3" do %>
       <% rank_title = capture do %>Rank tracking<% if @presenter.sample_rankings? %> <%= dash_badge "Sample data", tone: :warning, title: "No search provider is set up yet, so these numbers are made up." %><% end %><% end %>

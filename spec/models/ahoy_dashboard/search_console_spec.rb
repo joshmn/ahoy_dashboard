@@ -1,5 +1,4 @@
 require "rails_helper"
-require "support/ahoy_dashboard/search_console"
 
 RSpec.describe AhoyDashboard::SearchConsole do
   describe ".enabled?" do
@@ -110,10 +109,6 @@ RSpec.describe AhoyDashboard::SearchConsole do
 
     it "re-reads a trailing week on every run" do
       expect(described_class.ingest_dates).to eq((Date.new(2026, 8, 3)..Date.new(2026, 8, 9)).to_a)
-    end
-
-    it "leaves the days after that as the pending tail" do
-      expect(described_class.pending_dates).to eq([ Date.new(2026, 8, 10), Date.new(2026, 8, 11), Date.new(2026, 8, 12) ])
     end
   end
 end

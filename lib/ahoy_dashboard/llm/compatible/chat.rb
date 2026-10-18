@@ -5,6 +5,17 @@ module AhoyDashboard
         DEFAULT_MAX_TOKENS = 4_096
         STOPS = { "stop" => :end, "tool_calls" => :tool_use, "function_call" => :tool_use,
                   "length" => :max_tokens, "content_filter" => :refusal }.freeze
+        INTERRUPTED = {
+          "insufficient_system_resource" => "the provider ran out of capacity partway through the answer",
+          "aborted" => "the provider stopped the answer partway through"
+        }.freeze
+        THINKING = { "type" => "enabled" }.freeze
+
+        def initialize(thinking: false, replays_reasoning: false, **options)
+          super(**options)
+          @thinking = thinking
+          @replays_reasoning = replays_reasoning
+        end
 
         private
 
@@ -12,8 +23,17 @@ module AhoyDashboard
           DEFAULT_MAX_TOKENS
         end
 
+        def replays_calls?
+          !@replays_reasoning
+        end
+
+        def reasoning_required?
+          @replays_reasoning && @thinking && tools.any?
+        end
+
         def complete(final:, &emit)
           content = +""
+          reasoning = +""
           calls = {}
           usage = {}
           finish = nil
@@ -32,21 +52,22 @@ module AhoyDashboard
               emit.call(piece)
             end
 
+            reasoning << delta["reasoning_content"].to_s
             collect(calls, delta["tool_calls"])
           end
 
-          raise Error, "the stream ended before the response finished" if finish.nil?
+          raise Error, LLM::Client::UNFINISHED if finish.nil?
+          raise Error.new(INTERRUPTED.fetch(finish), type: finish) if INTERRUPTED.key?(finish)
 
           assembled = assemble(calls)
           stop = STOPS.fetch(finish.to_s) { raise Error, "unknown model finish reason: #{finish}" }
 
-          Round.new(text: content, calls: assembled, stop: stop,
-                    input_tokens: usage["prompt_tokens"], output_tokens: usage["completion_tokens"])
+          Round.new(text: content, calls: assembled, stop: stop, reasoning: reasoning,
+                    wire: message(text: content, calls: assembled, reasoning: reasoning),
+                    input_tokens: usage["prompt_tokens"], output_tokens: usage["completion_tokens"],
+                    cache_read_tokens: usage["prompt_cache_hit_tokens"] || usage.dig("prompt_tokens_details", "cached_tokens"))
         end
 
-        # Tool calls arrive in pieces keyed by index, with the arguments split
-        # across frames the same way the text is. Nothing can be parsed until the
-        # stream is done, so the fragments are stitched first and parsed after.
         def collect(calls, deltas)
           Array(deltas).each do |delta|
             slot = calls[delta["index"].to_i] ||= { "id" => nil, "name" => +"", "arguments" => +"" }
@@ -82,7 +103,8 @@ module AhoyDashboard
             "stream_options" => { "include_usage" => true },
             "max_tokens" => @max_tokens
           }
-          body["temperature"] = @temperature unless @temperature.nil?
+          body["thinking"] = THINKING if @thinking
+          body["temperature"] = @temperature unless @temperature.nil? || @thinking
           if tools.any?
             body["tools"] = tools.map(&:to_function)
             body["tool_choice"] = final ? "none" : "auto"
@@ -101,7 +123,7 @@ module AhoyDashboard
         def wire(entry)
           case entry[:kind]
           when :user then [ { "role" => "user", "content" => entry[:text] } ]
-          when :assistant then [ assistant(entry) ]
+          when :assistant then [ entry[:wire] || message(text: entry[:text], calls: entry[:calls], reasoning: entry[:reasoning]) ]
           when :results
             entry[:results].map do |result|
               { "role" => "tool", "tool_call_id" => result[:call].id, "content" => result[:content] }
@@ -109,12 +131,13 @@ module AhoyDashboard
           end
         end
 
-        def assistant(entry)
-          message = { "role" => "assistant", "content" => entry[:text].presence }
-          return message.merge("content" => entry[:text].to_s) if entry[:calls].empty?
+        def message(text:, calls:, reasoning:)
+          message = { "role" => "assistant", "content" => calls.empty? ? text.to_s : text.presence }
+          message["reasoning_content"] = reasoning.to_s if reasoning.present? || reasoning_required?
+          return message if calls.empty?
 
           message.merge(
-            "tool_calls" => entry[:calls].map do |call|
+            "tool_calls" => calls.map do |call|
               { "id" => call.id, "type" => "function",
                 "function" => { "name" => call.name, "arguments" => JSON.generate(call.arguments) } }
             end

@@ -1,10 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Keywords::FetchCommand do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 20, 9, 0) }
+  let(:now) { dash_time(2026, 8, 20, 9, 0) }
   let(:endpoint) { AhoyDashboard::Serp::Adapters::DataForSeoAdapter::KEYWORD_ENDPOINT }
   let!(:provider) do
     create(:dash_serp_provider, name: "dataforseo", monthly_cap_units: 10, units_spent: 3,
@@ -31,8 +28,8 @@ RSpec.describe AhoyDashboard::Keywords::FetchCommand do
   end
 
   def saved_idea(query, provider: "dataforseo", location: "us", language: "en")
-    AhoyDashboard::KeywordIdea.create!(seed: "visiting", query: query, location: location, language: language,
-                                       provider: provider, fetched_at: now - 1.day)
+    create(:dash_keyword_idea, seed: "visiting", query: query, location: location, language: language,
+           provider: provider, fetched_at: now - 1.day)
   end
 
   it "counts what the lookup cost against the provider's ceiling" do
@@ -64,6 +61,26 @@ RSpec.describe AhoyDashboard::Keywords::FetchCommand do
     events = described_class.call(seed: "visiting")
 
     expect(events).to have_key(:failed)
+    expect(provider.reload.spent_this_month).to eq(3)
+  end
+
+  it "fails on a refused login rather than calling it a quota" do
+    stub_request(:post, endpoint).to_return(status: 401, body: { "status_code" => 40_100, "status_message" => "Unauthorized." }.to_json)
+
+    events = described_class.call(seed: "visiting")
+
+    expect(events[:failed]).to eq("Unauthorized.")
+    expect(events).not_to have_key(:rate_limited)
+    expect(provider.reload.last_error).to eq("Unauthorized.")
+    expect(provider.spent_this_month).to eq(3)
+  end
+
+  it "reads a used up balance as a quota" do
+    stub_request(:post, endpoint).to_return(status: 200, body: dataforseo_body(task_status: 40_202).to_json)
+
+    events = described_class.call(seed: "visiting")
+
+    expect(events).to have_key(:rate_limited)
     expect(provider.reload.spent_this_month).to eq(3)
   end
 

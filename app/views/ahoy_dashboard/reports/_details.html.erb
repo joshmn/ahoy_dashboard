@@ -1,37 +1,14 @@
-<% term = dash_search_term(params[:q]) %>
-<% page = presenter.page %>
+<% term = presenter.term.to_s %>
 <% chip = dash_chip_kind(presenter.dimension.key) %>
 <% mono = dash_mono_dimension?(presenter.dimension.key) %>
-<%# The term rides along on every link this list builds, and the presenter
-    carries the rest, including which custom property the card is grouping by. A
-    page forward that dropped either one would quietly answer a different
-    question than the one on screen. %>
-<% carried = term.present? ? { q: term } : {} %>
-<% cleared = presenter.details_params.except(:q, :page) %>
-
-<%# The card's own header controls, in a row of their own inside the frame.
-
-    Two things were wrong with them in the dialog's header. They were static
-    markup rendered once with the dashboard, so the tab marked was the report's
-    default rather than the one on screen; and they were the tabs alone, so the
-    dialog could not do the two things the card behind it can — group by a
-    different reading of the dimension, or by a different custom property. Every
-    control the card has, the dialog has, with the same partials behind them.
-
-    All the tabs, rather than the card's two and an overflow: the row is the full
-    width of the dialog and has room for them. `view` is what keeps a click in
-    the dialog instead of coming back as the card. %>
-<% details_view = { view: AhoyDashboard::ReportPresenter::DETAILS_VIEW } %>
 <% properties = presenter.property_options %>
-<% breakdowns = tab.breakdown_options %>
+<% breakdowns = presenter.breakdown_options %>
 
 <% if report.tabs.many? || properties.any? || breakdowns.many? %>
   <div class="m-views">
     <% if report.tabs.many? %>
-      <%= dash_tabs report.tabs.map { |card_tab|
-            { label: card_tab.label,
-              url: report_path(report.key, query.to_query.merge(tab: card_tab.key).merge(details_view)),
-              current: card_tab.key == tab.key,
+      <%= dash_tabs presenter.tabs.map { |option|
+            { label: option.label, url: option.path, current: option.active?,
               data: { tm_frame: presenter.details_frame_id } }
           },
           label: "Views of #{report.title.downcase}", class: "m-views__tabs" %>
@@ -41,11 +18,11 @@
       <div class="m-views__pickers">
         <% if properties.any? %>
           <%= render "ahoy_dashboard/reports/property_picker",
-                report: report, presenter: presenter, scope: "modal", extra: details_view %>
+                report: report, presenter: presenter, scope: "modal" %>
         <% end %>
 
         <%= render "ahoy_dashboard/reports/breakdown_picker",
-              report: report, tab: tab, scope: "modal", extra: details_view %>
+              report: report, presenter: presenter, scope: "modal" %>
       </div>
     <% end %>
   </div>
@@ -58,34 +35,16 @@
         data: { tm_frame: presenter.details_frame_id },
         html: { role: "search", "aria-label": "Search #{report.title.downcase}" } do %>
     <%= render "ahoy_dashboard/shared/query_fields" %>
-<%# Everything the card is holding that the query itself does not carry: the tab,
-    which breakdown, which custom property, and that this is the details view.
-    Read off the presenter rather than listed here, so a card that learns to
-    carry something new keeps it through a search without being told twice. %>
-    <% presenter.details_params.except(*query.to_query.keys, :page, :q).each do |name, value| %>
-      <%= hidden_field_tag name, value, id: nil %>
-    <% end %>
+    <%= dash_hidden_fields presenter.details_params.except(*query.to_query.keys, :page, :q) %>
 
     <%= dash_icon(:search, size: 15) %>
-    <label class="visually-hidden" for="tm-search-<%= report.key %>">
-      Find a row in <%= report.title.downcase %>
-    </label>
-    <input class="form-control"
-           type="search"
-           id="tm-search-<%= report.key %>"
-           name="q"
-           value="<%= term %>"
-           placeholder="Search <%= tab.label_column.downcase.pluralize %>&hellip;"
-           autocomplete="off"
-           spellcheck="false">
+    <%= dash_search_field :q, term, label: "Find a row in #{report.title.downcase}", id: "tm-search-#{report.key}",
+          size: :md, placeholder: "Search #{tab.label_column.downcase.pluralize}\u2026", spellcheck: false %>
     <kbd>esc</kbd>
   <% end %>
 </div>
 
-<%# The full list is the same row the card draws, at the same height, rather than
-    a table of every metric. One value per line is what somebody is here to find;
-    the four columns live in Explore, which the foot links to. %>
-<div class="modal-body m-list">
+<%= dash_dialog_body list: true do %>
   <% if presenter.empty? %>
     <% if presenter.no_properties? %>
       <%= dash_empty "No custom properties in this range", compact: true,
@@ -94,8 +53,7 @@
       <%= dash_empty "Nothing matches that", compact: true,
             hint: "No #{presenter.label_heading.downcase.pluralize} here contain \u201C#{term}\u201D. Try a shorter search." %>
     <% else %>
-      <%= dash_empty "Nothing here for this range", compact: true,
-            hint: query.filters.any? ? "Try a wider date range, or drop one of the filters." : "Try a wider date range." %>
+      <%= dash_empty "Nothing here for this range", compact: true, hint: dash_range_hint %>
     <% end %>
   <% else %>
     <% presenter.rows.each do |row| %>
@@ -106,10 +64,7 @@
             "aria-current": (current ? "true" : nil),
             data: { tm_frame: "_top" } do %>
         <%= dash_bar_tag(row.share, inset: 110) %>
-        <span class="<%= class_names("rn", "mono" => mono) %>">
-          <%= dash_row_chip(chip, row.label) if chip %>
-          <%= dash_row_label(row.display_label, split: mono) %>
-        </span>
+        <%= dash_row_name row.display_label, chip: chip, chip_label: row.label, mono: mono %>
         <% if row.percent %>
           <span class="pct" title="<%= presenter.percent_title %>"><%= row.percent %></span>
         <% end %>
@@ -120,44 +75,36 @@
       <% end %>
     <% end %>
   <% end %>
-</div>
+<% end %>
 
-<%# Says what is on screen rather than how many there are altogether, which the
-    query cannot answer without counting the whole breakdown a second time. With
-    a term it says so, because a count that dropped from four hundred to three
-    without explaining itself reads as data going missing. %>
 <% count = capture do %><%= presenter.count_label %><% if term.present? %> matching &ldquo;<%= term %>&rdquo;<% end %><% end %>
 <%= dash_dialog_footer count do %>
     <% if term.present? %>
       <%= dash_button "Clear search",
-            report_path(report.key, cleared),
+            presenter.clear_search_path,
             tone: :link,
             data: { tm_frame: presenter.details_frame_id, tm_role: "clear" } %>
     <% end %>
 
-    <% if page > 1 %>
+    <% if presenter.previous_path %>
       <%= dash_button "Previous",
-            report_path(report.key, presenter.details_params(page - 1).merge(carried)),
+            presenter.previous_path,
             tone: :link,
             icon: :chevron_left,
             data: { tm_frame: presenter.details_frame_id, tm_role: "pager" } %>
     <% end %>
 
-    <% if presenter.more? %>
+    <% if presenter.next_path %>
       <%= dash_button "Next",
-            report_path(report.key, presenter.details_params(page + 1).merge(carried)),
+            presenter.next_path,
             tone: :link,
             icon_end: :chevron_right,
             data: { tm_frame: presenter.details_frame_id, tm_role: "pager" } %>
     <% end %>
 
-<%# Out of the dialog and onto a page where the grouping, the columns and the
-    range are all editable. _top because this frame is inside the modal. %>
     <%= dash_button "Open in Explore", presenter.explore_path, tone: :link, icon_end: :expand,
           data: { tm_frame: "_top" } %>
 
-<%# No term on the export. The CSV endpoint reads the card, not the search box,
-    and a link that carried a term it ignores would promise a filtered download. %>
     <%= dash_button "CSV", presenter.export_path, tone: :link, icon: :download,
           data: { tm_frame: "_top" } %>
 <% end %>

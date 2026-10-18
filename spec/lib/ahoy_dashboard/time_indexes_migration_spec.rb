@@ -1,33 +1,19 @@
 require "rails_helper"
 
-class DashboardIndexTestRecord < ActiveRecord::Base
-  self.abstract_class = true
-end
-
 RSpec.describe "Dashboard time indexes on host tables" do
   self.use_transactional_tests = false
-  let(:connection) { DashboardIndexTestRecord.connection }
+  let(:connection) { DashboardIsolatedRecord.connection }
 
   around do |example|
-    configuration = if ActiveRecord::Base.respond_to?(:connection_db_config)
-      ActiveRecord::Base.connection_db_config.configuration_hash
-    else
-      ActiveRecord::Base.connection_config
+    with_isolated_schema("dashboard_time_indexes_test") do |isolated|
+      isolated.create_table(:ahoy_visits) { |table| table.datetime(:started_at) }
+      isolated.create_table(:ahoy_events) { |table| table.datetime(:time) }
+      example.run
     end
-    DashboardIndexTestRecord.establish_connection(configuration)
-    connection.execute("CREATE SCHEMA dashboard_time_indexes_test")
-    connection.schema_search_path = "dashboard_time_indexes_test"
-    connection.create_table(:ahoy_visits) { |table| table.datetime(:started_at) }
-    connection.create_table(:ahoy_events) { |table| table.datetime(:time) }
-    example.run
-  ensure
-    connection.execute("DROP SCHEMA IF EXISTS dashboard_time_indexes_test CASCADE")
-    DashboardIndexTestRecord.remove_connection
   end
 
   def migrate
-    path = AhoyDashboard::Engine.root.join("db/migrate/core/add_ahoy_dashboard_indexes_to_ahoy.rb")
-    load(path.to_s) unless defined?(AddAhoyDashboardIndexesToAhoy)
+    engine_migration("core/add_ahoy_dashboard_indexes_to_ahoy.rb")
     ActiveRecord::Migration.suppress_messages do
       AddAhoyDashboardIndexesToAhoy.new.exec_migration(connection, :up)
     end
@@ -47,7 +33,7 @@ RSpec.describe "Dashboard time indexes on host tables" do
 
     migrate
 
-    expect(connection.indexes(:ahoy_events).map(&:name)).to eq(["host_complete_time"])
+    expect(connection.indexes(:ahoy_events).map(&:name)).to eq([ "host_complete_time" ])
   end
 
   it "leaves a failed concurrent host build alone" do
@@ -59,8 +45,7 @@ RSpec.describe "Dashboard time indexes on host tables" do
 
     migrate
 
-    expect(connection.select_value("SELECT indisvalid FROM pg_index WHERE indexrelid = 'host_failed_time'::regclass"))
-      .to be(false)
+    expect(index_valid?(connection, "host_failed_time")).to be(false)
   end
 
   it "refuses a host object occupying an engine name with a different definition" do

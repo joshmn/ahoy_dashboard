@@ -1,17 +1,10 @@
 require "rails_helper"
 
 RSpec.describe "Dashboard seo numbers", type: :request do
-  include ActiveSupport::Testing::TimeHelpers
-
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
   let(:key) { AhoyDashboard::Seo::BrandTerms::KEY }
 
   around { |example| travel_to(now) { example.run } }
-  after { AhoyDashboard::Setting.clear(key) }
-
-  def document
-    Nokogiri::HTML5(response.body)
-  end
 
   def stored!(days: 5)
     days.times do |back|

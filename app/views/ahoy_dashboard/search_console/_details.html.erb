@@ -1,26 +1,18 @@
-<%# The panel lays its own children out, and the frame above is display: contents
-    for that reason. The scope the tick-all box and the row boxes share has to be
-    the same kind of nothing, or the list stops scrolling inside the dialog. %>
 <div class="sc-scope" data-controller="dash--check-all">
 
 <div class="m-views">
-  <%= dash_tabs AhoyDashboard::SearchConsolePresenter::TABS.map { |key, config|
-        { label: config[:label],
-          url: search_console_path(query.to_query.merge(tab: key, view: AhoyDashboard::SearchConsolePresenter::DETAILS_VIEW)),
-          current: key == presenter.tab,
+  <%= dash_tabs presenter.tabs.map { |option|
+        { label: option.label, url: option.path, current: option.active?,
           data: { tm_frame: AhoyDashboard::SearchConsolePresenter::DETAILS_FRAME } }
       },
-      label: "Views of #{AhoyDashboard::SearchConsolePresenter::TITLE.downcase}", class: "m-views__tabs" %>
+      label: "Views of #{presenter.title.downcase}", class: "m-views__tabs" %>
 </div>
 
 <% unless presenter.unconfigured? || presenter.empty? %>
   <%= render "ahoy_dashboard/search_console/columns", presenter: presenter %>
 <% end %>
 
-<%# Same list the card draws, at the dialog's height, with the notes moved into
-    the foot. Search Console is the one card that has to explain itself, and the
-    explanation reads better under the rows than above them. %>
-<div class="modal-body m-list">
+<%= dash_dialog_body list: true do %>
   <% if presenter.unconfigured? %>
     <%= render "ahoy_dashboard/search_console/unconnected" %>
   <% elsif presenter.empty? %>
@@ -29,7 +21,7 @@
     <%= render partial: "ahoy_dashboard/search_console/line", collection: presenter.rows, as: :row,
           locals: { presenter: presenter, form: presenter.track_form_id } %>
   <% end %>
-</div>
+<% end %>
 
 <% if presenter.problem_note.present? %>
   <p class="m-note small text-body-secondary">

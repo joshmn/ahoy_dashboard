@@ -9,10 +9,6 @@ RSpec.describe AhoyDashboard::SearchConsoleRow do
     }
   end
 
-  it "sits on the prefixed table" do
-    expect(described_class.table_name).to eq("ahoy_dashboard_search_console_rows")
-  end
-
   describe ".absorb" do
     it "writes nothing and counts nothing for an empty batch" do
       expect(described_class.absorb([])).to eq(0)
@@ -25,8 +21,6 @@ RSpec.describe AhoyDashboard::SearchConsoleRow do
       expect(described_class.count).to eq(1)
     end
 
-    # Google revises the last few days under you, so a second run over the same
-    # window has to rewrite rather than duplicate or blow up.
     it "rewrites a row it has already seen instead of duplicating it" do
       described_class.absorb([ row ])
       described_class.absorb([ row.merge(clicks: 9, impressions: 200) ])
@@ -42,10 +36,6 @@ RSpec.describe AhoyDashboard::SearchConsoleRow do
       expect(described_class.count).to eq(2)
     end
 
-    # The unique index is a btree and a btree key stops at 2704 bytes. An upsert
-    # is one statement, so a single row over that took the whole batch with it and
-    # the day landed empty. The text has to be genuinely incompressible: a btree
-    # compresses a repeated character and 3,000 of them fit.
     describe "a row whose key is too long for the index" do
       let(:huge) { row.merge(query: SecureRandom.alphanumeric(2_800)) }
 
@@ -65,6 +55,17 @@ RSpec.describe AhoyDashboard::SearchConsoleRow do
         described_class.absorb([ huge ])
 
         expect(Rails.logger).to have_received(:warn).with(/search console row dropped/)
+      end
+
+      it "names both halves of the key and their size in the log" do
+        allow(Rails.logger).to receive(:warn)
+
+        described_class.absorb([ huge ])
+
+        expect(Rails.logger).to have_received(:warn).with(
+          "search console row dropped for 2026-08-10, query and page are " \
+          "#{huge[:query].bytesize + huge[:page].bytesize} bytes and the index holds 2500: #{huge[:query].truncate(60)}"
+        )
       end
 
       it "keeps a long key that the index can still hold" do
@@ -89,10 +90,6 @@ RSpec.describe AhoyDashboard::SearchConsoleRow do
       range = Date.new(2026, 8, 5).beginning_of_day..Date.new(2026, 8, 15).end_of_day
 
       expect(described_class.in_range(range).pluck(:clicks)).to eq([ 50 ])
-    end
-
-    it "ranks by clicks" do
-      expect(described_class.ranked.pluck(:clicks)).to eq([ 50, 5, 1 ])
     end
   end
 end

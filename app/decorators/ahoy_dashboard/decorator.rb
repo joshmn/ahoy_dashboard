@@ -1,12 +1,9 @@
 module AhoyDashboard
   class Decorator
+    DATE = "%-d %b".freeze
+
     delegate_missing_to :@object
 
-    # delegate_missing_to can't catch to_param: ActiveSupport defines it on
-    # Object (as to_s), so it's never "missing", and url helpers given a
-    # decorated record build hrefs from the decorator's inspect string.
-    # to_model and to_partial_path ride along so form and render helpers treat
-    # the decorator as the record.
     delegate :to_param, :to_model, :to_partial_path, to: :@object
 
     def initialize(object)
@@ -19,6 +16,18 @@ module AhoyDashboard
 
     def object
       @object
+    end
+
+    def dates
+      return "Created #{on(created_at)}" if created_at.to_i == updated_at.to_i
+
+      "Created #{on(created_at)}, last updated #{on(updated_at)}"
+    end
+
+    private
+
+    def on(time)
+      time.in_time_zone(AhoyDashboard.time_zone).strftime(DATE)
     end
   end
 end

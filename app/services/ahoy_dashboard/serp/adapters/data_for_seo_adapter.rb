@@ -9,6 +9,7 @@ module AhoyDashboard
         QUOTA_CODES = [ 40_200, 40_202, 40_203, 40_402 ].freeze
 
         MAX_DEPTH = 200
+        MAX_LIMIT = 1_000
         ORGANIC = "organic".freeze
         AI_OVERVIEW = "ai_overview".freeze
 
@@ -40,18 +41,6 @@ module AhoyDashboard
             COUNTRIES
           end
 
-          def configured?
-            credential_keys.all? { |key| Serp.credential(:dataforseo, key).present? }
-          end
-
-          # One request takes the whole depth, so five pages is one call rather
-          # than five. The cap counts requests, which is what a page of results
-          # costs everywhere, so a deep read here is cheaper than the same read
-          # through a provider that pages.
-          def paginates?
-            false
-          end
-
           def keyword_cost_units
             2
           end
@@ -60,19 +49,20 @@ module AhoyDashboard
             2
           end
 
+          def keywords?
+            true
+          end
+
+          def backlinks?
+            true
+          end
+
           def requests_for(pages: 1)
             depth = pages.to_i.clamp(1, Serp::MAX_PAGES) * Serp::RESULTS_PER_PAGE
 
             [ BaseAdapter::Request.new(page: 1, start: 0, depth: depth.clamp(1, MAX_DEPTH)) ]
           end
 
-          # Nothing this one returns is at the top level. The inherited trim
-          # slices keys like organic_results off the root, and this payload's
-          # root is version, status_code, tasks, so that slice matched nothing
-          # and every reading stored an empty response while raw_bytes went on
-          # recording the real size. Everything worth keeping is one array of
-          # typed items three levels down, and the parser reads it from exactly
-          # that path, so the path is what gets kept.
           def trim(payload)
             return {} if payload.blank?
 
@@ -92,36 +82,25 @@ module AhoyDashboard
           end
         end
 
-        # The one provider in this list that sells all three. Positions come off
-        # the serp endpoint above, and these two are separate products on the
-        # same account, which is the whole reason they are worth having here:
-        # another method rather than another vendor, another bill and another set
-        # of credentials.
         KEYWORD_ENDPOINT = "https://api.dataforseo.com/v3/dataforseo_labs/google/keyword_ideas/live".freeze
         DIFFICULTY_ENDPOINT = "https://api.dataforseo.com/v3/dataforseo_labs/google/bulk_keyword_difficulty/live".freeze
         BACKLINK_ENDPOINT = "https://api.dataforseo.com/v3/backlinks/referring_domains/live".freeze
         ANCHOR_ENDPOINT = "https://api.dataforseo.com/v3/backlinks/anchors/live".freeze
 
-        def keywords?(*forwarded_arguments, **forwarded_keywords, &forwarded_block)
-          true
-        end
-
-        def backlinks?(*forwarded_arguments, **forwarded_keywords, &forwarded_block)
-          true
+        def initialize(login: nil, password: nil)
+          super()
+          @login = login.presence || Serp.credential(:dataforseo, :login)
+          @password = password.presence || Serp.credential(:dataforseo, :password)
         end
 
         def keywords(seed:, location: nil, language: Serp::DEFAULT_LANGUAGE, limit: 100)
-          require_login!
+          require_credentials!
           place = Location.parse(location)
-          payload = post_json(KEYWORD_ENDPOINT, basic_auth: [ login, password ], body: [ {
-            keywords: [ seed.to_s ],
-            location_name: location_name(place),
-            language_code: language,
-            limit: limit.to_i.clamp(1, 1_000),
-            order_by: [ "keyword_info.search_volume,desc" ]
-          } ])
+          payload = post_task(KEYWORD_ENDPOINT, keywords: [ seed.to_s ], location_name: location_name(place),
+                                                language_code: language, limit: capped(limit),
+                                                order_by: [ "keyword_info.search_volume,desc" ])
 
-          ideas = Array(payload.dig("tasks", 0, "result", 0, "items")).map do |item|
+          ideas = items_in(payload).map do |item|
             query = item["keyword"]
             next if query.blank?
 
@@ -140,70 +119,37 @@ module AhoyDashboard
         end
 
         def backlinks(domain:, limit: 100)
-          require_login!
+          require_credentials!
           domains, total = referring_domains(domain, limit)
 
           { domains: domains, anchors: anchors(domain, limit), total: total }
-        end
-
-        def initialize(login: nil, password: nil)
-          super()
-          @login = login.presence || Serp.credential(:dataforseo, :login)
-          @password = password.presence || Serp.credential(:dataforseo, :password)
-        end
-
-        def search(query:, location: nil, request: nil, device: Serp::DEFAULT_DEVICE,
-                   language: Serp::DEFAULT_LANGUAGE, engine: Serp::DEFAULT_ENGINE)
-          require_login!
-
-          request ||= first_request
-          place = Location.parse(location)
-          body = [ task(query, place, request, device, language) ]
-          payload = post_json(ENDPOINT, body: body, basic_auth: [ login, password ])
-
-          parse_payload(payload, query: query, location: place, request: request, device: device,
-                                 language: language, engine: engine)
-        end
-
-        def parse_payload(payload, query:, location: nil, request: nil, device: Serp::DEFAULT_DEVICE,
-                          language: Serp::DEFAULT_LANGUAGE, engine: Serp::DEFAULT_ENGINE)
-          request ||= first_request
-          items = items_in(payload)
-
-          Result.new(
-            provider: provider_name, engine: engine, query: query, location: Location.parse(location),
-            device: device, language: language, page: request.page, start: request.start,
-            organic: organic_from(entries(items), request: request),
-            ai_overview: ai_overview(items),
-            provider_search_id: payload.dig("tasks", 0, "id"),
-            cost_units: 1,
-            raw: payload
-          )
         end
 
         private
 
         attr_reader :login, :password
 
-        def require_login!
+        def require_credentials!
           raise AuthError, "no dataforseo login is configured" if login.blank? || password.blank?
         end
 
-        # The ideas endpoint does not always carry a difficulty, and the bulk one
-        # answers a hundred at a time for a fraction of a request. Asked for in
-        # one go rather than per keyword, and a failure here leaves the volumes
-        # intact rather than losing the whole lookup over a column.
+        def fetch_payload(query:, place:, request:, device:, language:, engine:)
+          post_task(ENDPOINT, keyword: query, location_name: location_name(place), language_code: language,
+                              device: device, depth: request.depth)
+        end
+
+        def post_task(endpoint, task)
+          post_json(endpoint, basic_auth: [ login, password ], body: [ task ])
+        end
+
         def difficulty_for(ideas, place, language)
           missing = ideas.reject(&:difficulty).first(1_000).map(&:query)
           return ideas if missing.empty?
 
-          payload = post_json(DIFFICULTY_ENDPOINT, basic_auth: [ login, password ], body: [ {
-            keywords: missing, location_name: location_name(place), language_code: language
-          } ])
+          payload = post_task(DIFFICULTY_ENDPOINT, keywords: missing, location_name: location_name(place),
+                                                   language_code: language)
 
-          scores = Array(payload.dig("tasks", 0, "result", 0, "items")).map { |item|
-            [ item["keyword"], item["keyword_difficulty"] ]
-          }.to_h
+          scores = items_in(payload).map { |item| [ item["keyword"], item["keyword_difficulty"] ] }.to_h
 
           ideas.map { |idea| idea.difficulty ? idea : idea.with(difficulty: scores[idea.query]&.to_i) }
         rescue Error
@@ -211,12 +157,10 @@ module AhoyDashboard
         end
 
         def referring_domains(domain, limit)
-          payload = post_json(BACKLINK_ENDPOINT, basic_auth: [ login, password ], body: [ {
-            target: domain, limit: limit.to_i.clamp(1, 1_000), order_by: [ "rank,desc" ],
-            backlinks_status_type: "live"
-          } ])
+          payload = post_task(BACKLINK_ENDPOINT, target: domain, limit: capped(limit), order_by: [ "rank,desc" ],
+                                                 backlinks_status_type: "live")
 
-          referrers = Array(payload.dig("tasks", 0, "result", 0, "items")).map do |item|
+          referrers = items_in(payload).map do |item|
             host = item["domain"]
             next if host.blank?
 
@@ -228,15 +172,13 @@ module AhoyDashboard
             )
           end.select { |value| value }
 
-          [ referrers, payload.dig("tasks", 0, "result", 0, "total_count")&.to_i ]
+          [ referrers, result_in(payload)["total_count"]&.to_i ]
         end
 
         def anchors(domain, limit)
-          payload = post_json(ANCHOR_ENDPOINT, basic_auth: [ login, password ], body: [ {
-            target: domain, limit: limit.to_i.clamp(1, 1_000), order_by: [ "backlinks,desc" ]
-          } ])
+          payload = post_task(ANCHOR_ENDPOINT, target: domain, limit: capped(limit), order_by: [ "backlinks,desc" ])
 
-          Array(payload.dig("tasks", 0, "result", 0, "items")).map do |item|
+          items_in(payload).map do |item|
             text = item["anchor"]
             next if text.blank?
 
@@ -247,25 +189,16 @@ module AhoyDashboard
           nil
         end
 
+        def capped(limit)
+          limit.to_i.clamp(1, MAX_LIMIT)
+        end
+
         def parse_date(value)
           value.present? ? Date.parse(value.to_s) : nil
-        rescue Date::Error
+        rescue ArgumentError
           nil
         end
 
-        def task(query, place, request, device, language)
-          {
-            keyword: query,
-            location_name: location_name(place),
-            language_code: language,
-            device: device,
-            depth: request.depth
-          }
-        end
-
-        # A city is written the same way here as everywhere else. A country is
-        # not: this one wants the name rather than the code, and a code nobody
-        # mapped is refused rather than quietly searched from the wrong country.
         def location_name(place)
           return place.canonical_name if place.city?
 
@@ -275,12 +208,20 @@ module AhoyDashboard
           end
         end
 
-        def items_in(payload)
-          Array(payload.dig("tasks", 0, "result", 0, "items"))
+        def result_in(payload)
+          payload.dig("tasks", 0, "result", 0) || {}
         end
 
-        def entries(items)
-          items.select { |item| item["type"] == ORGANIC }.map do |item|
+        def items_in(payload)
+          Array(result_in(payload)["items"])
+        end
+
+        def search_id(payload)
+          payload.dig("tasks", 0, "id")
+        end
+
+        def entries(payload)
+          items_in(payload).select { |item| item["type"] == ORGANIC }.map do |item|
             {
               position: item["rank_absolute"] || item["rank_group"],
               link: item["url"],
@@ -290,8 +231,8 @@ module AhoyDashboard
           end
         end
 
-        def ai_overview(items)
-          overview = items.find { |item| item["type"] == AI_OVERVIEW }
+        def ai_overview(payload)
+          overview = items_in(payload).find { |item| item["type"] == AI_OVERVIEW }
           return AiOverview.absent if overview.blank?
 
           sources = sources_from(overview)

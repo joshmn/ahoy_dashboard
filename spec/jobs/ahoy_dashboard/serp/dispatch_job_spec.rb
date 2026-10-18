@@ -1,13 +1,10 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe AhoyDashboard::Serp::DispatchJob do
   let(:site) { create(:dash_serp_site) }
 
   def tracked(**attributes)
-    keyword = create(:dash_serp_keyword, **attributes)
-    create(:dash_serp_keyword_target, keyword: keyword, site: site)
-    keyword
+    create(:dash_serp_keyword, :tracked, site: site, **attributes)
   end
 
   before { serp_enabled! }

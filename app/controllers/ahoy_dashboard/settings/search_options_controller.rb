@@ -1,19 +1,18 @@
 module AhoyDashboard
   module Settings
-    class SearchOptionsController < AhoyDashboard::BaseController
+    class SearchOptionsController < AhoyDashboard::Settings::BaseController
       requires_installed :serp, :keywords, :backlinks
+
+      include AhoyDashboard::SerpProvidersScreen
 
       def update
         @options = AhoyDashboard::SearchOptionsForm.new(options_params)
 
-        AhoyDashboard::SearchOptions::UpdateCommand.call(form: @options) do
+        AhoyDashboard::Preferences::UpdateCommand.call(form: @options) do
           on(:ok) { redirect_to settings_serp_providers_path(anchor: "search-options"), notice: "Saved." }
           on(:invalid) do |form|
-            @options = form
-            @records = AhoyDashboard::SerpProvider.ordered.index_by(&:name)
-            @names = AhoyDashboard::SerpProvider::NAMES
-            @active = AhoyDashboard::Serp.provider.to_s
-            render "ahoy_dashboard/settings/serp_providers/index", status: :unprocessable_entity
+            load_serp_providers_screen(options: form)
+            render "ahoy_dashboard/settings/serp_providers/index", status: 422
           end
         end
       end

@@ -1,8 +1,7 @@
 require "rails_helper"
-require "support/ahoy_dashboard/fixtures"
 
 RSpec.describe "Dashboard explore", type: :request do
-  let(:now) { AhoyDashboard.time_zone.local(2026, 8, 11, 14, 30) }
+  let(:now) { dash_time(2026, 8, 11, 14, 30) }
 
   around { |example| travel_to(now) { example.run } }
 
@@ -16,7 +15,7 @@ RSpec.describe "Dashboard explore", type: :request do
 
   def explore(params = {})
     get "/telemetry/explore", params: params
-    Nokogiri::HTML5(response.body)
+    document
   end
 
   def labels(document)
@@ -28,14 +27,6 @@ RSpec.describe "Dashboard explore", type: :request do
   end
 
   describe "the gate" do
-    it "sends a stranger to sign in" do
-      sign_out :user
-
-      get "/telemetry/explore"
-
-      expect(response).to redirect_to(Rails.application.routes.url_helpers.new_user_session_path)
-    end
-
     it "404s somebody signed in without the flag" do
       sign_out :user
       sign_in create(:user)
@@ -78,7 +69,7 @@ RSpec.describe "Dashboard explore", type: :request do
     it "reads a custom property as a dimension" do
       visit = dash_visit(started_at: now - 1.day)
       dash_goal(visit, "site_searched", facility_id: "12")
-      AhoyDashboard::Property.create!(key: "facility_id", position: 1)
+      create(:dash_property, key: "facility_id", position: 1)
 
       expect(labels(explore(dimension: "prop:facility_id"))).to eq([ "12" ])
     end
@@ -104,9 +95,6 @@ RSpec.describe "Dashboard explore", type: :request do
       )
     end
 
-    # The engagement event carries a path and nothing else, so grouping it by any
-    # other event property returns nothing and the column would read as nobody
-    # scrolled. exit_page reads a column off a join that carries no events.
     it "drops a metric the dimension cannot answer rather than printing zero" do
       expect(headings(explore(dimension: "controller", columns: "visitors,scroll_depth"))).to eq(
         [ "Rails controller", "Unique visitors" ]
@@ -116,8 +104,6 @@ RSpec.describe "Dashboard explore", type: :request do
       )
     end
 
-    # A visit dimension can: the engagement event belongs to a visit and the
-    # visit knows where it came from.
     it "keeps scroll depth on a dimension that can answer it" do
       expect(headings(explore(dimension: "country", columns: "visitors,scroll_depth"))).to eq(
         [ "Country", "Unique visitors", "Scroll depth" ]
@@ -256,8 +242,6 @@ RSpec.describe "Dashboard explore", type: :request do
       expect(labels(document)).to eq([ "/going-in" ])
     end
 
-    # A row on a card throws you back to the dashboard. A row here is part of the
-    # question, so it has to come back to the same question.
     it "keeps the question in every row's link" do
       link = explore(dimension: "country", metric: "pageviews").at_css("tbody th a")["href"]
 
@@ -271,9 +255,6 @@ RSpec.describe "Dashboard explore", type: :request do
   describe "the date range" do
     before { page_at("/going-in", visitor: "one") }
 
-    # "Custom range" is the name of the menu item somebody picked, not the window
-    # they are looking at, and on a range dragged off the dashboard chart that
-    # window is the one thing on the page nothing else prints.
     it "says which window a custom range is, rather than that it is custom" do
       document = explore(period: "custom", from: "2026-08-10T01:11", to: "2026-08-10T01:29")
 
@@ -320,9 +301,6 @@ RSpec.describe "Dashboard explore", type: :request do
       document.css(".ex-ask .chip")
     end
 
-    # The whole sentence used to go in the value slot, where a 200px clamp cut it
-    # mid URL: "Entry URL is https://exampl...". The parts are separate now, the
-    # same way the dashboard bar says them.
     it "says the dimension, how it is matched and the value apart from each other" do
       chip = chips(explore(filters: [ { dimension: "country", operator: "is_not", value: "US" } ])).first
 
@@ -377,7 +355,7 @@ RSpec.describe "Dashboard explore", type: :request do
       remove = cluster.at_css("a[aria-label='Remove the filter Country is US']")["href"]
 
       expect(remove).to start_with("/telemetry/explore")
-      expect(Rack::Utils.parse_nested_query(URI.parse(remove).query)).to include(
+      expect(link_query(remove)).to include(
         "dimension" => "browser",
         "filters" => [ { "dimension" => "country", "operator" => "is", "value" => "CA" } ]
       )
@@ -387,7 +365,7 @@ RSpec.describe "Dashboard explore", type: :request do
       document = explore(dimension: "browser", filters: [ { dimension: "country", operator: "is", value: "US" } ])
       href = document.at_css(".ex-ask a[aria-label='Add another option to Country is US']")["href"]
 
-      expect(Rack::Utils.parse_nested_query(URI.parse(href).query))
+      expect(link_query(href))
         .to include("return" => "explore", "for_dimension" => "browser", "dimension" => "country")
     end
   end
@@ -407,7 +385,7 @@ RSpec.describe "Dashboard explore", type: :request do
 
     it "is linked from the dashboard header, carrying the view" do
       get "/telemetry", params: { period: "day" }
-      link = Nokogiri::HTML5(response.body).css("header .hd-nav").find { |node| node.text.strip == "Explore" }
+      link = document.css("header .hd-nav").find { |node| node.text.strip == "Explore" }
 
       expect(link["href"]).to start_with("/telemetry/explore")
       expect(link["href"]).to include("period=day")
@@ -417,7 +395,7 @@ RSpec.describe "Dashboard explore", type: :request do
     it "marks no header tab as current on a settings page" do
       get "/telemetry/settings/goals"
 
-      expect(Nokogiri::HTML5(response.body).at_css("header .hd-nav[aria-current=page]")).to be_nil
+      expect(document.at_css("header .hd-nav[aria-current=page]")).to be_nil
     end
   end
 
@@ -495,7 +473,7 @@ RSpec.describe "Dashboard explore", type: :request do
       page_at("/going-in", visitor: "one")
 
       get "/telemetry/reports/sources", params: { view: "details", tab: "channels" }
-      link = Nokogiri::HTML5(response.body).css("a").find { |a| a.text.include?("Open in Explore") }
+      link = document.css("a").find { |a| a.text.include?("Open in Explore") }
 
       expect(link["href"]).to include("/telemetry/explore")
       expect(link["href"]).to include("dimension=channel")

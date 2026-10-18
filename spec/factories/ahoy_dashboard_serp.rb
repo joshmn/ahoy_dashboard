@@ -5,6 +5,10 @@ FactoryBot.define do
     trait :active do
       active { true }
     end
+
+    trait :keyed do
+      credentials { { api_key: "stored-key" } }
+    end
   end
 
   factory :dash_serp_provider, class: "AhoyDashboard::SerpProvider" do
@@ -40,6 +44,11 @@ FactoryBot.define do
     trait :subdomains do
       match_subdomains { true }
     end
+
+    trait :ours do
+      name { "Us" }
+      domain { AhoyDashboard::Serp.own_domain }
+    end
   end
 
   factory :dash_serp_keyword, class: "AhoyDashboard::SerpKeyword" do
@@ -47,6 +56,16 @@ FactoryBot.define do
     locations { [ "us" ] }
     pages { 1 }
     frequency { :daily }
+
+    trait :tracked do
+      transient do
+        site { association(:dash_serp_site) }
+      end
+
+      after(:create) do |keyword, evaluator|
+        create(:dash_serp_keyword_target, keyword: keyword, site: evaluator.site)
+      end
+    end
   end
 
   factory :dash_serp_keyword_target, class: "AhoyDashboard::SerpKeywordTarget" do

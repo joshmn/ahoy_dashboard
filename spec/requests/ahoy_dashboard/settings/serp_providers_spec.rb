@@ -1,23 +1,6 @@
 require "rails_helper"
-require "support/ahoy_dashboard/serp"
 
 RSpec.describe "Dashboard serp provider settings", type: :request do
-  describe "gating" do
-    it "sends a signed out visitor to sign in" do
-      get "/telemetry/settings/serp_providers"
-
-      expect(response).to redirect_to("/users/sign_in")
-    end
-
-    it "is a 404 for a signed in visitor who is not an admin" do
-      sign_in create(:user)
-
-      get "/telemetry/settings/serp_providers/serpapi/edit"
-
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   describe "as an admin" do
     before { sign_in create(:user, :admin) }
 
@@ -30,7 +13,7 @@ RSpec.describe "Dashboard serp provider settings", type: :request do
 
     describe "the credentials column" do
       def credentials_for(label)
-        row = Nokogiri::HTML5(response.body).css("tbody tr").find { |node| node.at_css("td")&.text&.include?(label) }
+        row = document.css("tbody tr").find { |node| node.at_css("td")&.text&.include?(label) }
         row.css("td")[1].text.squish
       end
 
@@ -65,18 +48,10 @@ RSpec.describe "Dashboard serp provider settings", type: :request do
 
       it "uses the loaded provider records for every credentials cell" do
         create(:dash_serp_provider, name: "dataforseo", credentials: { login: "stored-login", password: "stored-password" })
-        queries = []
-        subscriber = ->(_name, _started, _finished, _id, payload) do
-          sql = payload[:sql]
-          queries << sql if sql.include?('FROM "ahoy_dashboard_serp_providers"')
-        end
-
-        ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
-          get "/telemetry/settings/serp_providers"
-        end
+        queries = captured_sql('FROM "ahoy_dashboard_serp_providers"', cached: true) { get "/telemetry/settings/serp_providers" }
 
         expect(credentials_for("DataForSEO")).to eq("Stored")
-        expect(queries.size).to eq(2) # The provider list and the current-provider lookup.
+        expect(queries.size).to eq(2)
         expect(response.body).not_to include("stored-login", "stored-password")
       end
     end

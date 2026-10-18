@@ -1,8 +1,3 @@
-<%# Two shapes of the same list. The sidebar is the real one; below 880px, where
-    the design folds the settings shell into one column, it comes off and the
-    whole list becomes one menu, stacked under its group headings, with the
-    section you are on as the button. It used to be one dropdown for each group,
-    which is a row of buttons to hunt through. %>
 <% grouped = AhoyDashboard::SettingsSection.grouped %>
 <% current_section = grouped.flat_map(&:last).find { |section| section.current?(controller_path) } %>
 

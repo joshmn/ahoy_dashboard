@@ -1,338 +1,315 @@
 <% content_for :title, "Search Console" %>
 <% content_for :dash_settings_section, "search_console" %>
 
-<% connected = @account&.connected? %>
+<% account = @connection.account %>
+<% callback = @connection.callback %>
+<% connected = @connection.connected? %>
+<% state = @connection.state %>
 <% display = AhoyDashboard::Settings::Display %>
 
-<div class="set-main">
-  <section class="sec">
-    <%= dash_page_head title: "Google Search Console",
-          lede: "The searches people made on Google before they landed on your site." %>
+<%= dash_page_head title: "Google Search Console",
+      lede: "The searches people made on Google before they landed on your site." %>
 
-    <%= dash_card do %>
-      <div class="gsc-in">
-        <span class="<%= class_names("glc", "off" => !connected) %>" aria-hidden="true">G</span>
+<%= dash_card do %>
+  <div class="gsc-in">
+    <span class="<%= class_names("glc", "off" => !connected) %>" aria-hidden="true">G</span>
 
-        <div class="gsc-t">
-          <div class="gsc-name">
-            Google Search Console
-            <% if !@credentials_ready %>
-              <%= dash_badge AhoyDashboard::SearchConsole.client_id.present? ? "Client secret missing" : AhoyDashboard::SearchConsole.client_secret.present? ? "Client ID missing" : "No client ID or secret set" %>
-            <% elsif !@configured %>
-              <%= dash_badge "Off" %>
-            <% elsif connected %>
-              <%= dash_badge tone: :success do %><span class="bdot"></span>Active<% end %>
-              <% if @account.domain_property? %>
-                <%= dash_badge "Domain property" %>
-              <% end %>
-            <% else %>
-              <%= dash_badge "Not connected" %>
-            <% end %>
-          </div>
-
-          <p class="gsc-meta mb-0">
-            <% if !@credentials_ready %>
-              Add the OAuth client ID and secret below to connect.
-            <% elsif !@configured %>
-              Search Console is off. Turn it on under <%= link_to "Settings, Features", settings_features_path(anchor: "feature-search_console") %>.
-            <% elsif connected %>
-              <% if @account.property_uri.present? %>
-                Connected to <span class="mono"><%= @account.property_uri %></span>.
-              <% else %>
-                Connected. Pick a property to start syncing.
-              <% end %>
-              <% if @account.synced_at.present? %>
-                Last synced <%= dash_ago(@account.synced_at) %>.
-              <% else %>
-                Not synced yet.
-              <% end %>
-            <% else %>
-              Sign in with the Google account that owns the property. Access is read only.
-            <% end %>
-          </p>
-
-          <% if @account&.last_error.present? %>
-            <p class="gsc-meta gsc-err mb-0">
-              <%= dash_badge "Last sync failed", tone: :danger %>
-              <%= @account.last_error %>
-              <% if @account.last_error_at.present? %>
-                <span class="text-nowrap">(<%= dash_ago(@account.last_error_at) %>)</span>
-              <% end %>
-            </p>
-          <% end %>
-        </div>
-
-        <div class="gsc-acts">
-          <% if @confirming %>
-            <span class="gsc-confirm-msg">Disconnect Google? The rows already pulled stay put.</span>
-            <%= dash_button_to "Disconnect", settings_google_connection_path, method: :delete, tone: :danger %>
-            <%= dash_button "Cancel", settings_google_connection_path, tone: :link %>
-          <% else %>
-            <% if connected %>
-              <% broken = @configured && @account.last_error.present? %>
-              <% if broken %>
-                <%= dash_button "Reconnect", new_settings_google_authorization_path, tone: :primary %>
-              <% end %>
-              <%= dash_button_to "Sync now", settings_search_console_sync_path,
-                    reason: @unavailable || ("Pick a property first." unless @account.ready?),
-                    tone: (broken ? :secondary : :primary),
-                    title: "Pull the last week from Google" %>
-            <% elsif @configured && @redirect_uri.blank? %>
-              <%= dash_unavailable "Connect Google account", reason: AhoyDashboard::SearchConsole::NO_HOST_MESSAGE, tone: :primary %>
-            <% elsif @configured %>
-              <%= dash_button "Connect Google account", new_settings_google_authorization_path, tone: :primary %>
-            <% end %>
-
-            <% if @account.present? %>
-              <%= dash_menu id: "gsc-more", label: "More", caret: false, chevron: true,
-                    menu_class: "set-more", panel_class: "set-more__panel" do %>
-                <% if @configured %>
-                  <%= dash_menu_item "Reconnect", new_settings_google_authorization_path %>
-                <% end %>
-                <% if connected %>
-                  <%= dash_menu_item "Pick a property", edit_settings_search_console_property_path %>
-                  <% backfill_reason = @unavailable || ("Pick a property first." unless @account.ready?) ||
-                       ("Everything Google still keeps is already here." if @backfill_done) %>
-                  <% if backfill_reason %>
-                    <%= dash_menu_item "Reach back a month", meta: backfill_reason, disabled: true %>
-                  <% else %>
-                    <%= dash_menu_item "Reach back a month", settings_search_console_backfill_path, method: :post,
-                          form_class: "set-more__form", title: "Pull one more month of history" %>
-                  <% end %>
-                <% end %>
-                <%= dash_menu_item "Disconnect", settings_google_connection_path(confirm: 1), danger: true %>
-              <% end %>
-            <% end %>
-          <% end %>
-        </div>
-      </div>
-    <% end %>
-
-    <%= dash_card do %>
-      <%= dash_card_header "OAuth client" do %>
-        <span class="g-hint">From Google Cloud, step 3 below</span>
-      <% end %>
-
-      <% if @removing %>
-        <%= render "ahoy_dashboard/settings/shared/remove_secret", secret: @removing,
-              url: settings_google_credential_secret_path(@removing.key),
-              cancel: settings_google_connection_path %>
-      <% end %>
-
-      <%= dash_form_with scope: :google_credential, url: settings_google_credential_path, method: :patch, card: true do |f| %>
-        <%= f.grid do %>
-          <% client_id = @secrets.fetch(:client_id) %>
-          <%= f.text_field :client_id, label: "Client ID", mono: true,
-                value: @credential.value(:client_id),
-                hint: client_id.hint(stored: "Stored."),
-                autocomplete: "off",
-                append: (if client_id.stored?
-                           dash_button "Remove", settings_google_connection_path(remove: client_id.key, anchor: "remove-secret"),
-                             size: :md, aria: { label: "Remove the stored #{client_id.label}" }
-                         end) %>
-
-          <% client_secret = @secrets.fetch(:client_secret) %>
-          <%= f.password_field :client_secret, label: "Client secret", mono: true,
-                hint: client_secret.hint,
-                autocomplete: "off",
-                append: (if client_secret.stored?
-                           dash_button "Remove", settings_google_connection_path(remove: client_secret.key, anchor: "remove-secret"),
-                             size: :md, aria: { label: "Remove the stored #{client_secret.label}" }
-                         end) %>
-        <% end %>
-
-        <%= f.actions "Save credentials" %>
-      <% end %>
-    <% end %>
-
-    <%= dash_card id: "redirect-url" do %>
-      <%= dash_card_header "Redirect URL" do %>
-        <span class="g-hint">Where Google sends you back after you sign in</span>
-      <% end %>
-
-      <%= dash_form_with model: @redirect_form, scope: :search_console_redirect, url: settings_search_console_redirect_path,
-            method: :patch, card: true do |f| %>
-        <%= f.error_summary %>
-
-        <% redirect_hint = capture do %>
-          <% if @redirect_uri.present? %>
-            Now <span class="font-monospace"><%= @redirect_uri %></span>, from <%= @callback.source_label %>.
-          <% else %>
-            Nothing yet, because the dashboard has no host set. Set it under
-            <%= link_to "Settings, General", edit_settings_general_path %>.
-          <% end %>
-          Leave this blank to build it from the host. Fill it in only when Google has to send you back somewhere else,
-          like a different port in development.
-        <% end %>
-        <%= f.text_field :redirect_uri, label: "Redirect URL override", optional: true, mono: true,
-              autocomplete: "off", spellcheck: false, autocapitalize: "none", hint: redirect_hint %>
-
-        <%= f.actions "Save redirect URL" %>
-      <% end %>
-    <% end %>
-
-    <% if connected %>
-      <%= dash_card do %>
-        <%= dash_card_header "Property" do %>
-          <span class="g-hint">A domain property covers every subdomain</span>
-        <% end %>
-
-        <% if @account.property_selected? %>
-          <%= dash_table label: "Property", cols: "minmax(0, 1fr) minmax(0, 1fr) 90px" do %>
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">URI</th>
-                <th scope="col"><span class="visually-hidden">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><span class="t-main"><b><%= @account.property_label %></b></span></td>
-                <td><span class="t-mono"><%= @account.property_uri %></span></td>
-                <td class="row-actions row-actions-visible">
-                  <%= dash_button "Change", edit_settings_search_console_property_path,
-                        aria: { label: "Change the property" } %>
-                </td>
-              </tr>
-            </tbody>
+    <div class="gsc-t">
+      <div class="gsc-name">
+        Google Search Console
+        <% if state == :credentials %>
+          <%= dash_badge @connection.missing_credentials_label %>
+        <% elsif state == :off %>
+          <%= dash_badge "Off" %>
+        <% elsif state == :connected %>
+          <%= dash_badge tone: :success do %><span class="bdot"></span>Active<% end %>
+          <% if account.domain_property? %>
+            <%= dash_badge "Domain property" %>
           <% end %>
         <% else %>
-          <%= dash_empty title: "No property picked", compact: true,
-                hint: "Nothing syncs until you pick one.",
-                action: { label: "Pick a property", url: edit_settings_search_console_property_path } %>
+          <%= dash_badge "Not connected" %>
         <% end %>
-      <% end %>
-    <% end %>
-
-    <%= dash_card_disclosure "Setting it up in Google Cloud", open: (@configured && !connected),
-          hint: "One time, in the Google account that owns the property" do %>
-
-      <div class="steps">
-        <div class="step">
-          <span class="step-n" aria-hidden="true">1</span>
-          <div>
-            <div class="step-t">Create a project</div>
-            <div class="step-b">
-              At <span class="mono">console.cloud.google.com</span>, create a project and turn on the
-              Google Search Console API.
-            </div>
-          </div>
-        </div>
-
-        <div class="step">
-          <span class="step-n" aria-hidden="true">2</span>
-          <div>
-            <div class="step-t">Publish the consent screen</div>
-            <div class="step-b">
-              Choose External, then set the publishing status to <b>In production</b>. On Testing,
-              Google ends the connection every seven days. Apps with under 100 users need no review.
-              You will click past one unverified app warning when you connect.
-            </div>
-          </div>
-        </div>
-
-        <div class="step">
-          <span class="step-n" aria-hidden="true">3</span>
-          <div>
-            <div class="step-t">Create an OAuth client</div>
-            <div class="step-b">
-              Choose Web application and add this URL under Authorized redirect URIs. It has to match
-              exactly, including the scheme and any trailing slash.
-            </div>
-            <% if @redirect_uri.present? %>
-              <div class="step-b"><span class="mono"><%= @redirect_uri %></span></div>
-            <% else %>
-              <div class="step-b">
-                <b>There is no URL to add yet.</b> The dashboard has no host set, so Google would have nowhere to send you back.
-                Set the host under <%= link_to "Settings, General", edit_settings_general_path %>.
-              </div>
-            <% end %>
-
-            <% if @callback.differs? %>
-              <div class="step-b">
-                <b>This does not match the address you are on.</b> Connecting from here sends Google
-                <span class="mono"><%= @callback.browsing %></span>, which it will refuse unless that URL is
-                registered too.
-                <% if @callback.scheme_only? %>
-                  Only http and https differ. If a proxy handles TLS, check that it forwards the scheme.
-                <% end %>
-                <% if @callback.wrong? %>
-                  The dashboard's host is <%= @callback.missing_host? ? "not set" : "still the example placeholder" %>.
-                  Set it under <%= link_to "Settings, General", edit_settings_general_path %>.
-                <% else %>
-                  If you use more than one address, register each one.
-                <% end %>
-              </div>
-            <% end %>
-          </div>
-        </div>
-
-        <div class="step">
-          <span class="step-n" aria-hidden="true">4</span>
-          <div>
-            <div class="step-t">Save the client ID and secret</div>
-            <div class="step-b">
-              Paste both into the OAuth client card above and save. They are encrypted before they are
-              stored, and disconnecting does not remove them.
-            </div>
-          </div>
-        </div>
-
-        <div class="step">
-          <span class="step-n" aria-hidden="true">5</span>
-          <div>
-            <div class="step-t">Connect and pick the property</div>
-            <div class="step-b">
-              The only permission requested is <span class="mono"><%= @scope %></span>, which is read only.
-            </div>
-          </div>
-        </div>
       </div>
-    <% end %>
 
-    <%= dash_card do %>
-      <%= dash_card_header "Stored data" do %>
-        <span class="g-hint">
-          Syncs nightly. Google lags, so <%= display.short_date(@status.expected_last_date) %> is the latest day available.
-        </span>
-        <% if @status.any? %>
-          <%= dash_button "View rows", settings_search_console_rows_path %>
+      <p class="gsc-meta mb-0">
+        <% if state == :credentials %>
+          Add the OAuth client ID and secret below to connect.
+        <% elsif state == :off %>
+          Search Console is off. Turn it on under <%= link_to "Settings, Features", settings_features_path(anchor: "feature-search_console") %>.
+        <% elsif state == :connected %>
+          <% if account.property_uri.present? %>
+            Connected to <span class="mono"><%= account.property_uri %></span>.
+          <% else %>
+            Connected. Pick a property to start syncing.
+          <% end %>
+          <% if account.synced_at.present? %>
+            Last synced <%= dash_ago(account.synced_at) %>.
+          <% else %>
+            Not synced yet.
+          <% end %>
+        <% else %>
+          Sign in with the Google account that owns the property. Access is read only.
         <% end %>
+      </p>
+
+      <% if account&.last_error.present? %>
+        <p class="gsc-meta gsc-err mb-0">
+          <%= dash_badge "Last sync failed", tone: :danger %>
+          <%= account.last_error %>
+          <% if account.last_error_at.present? %>
+            <span class="text-nowrap">(<%= dash_ago(account.last_error_at) %>)</span>
+          <% end %>
+        </p>
       <% end %>
+    </div>
 
-      <% if @status.any? %>
-        <%= dash_tiles label: "What has been pulled", compact: true, ruled: true do %>
-          <%= dash_tile "day".pluralize(@status.days).capitalize, number_with_delimiter(@status.days) %>
-          <%= dash_tile "Query and page rows", number_with_delimiter(@status.rows) %>
-          <%= dash_tile "Clicks", number_with_delimiter(@status.clicks) %>
-          <%= dash_tile "Impressions", number_with_delimiter(@status.impressions) %>
-        <% end %>
+    <div class="gsc-acts">
+      <% if @confirming %>
+        <span class="gsc-confirm-msg">Disconnect Google? The rows already pulled stay put.</span>
+        <%= dash_button_to "Disconnect", settings_google_connection_path, method: :delete, tone: :danger %>
+        <%= dash_button "Cancel", settings_google_connection_path, tone: :link %>
       <% else %>
-        <%= dash_empty title: "Nothing synced yet", compact: true,
-              hint: (@configured ? "Connect an account and pick a property. The first sync brings back a week." : "Nothing syncs while Search Console is off.") %>
-      <% end %>
+        <% if connected %>
+          <% broken = @connection.broken? %>
+          <% if broken %>
+            <%= dash_button "Reconnect", new_settings_google_authorization_path, tone: :primary %>
+          <% end %>
+          <%= dash_button_to "Sync now", settings_search_console_sync_path,
+                reason: @connection.sync_reason,
+                tone: (broken ? :secondary : :primary),
+                title: "Pull the last week from Google" %>
+        <% elsif @connection.configured? && @connection.redirect_uri.blank? %>
+          <%= dash_unavailable "Connect Google account", reason: AhoyDashboard::SearchConsole::NO_HOST_MESSAGE, tone: :primary %>
+        <% elsif @connection.configured? %>
+          <%= dash_button "Connect Google account", new_settings_google_authorization_path, tone: :primary %>
+        <% end %>
 
-      <% summary = [] %>
-      <% if @status.any? %>
-        <% summary << "#{display.short_date(@status.first_date)} to #{display.short_date(@status.last_date)}#{", up to date" if @status.current?}." %>
-      <% end %>
-      <% if connected %>
-        <% if @backfill_done %>
-          <% summary << "History is complete back to #{display.short_date(@backfill_floor)}." %>
-        <% elsif @backfill_reached %>
-          <% summary << "History reaches back to #{display.short_date(@backfill_reached)}, #{pluralize((@backfill_reached - @backfill_floor).to_i, "day")} short of #{display.short_date(@backfill_floor)}." %>
-        <% else %>
-          <% summary << "Older history has not been pulled yet." %>
+        <% if account.present? %>
+          <%= dash_menu id: "gsc-more", label: "More", caret: false, chevron: true,
+                menu_class: "set-more", panel_class: "set-more__panel" do %>
+            <% if @connection.configured? %>
+              <%= dash_menu_item "Reconnect", new_settings_google_authorization_path %>
+            <% end %>
+            <% if connected %>
+              <%= dash_menu_item "Pick a property", edit_settings_search_console_property_path %>
+              <% backfill_reason = @connection.backfill_reason %>
+              <% if backfill_reason %>
+                <%= dash_menu_item "Reach back a month", meta: backfill_reason, disabled: true %>
+              <% else %>
+                <%= dash_menu_item "Reach back a month", settings_search_console_backfill_path, method: :post,
+                      form_class: "set-more__form", title: "Pull one more month of history" %>
+              <% end %>
+            <% end %>
+            <%= dash_menu_item "Disconnect", settings_google_connection_path(confirm: 1), danger: true %>
+          <% end %>
         <% end %>
       <% end %>
-      <% if summary.any? %>
-        <%= dash_card_footer do %><%= summary.join(" ") %><% end %>
-      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%= dash_card do %>
+  <%= dash_card_header "OAuth client" do %>
+    <span class="g-hint">From Google Cloud, step 3 below</span>
+  <% end %>
+
+  <% removing = @connection.removing %>
+  <% if removing %>
+    <%= render "ahoy_dashboard/settings/shared/remove_secret", secret: removing,
+          url: settings_google_credential_secret_path(removing.key),
+          cancel: settings_google_connection_path %>
+  <% end %>
+
+  <%= dash_form_with scope: :google_credential, url: settings_google_credential_path, method: :patch, card: true do |f| %>
+    <%= f.grid do %>
+      <% client_id = @connection.secrets.fetch(:client_id) %>
+      <%= render "ahoy_dashboard/settings/shared/secret_field", form: f, secret: client_id, label: "Client ID",
+            nested: false, value: @connection.credential.credential(:client_id), hint: client_id.hint(stored: "Stored."),
+            remove_url: settings_google_connection_path(remove: client_id.key, anchor: "remove-secret") %>
+
+      <% client_secret = @connection.secrets.fetch(:client_secret) %>
+      <%= render "ahoy_dashboard/settings/shared/secret_field", form: f, secret: client_secret, label: "Client secret",
+            nested: false, remove_url: settings_google_connection_path(remove: client_secret.key, anchor: "remove-secret") %>
     <% end %>
 
-    <% if @missing %>
-      <%= render "missing_days" %>
+    <%= f.actions "Save credentials" %>
+  <% end %>
+<% end %>
+
+<%= dash_card id: "redirect-url" do %>
+  <%= dash_card_header "Redirect URL" do %>
+    <span class="g-hint">Where Google sends you back after you sign in</span>
+  <% end %>
+
+  <%= dash_form_with model: @redirect_form, scope: :search_console_redirect, url: settings_search_console_redirect_path,
+        method: :patch, card: true do |f| %>
+    <%= f.error_summary %>
+
+    <% redirect_hint = capture do %>
+      <% if @connection.redirect_uri.present? %>
+        Now <span class="font-monospace"><%= @connection.redirect_uri %></span>, from <%= callback.source_label %>.
+      <% else %>
+        Nothing yet, because the dashboard has no host set. Set it under
+        <%= link_to "Settings, General", edit_settings_general_path %>.
+      <% end %>
+      Leave this blank to build it from the host. Fill it in only when Google has to send you back somewhere else,
+      like a different port in development.
     <% end %>
-  </section>
-</div>
+    <%= f.text_field :redirect_uri, label: "Redirect URL override", optional: true, mono: true,
+          autocomplete: "off", spellcheck: false, autocapitalize: "none", hint: redirect_hint %>
+
+    <%= f.actions "Save redirect URL" %>
+  <% end %>
+<% end %>
+
+<% if connected %>
+  <%= dash_card do %>
+    <%= dash_card_header "Property" do %>
+      <span class="g-hint">A domain property covers every subdomain</span>
+    <% end %>
+
+    <% if account.property_selected? %>
+      <%= dash_table label: "Property", cols: "minmax(0, 1fr) minmax(0, 1fr) 90px" do %>
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">URI</th>
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="t-main"><b><%= account.property_label %></b></span></td>
+            <td><span class="t-mono"><%= account.property_uri %></span></td>
+            <td class="row-actions row-actions-visible">
+              <%= dash_button "Change", edit_settings_search_console_property_path,
+                    aria: { label: "Change the property" } %>
+            </td>
+          </tr>
+        </tbody>
+      <% end %>
+    <% else %>
+      <%= dash_empty title: "No property picked", compact: true,
+            hint: "Nothing syncs until you pick one.",
+            action: { label: "Pick a property", url: edit_settings_search_console_property_path } %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<%= dash_card_disclosure "Setting it up in Google Cloud", open: @connection.setup_open?,
+      hint: "One time, in the Google account that owns the property" do %>
+
+  <div class="steps">
+    <div class="step">
+      <span class="step-n" aria-hidden="true">1</span>
+      <div>
+        <div class="step-t">Create a project</div>
+        <div class="step-b">
+          At <span class="mono">console.cloud.google.com</span>, create a project and turn on the
+          Google Search Console API.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-n" aria-hidden="true">2</span>
+      <div>
+        <div class="step-t">Publish the consent screen</div>
+        <div class="step-b">
+          Choose External, then set the publishing status to <b>In production</b>. On Testing,
+          Google ends the connection every seven days. Apps with under 100 users need no review.
+          You will click past one unverified app warning when you connect.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-n" aria-hidden="true">3</span>
+      <div>
+        <div class="step-t">Create an OAuth client</div>
+        <div class="step-b">
+          Choose Web application and add this URL under Authorized redirect URIs. It has to match
+          exactly, including the scheme and any trailing slash.
+        </div>
+        <% if @connection.redirect_uri.present? %>
+          <div class="step-b"><span class="mono"><%= @connection.redirect_uri %></span></div>
+        <% else %>
+          <div class="step-b">
+            <b>There is no URL to add yet.</b> The dashboard has no host set, so Google would have nowhere to send you back.
+            Set the host under <%= link_to "Settings, General", edit_settings_general_path %>.
+          </div>
+        <% end %>
+
+        <% if callback.differs? %>
+          <div class="step-b">
+            <b>This does not match the address you are on.</b> Connecting from here sends Google
+            <span class="mono"><%= callback.browsing %></span>, which it will refuse unless that URL is
+            registered too.
+            <% if callback.scheme_only? %>
+              Only http and https differ. If a proxy handles TLS, check that it forwards the scheme.
+            <% end %>
+            <% if callback.wrong? %>
+              The dashboard's host is <%= callback.missing_host? ? "not set" : "still the example placeholder" %>.
+              Set it under <%= link_to "Settings, General", edit_settings_general_path %>.
+            <% else %>
+              If you use more than one address, register each one.
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-n" aria-hidden="true">4</span>
+      <div>
+        <div class="step-t">Save the client ID and secret</div>
+        <div class="step-b">
+          Paste both into the OAuth client card above and save. They are encrypted before they are
+          stored, and disconnecting does not remove them.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-n" aria-hidden="true">5</span>
+      <div>
+        <div class="step-t">Connect and pick the property</div>
+        <div class="step-b">
+          The only permission requested is <span class="mono"><%= AhoyDashboard::SearchConsole::SCOPE %></span>, which is read only.
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<% status = @connection.status %>
+<%= dash_card do %>
+  <%= dash_card_header "Stored data" do %>
+    <span class="g-hint">
+      Syncs nightly. Google lags, so <%= display.short_date(status.expected_last_date) %> is the latest day available.
+    </span>
+    <% if status.any? %>
+      <%= dash_button "View rows", settings_search_console_rows_path %>
+    <% end %>
+  <% end %>
+
+  <% if status.any? %>
+    <%= dash_tiles label: "What has been pulled", compact: true, ruled: true do %>
+      <%= dash_tile "day".pluralize(status.days).capitalize, number_with_delimiter(status.days) %>
+      <%= dash_tile "Query and page rows", number_with_delimiter(status.rows) %>
+      <%= dash_tile "Clicks", number_with_delimiter(status.clicks) %>
+      <%= dash_tile "Impressions", number_with_delimiter(status.impressions) %>
+    <% end %>
+  <% else %>
+    <%= dash_empty title: "Nothing synced yet", compact: true, hint: @connection.empty_hint %>
+  <% end %>
+
+  <% summary = @connection.summary %>
+  <% if summary %>
+    <%= dash_card_footer do %><%= summary %><% end %>
+  <% end %>
+<% end %>
+
+<% if @connection.missing %>
+  <%= render "missing_days" %>
+<% end %>

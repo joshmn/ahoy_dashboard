@@ -6,8 +6,7 @@ RSpec.describe AhoyDashboard::Alerts::RankPairsQuery do
   let(:since) { 2.days.ago.change(usec: 0) }
 
   def reading(location:, at:, site: self.site, status: :success)
-    run = create(:dash_serp_run, keyword: keyword, location: location, checked_at: at)
-    create(:dash_serp_check, run: run, site: site, status: status)
+    serp_reading(keyword, site: site, at: at, position: 3, location: location, status: status)
   end
 
   it "loads only active locations while retaining older predecessors and ignoring failed or other-site checks" do
@@ -17,20 +16,15 @@ RSpec.describe AhoyDashboard::Alerts::RankPairsQuery do
     reading(location: "gb", at: since - 1.day)
     reading(location: "gb", at: since + 1.hour, status: :failed)
     reading(location: "gb", at: since + 2.hours, site: create(:dash_serp_site))
-    loaded = 0
-    subscriber = ->(_name, _started, _finished, _id, payload) do
-      loaded += payload[:record_count] if payload[:class_name] == "AhoyDashboard::SerpCheck"
-    end
-
-    pairs = ActiveSupport::Notifications.subscribed(subscriber, "instantiation.active_record") do
-      described_class.call(site: site, since: since)
-    end
+    pairs = nil
+    loaded = instantiated(AhoyDashboard::SerpCheck) { pairs = described_class.call(site: site, since: since) }
 
     expect(sole_item(pairs)).to have_attributes(keyword: keyword, location: "us", now: current, before: previous)
     expect(loaded).to eq(2)
   end
 
-  it "preserves timestamp tie-breaking and includes active locations removed from keyword settings" do
+  it "preserves timestamp tie-breaking across every place the keyword still searches" do
+    keyword.update!(locations: %w[ca us])
     previous = reading(location: "ca", at: since)
     current = reading(location: "ca", at: since)
     latest = reading(location: "us", at: since + 1.hour)
@@ -40,6 +34,15 @@ RSpec.describe AhoyDashboard::Alerts::RankPairsQuery do
     expect(pairs.map(&:location)).to eq(%w[ca us])
     expect(pairs.first).to have_attributes(now: current, before: previous)
     expect(pairs.last).to have_attributes(now: latest, before: nil)
+  end
+
+  it "leaves out a place removed from the keyword, the way Rankings does" do
+    reading(location: "ca", at: since + 1.hour)
+    kept = reading(location: "us", at: since + 1.hour)
+
+    pairs = described_class.call(site: site, since: since)
+
+    expect(sole_item(pairs)).to have_attributes(location: "us", now: kept)
   end
 
   it "returns no pairs without a site" do

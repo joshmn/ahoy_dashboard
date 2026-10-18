@@ -8,11 +8,13 @@ module AhoyDashboard
       FALLBACK_COLOR = "var(--t2)".freeze
       DASHES = [ nil, "6 4", "2 3", "10 3 2 3" ].freeze
       PLOT_HEIGHT = 120
-      PLOT_WIDTH = 640
+      PLOT_INSET = 2
 
-      Line = Data.define(:assistant, :model, :label, :color, :dash, :path, :latest)
+      Line = Data.define(:assistant, :model, :label, :color, :dash, :values, :latest)
 
       attr_reader :assistant, :model
+
+      delegate :by_assistant, :missing_prompts, :cited_instead, to: :result
 
       def initialize(assistant: nil, model: nil, **options)
         super(**options)
@@ -83,15 +85,10 @@ module AhoyDashboard
       end
 
       def setup_notice
-        unless enabled?
-          return { title: "Turn on AI visibility to get started",
-                   hint: "AI visibility is off. Every answer is a paid request, so it stays off until you " \
-                         "switch it on under Settings, Features." }
-        end
-        return setup_step("Turn on an assistant to get started", "Every assistant that is on and has a key is asked your prompts.", "Set up an assistant") unless asked?
-        return setup_step("Write your prompts to get started", "Write the questions you want to show up in, one per line.", "Write prompts") unless prompts?
+        return AhoyDashboard::SetupNotice.call(:ai_visibility) unless enabled?
+        return AhoyDashboard::SetupNotice.call(:ai_assistant, url: settings_path) unless asked?
 
-        nil
+        AhoyDashboard::SetupNotice.call(:ai_prompts, url: settings_path) unless prompts?
       end
 
       def empty_state
@@ -117,7 +114,7 @@ module AhoyDashboard
       end
 
       def run_reason
-        return "AI visibility is off. Turn it on under Settings, Features." unless enabled?
+        return AhoyDashboard::Settings::Display::AI_VISIBILITY_OFF unless enabled?
         return "No assistant is on with a key." unless asked?
         return "There are no prompts." unless prompts?
 
@@ -137,22 +134,6 @@ module AhoyDashboard
 
       def all_prompts
         AiVisibility::Prompt.ordered.to_a
-      end
-
-      def by_assistant
-        result.by_assistant
-      end
-
-      def missing_prompts
-        result.missing_prompts
-      end
-
-      def cited_instead
-        result.cited_instead
-      end
-
-      def position_of(row)
-        row.average_position.nil? ? DASH : decimal(row.average_position)
       end
 
       def prompt_path(prompt)
@@ -194,14 +175,13 @@ module AhoyDashboard
 
       def lines
         points = result.series.group_by { |point| [ point.assistant, point.model ] }
-        order = ->(key) { [ AiVisibility::NAMES.index(key.first) || AiVisibility::NAMES.size, key.first, key.last.to_s ] }
 
-        points.keys.sort_by(&order).group_by(&:first).flat_map do |name, keys|
+        points.keys.sort_by { |key| AiVisibility.target_order(*key) }.group_by(&:first).flat_map do |name, keys|
           keys.each_with_index.map do |key, index|
             by_day = points[key].index_by(&:on)
             Line.new(assistant: name, model: key.last, label: AiVisibility.target_label(*key),
                      color: COLORS.fetch(name, FALLBACK_COLOR), dash: DASHES[index % DASHES.size],
-                     path: path_for(dates.map { |on| by_day[on]&.rate }), latest: points[key].max_by(&:on))
+                     values: dates.map { |on| by_day[on]&.rate }, latest: points[key].max_by(&:on))
           end
         end
       end
@@ -218,11 +198,11 @@ module AhoyDashboard
         PLOT_HEIGHT
       end
 
-      private
-
-      def setup_step(title, hint, label)
-        { title: title, hint: hint, action: { label: label, url: settings_path, data: TOP } }
+      def plot_inset
+        PLOT_INSET
       end
+
+      private
 
       def carried
         { assistant: assistant, model: model }.compact
@@ -258,24 +238,6 @@ module AhoyDashboard
 
       def link_param
         super.merge(carried)
-      end
-
-      def path_for(values)
-        step = dates.size > 1 ? PLOT_WIDTH.to_f / (dates.size - 1) : 0
-        drawing = false
-
-        values.each_with_index.map do |value, index|
-          if value.nil?
-            drawing = false
-            next
-          end
-
-          x = (index * step).round(1)
-          y = (PLOT_HEIGHT - (value * (PLOT_HEIGHT - 4)) - 2).round(1)
-          command = drawing ? "L" : "M"
-          drawing = true
-          "#{command}#{x} #{y}"
-        end.select { |value| value }.join(" ")
       end
     end
   end
