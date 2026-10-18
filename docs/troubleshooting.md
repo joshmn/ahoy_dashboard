@@ -23,7 +23,7 @@ Find what you're seeing in the left column. Each feature's own page has more.
 | A page says "Not installed yet" and shows two commands | That feature's tables aren't in your database | Run the commands it shows, from your app's folder, then reload. See [Adding a feature later](installation.md#adding-a-feature-later). |
 | "Turn on" on Settings, Features is disabled | The feature isn't installed, and a feature without tables can't be switched on | Install it first. See [Adding a feature later](installation.md#adding-a-feature-later). |
 | A feature says Needs setup on Settings, Features | It's on, but something it needs is missing, like a key, a provider, a host, a prompt or a rule. Only the first missing thing is shown. | Click "Set it up" beside it, fix that, and come back to see if anything else is missing |
-| The generator stops with `this app ran an older ahoy_dashboard but is missing some of its migrations: ...` | The app ran an older version and some of the migrations it copied back then are gone from `db/migrate` | Copy the named files from the version you had, run them, then run the generator again. See [Upgrading](installation.md#upgrading). |
+| The generator stops with `this app ran an older ahoy_dashboard but is missing some of its migrations: ...` | The app ran an older version, and neither `db/migrate` nor the database has what some of those migrations made | Copy the named files from the version you had, run them, then run the generator again. If the message says the database could not be reached, start it and run the generator again first. See [Upgrading](installation.md#upgrading). |
 | A migration stops with `Tracked keywords differ only by capitals` | Two tracked keywords are the same search apart from capitals, like "Best CRM" and "best crm", so the same results were being bought twice. The message lists their IDs. | Keep one of each on Settings, Rank tracking, delete the rest, then migrate again |
 | The generator says `separate features with commas, not spaces` | `--only` or `--skip` got a list with spaces | Use `--only serp,alerts` |
 | `NameError` at boot, naming your mailer | `alerts[:parent_mailer]` names a class that doesn't exist | Fix the name |
@@ -47,7 +47,8 @@ Find what you're seeing in the left column. Each feature's own page has more.
 
 | You see | Why | Fix |
 |---|---|---|
-| "Nothing has run yet." on Settings, Jobs | `AhoyDashboard::TickJob` isn't scheduled | See [Schedule the tick](background-jobs.md#schedule-the-tick) |
+| "Nothing has run yet." on Settings, Jobs | The tick has not started work yet | See [Schedule the tick](background-jobs.md#schedule-the-tick) |
+| Embedded scheduling stops while the site is quiet | The host retired every web worker, or no worker has received its first request | Keep a web worker available and send an initial request, or use an [external scheduler](background-jobs.md#external-scheduler) |
 | A job stays Running, then shows "Did not finish" | Nothing works the `low` queue, or the worker died | Run a worker on `low` and `default` |
 | A job shows Off | One of its conditions isn't met, and the row says which | Follow its "Set it up" link |
 | A job says Ran and didn't work | Several jobs record their own failures somewhere else | See [What "Ran" means](background-jobs.md#what-ran-means) |

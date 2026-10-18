@@ -6,7 +6,7 @@ Optional. It's off until you turn it on, and the rest of the dashboard works wit
 
 ## What you need
 
-- `AhoyDashboard::TickJob` scheduled. See [Background jobs](background-jobs.md).
+- The embedded scheduler enabled, or `AhoyDashboard::TickJob` scheduled. See [Background jobs](background-jobs.md).
 - Alerts installed and switched on. Click "Turn on" beside Alerts on Settings, Features. If the row says Not installed, it shows the commands that add the tables. See [Settings, Features](configuration.md#settings-features).
 - At least one rule switched on. They all start off.
 

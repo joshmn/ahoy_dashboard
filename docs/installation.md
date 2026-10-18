@@ -160,13 +160,17 @@ With no `--only` or `--skip`, a second run works on the features you already hav
 
 Older versions shipped one migration per table. The generator knows those names and counts them as installed, so an app that ran them doesn't get the tables created twice.
 
-If an app ran some of the old per-table migrations for a feature but not all of them, the generator stops and lists the files it's missing:
+An old migration whose file is gone still counts when the database already has what it made: its tables, or the columns it added. That covers an app that deleted old migration files, or one that renamed tables it created under another name. The generator checks the database your app is configured to use, so run it where that database is reachable.
+
+If an app ran some of the old per-table migrations for a feature but not all of them, and the database doesn't have what the missing ones made either, the generator stops and lists them:
 
 ```
 this app ran an older ahoy_dashboard but is missing some of its migrations: create_ahoy_dashboard_serp_runs, create_ahoy_dashboard_serp_checks. copy those from the version you had, run them, then try again
 ```
 
 Copy those files from the gem version you had before, run `bin/rails db:migrate`, and run the generator again.
+
+If the generator can't reach the database, it goes by `db/migrate` alone, and the message ends with `(the database could not be reached, so this is going by db/migrate alone)`. Start the database and run the generator again before you copy anything.
 
 ## Who's allowed in
 
@@ -264,6 +268,6 @@ Run this task after schema loading in your application's database preparation an
 
 ## Background jobs
 
-Anything that runs on a schedule (Search Console syncs, rank checks, backlinks, the place list, AI visibility runs, alerts, alert emails and email reports) is started by one job, `AhoyDashboard::TickJob`. Schedule it every minute. Other jobs retain their own cadences; the minute tick also maintains an enabled precomputed default dashboard while idle. [Background jobs](background-jobs.md) has examples for Sidekiq, Solid Queue and cron. The ordinary analytics dashboard needs no jobs.
+Anything that runs on a schedule (Search Console syncs, rank checks, backlinks, the place list, AI visibility runs, alerts, alert emails and email reports) is started by one job, `AhoyDashboard::TickJob`. Enable the opt-in embedded scheduler with `config.embedded_scheduler = true`, or schedule the job every minute. The embedded loop starts on each web worker's first request and still needs Active Job workers for the resulting work. Other jobs retain their own cadences; the minute tick also maintains an enabled precomputed default dashboard while idle. [Background jobs](background-jobs.md) covers the embedded loop, Puma/Unicorn/Passenger worker behavior, and alternatives using Sidekiq, Solid Queue and cron. The ordinary analytics dashboard needs no jobs.
 
 Related: [Configuration](configuration.md), [Tracking](tracking.md), [Background jobs](background-jobs.md), [Security and privacy](security-and-privacy.md).

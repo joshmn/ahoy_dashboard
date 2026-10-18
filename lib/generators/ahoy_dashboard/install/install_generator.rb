@@ -208,11 +208,24 @@ module AhoyDashboard
 
       def check_legacy!(names)
         missing = names.select { |name| replaced?(name) }
-          .flat_map { |name| LEGACY.fetch(name).reject { |old| existing.include?(old) } }
+          .flat_map { |name| LEGACY.fetch(name).reject { |old| ran?(old) } }
         return if missing.empty?
 
+        unchecked = database ? "" : " (the database could not be reached, so this is going by db/migrate alone)"
         raise Thor::Error, "this app ran an older ahoy_dashboard but is missing some of its migrations: " \
-                           "#{missing.join(", ")}. copy those from the version you had, run them, then try again"
+                           "#{missing.join(", ")}. copy those from the version you had, run them, then try again#{unchecked}"
+      end
+
+      def ran?(old)
+        existing.include?(old) || (database && Installation::LegacyMigration.fetch(old).applied?(database))
+      end
+
+      def database
+        return @database if defined?(@database)
+
+        @database = AhoyDashboard::Record.connection.tap(&:verify!)
+      rescue ActiveRecord::ActiveRecordError
+        @database = nil
       end
 
       def host_migrations

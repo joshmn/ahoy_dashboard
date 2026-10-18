@@ -16,6 +16,8 @@ require "ahoy_dashboard/compatibility/upsert"
 require "ahoy_dashboard/compatibility/record"
 require "ahoy_dashboard/version"
 require "ahoy_dashboard/configuration"
+require "ahoy_dashboard/scheduler"
+require "ahoy_dashboard/scheduler/middleware"
 require "ahoy_dashboard/markdown"
 require "ahoy_dashboard/http_client"
 require "ahoy_dashboard/llm"
@@ -36,7 +38,11 @@ module AhoyDashboard
 
   SCROLL_MILESTONE = "scroll_milestone".freeze
 
+  @scheduler = Scheduler.new
+
   class << self
+    attr_reader :scheduler
+
     def config
       @config ||= Configuration.new
     end

@@ -68,6 +68,8 @@ Restart and open `/analytics-dashboard`. Until `authorize` lets you in, every da
 
 Everything else is set in the dashboard. Set your site host and time zone on Settings, General, then turn on what you want under Settings, Features. Keys and passwords go on the screen for each feature. Nothing is read from environment variables or Rails credentials.
 
+For scheduled work, opt in to the [embedded scheduler](docs/background-jobs.md#embedded-scheduler) with `config.embedded_scheduler = true` in the initializer, or schedule `AhoyDashboard::TickJob` every minute through your job backend. The embedded loop starts on each web worker's first request and still uses Active Job for the resulting work.
+
 Your app has to record page views as `page_view` events with a `path`. [Tracking](docs/tracking.md) has the details. [Installation](docs/installation.md) covers the generator, upgrading, the mount path, who's allowed in, and keeping the dashboard out of its own numbers. [Configuration](docs/configuration.md) covers every screen and what's left in the initializer.
 
 ## Docs

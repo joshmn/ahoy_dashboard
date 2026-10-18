@@ -13,7 +13,7 @@ It's separate from the [alert emails](alerts.md#alert-emails). Those list what c
 
 It also needs:
 
-- `AhoyDashboard::TickJob` scheduled. See [Schedule the tick](background-jobs.md#schedule-the-tick).
+- The embedded scheduler enabled, or `AhoyDashboard::TickJob` scheduled. See [Schedule the tick](background-jobs.md#schedule-the-tick).
 - A `host` in your mailer's `default_url_options`. Every link in the email is a full URL, so without a host every email fails.
 
 | On Settings, Emails | Default | Does |

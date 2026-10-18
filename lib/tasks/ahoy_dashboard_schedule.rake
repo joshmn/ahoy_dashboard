@@ -14,6 +14,6 @@ namespace :ahoy_dashboard do
 
     off = rows.reject(&:on?).map(&:key)
     puts(off.any? ? "switched off: #{off.join(", ")}" : "everything is on")
-    puts "schedule AhoyDashboard::TickJob and this list runs itself"
+    puts "enable the embedded scheduler or schedule AhoyDashboard::TickJob every minute and this list runs itself"
   end
 end

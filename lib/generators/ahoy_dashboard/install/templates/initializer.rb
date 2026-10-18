@@ -13,6 +13,10 @@ AhoyDashboard.configure do |config|
   # Defaults to Rails.cache. Accepts a store instance or Rails cache-store options.
   # config.cache_store = :redis_cache_store, { url: ENV.fetch("AHOY_DASHBOARD_CACHE_URL"), namespace: "ahoy_dashboard" }
 
+  # Run the minute tick inside each web worker after its first request.
+  # Active Job still processes the work. See docs/background-jobs.md.
+  # config.embedded_scheduler = true
+
   # Everything else is set in the dashboard, under Settings. What is left here
   # is code: your own ahoy models, your own mailers, and where an alert goes the
   # moment it fires.

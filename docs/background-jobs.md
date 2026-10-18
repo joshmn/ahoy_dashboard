@@ -1,10 +1,36 @@
 # Background jobs
 
-The dashboard runs its scheduled work (Search Console syncs, rank checks, backlinks, the place list, alerts, alert emails, traffic emails and AI visibility) from one job your app schedules: `AhoyDashboard::TickJob`. You schedule the tick, and the tick decides what's due. The optional [precomputed dashboard](#precomputed-dashboard-refresh) also uses the tick to stay prepared while idle, when enabled in Settings, General.
+The dashboard runs its scheduled work (Search Console syncs, rank checks, backlinks, the place list, alerts, alert emails, traffic emails and AI visibility) through `AhoyDashboard::TickJob`. Enable the embedded scheduler or schedule that job yourself; the tick decides what's due. The optional [precomputed dashboard](#precomputed-dashboard-refresh) also uses the tick to stay prepared while idle, when enabled in Settings, General.
 
 ## Schedule the tick
 
-Run `AhoyDashboard::TickJob` every minute. Any job backend works, as long as a worker processes the `low` and `default` queues.
+Run `AhoyDashboard::TickJob` every minute using one of the options below. Both use your Active Job backend for the resulting work, so keep workers processing `low` and `default`.
+
+### Embedded scheduler
+
+Opt in from `config/initializers/ahoy_dashboard.rb`:
+
+```ruby
+AhoyDashboard.configure do |config|
+  config.embedded_scheduler = true
+end
+```
+
+Restart the app. Each web worker starts one background thread on its first request to the host app, runs the tick immediately, then waits 60 seconds after each tick before running it again. The loop continues while the worker is idle. There is no separate daemon to supervise and no recurring-job configuration to install. The setting defaults to `false`; remove it or set it to `false` and restart to turn it off.
+
+Constructing the Rack stack does not start a thread. This keeps the loop out of preloaders and master processes for Puma (including clustered and preloaded modes), Unicorn and Passenger. Workers that load the app after forking behave the same way. A worker replacement starts its own loop on its first request, and a process ID check discards inherited thread state if a running worker forks again. Concurrent requests in one process share a single loop. Merely booting Rails for a console, runner, migration, asset build or job worker does not start it.
+
+Each tick runs inside the [Rails reloader](https://guides.rubyonrails.org/threading_and_code_execution.html#reloader), which also manages executor cleanup and database connections. A failed tick is logged and retried on the next interval. Process exit ends the thread; normal Ruby exit also wakes it and waits up to five seconds for an in-flight tick. No process-wide signal handlers are installed.
+
+Multiple workers and app instances can tick at once. Scheduled jobs still claim their existing database leases before enqueueing, and dashboard snapshots retain their existing enqueue lease. These prevent overlapping work; there is no elected scheduler leader or new coordination service. Use a shared cache for snapshots across processes.
+
+The first request matters: until a worker receives one, it does not tick. The loop also stops whenever its process exits. [Passenger can retire idle workers](https://www.phusionpassenger.com/docs/references/config_reference/), and hosts that scale to zero have no process left to tick. Use an external scheduler below if work must continue with no web processes, or if your app needs to establish tenant context for each tick. The loop does not inherit request-local tenant state or enumerate tenants.
+
+The embedded scheduler calls the tick directly, but the tick still enqueues the actual jobs with your configured Active Job adapter. It does not start a job worker or change that adapter. A durable queue and workers are needed for work that must survive a web-process restart. With an inline adapter, due jobs run on the scheduler thread and delay the next tick.
+
+### External scheduler
+
+Leave `embedded_scheduler` off and schedule `AhoyDashboard::TickJob` through your existing backend or cron. When switching to the embedded scheduler, remove the external recurring tick; temporarily running both still uses the same job claims.
 
 With sidekiq-scheduler, in `config/sidekiq.yml`:
 
@@ -35,7 +61,7 @@ With plain cron and any Active Job backend:
 
 The minute tick keeps an enabled default-dashboard snapshot prepared even when nobody visits. Other jobs retain their hourly, daily or monthly cadences: ticking more often does not make rank checks, imports or emails run every minute. A host upgrading from the previous 15-minute tick should update its recurring schedule once. Dashboard users only need the checkbox in Settings, General.
 
-The tick only enqueues. It never does the work inside itself, so it's quick.
+With an asynchronous Active Job adapter, the tick only enqueues, so it is quick.
 
 ## What runs
 
@@ -80,9 +106,9 @@ The assistant and dashboard snapshot refresh use `default`; the other jobs liste
 
 Check **Precompute default dashboard** under Settings, General and save to queue the initial build. The setting starts off. The minute tick queues upkeep without waiting for a page visit. Eligible page requests can also queue a refresh when the snapshot is more than 30 seconds old. A worker reuses a snapshot that another worker or request has already made fresh. Turning the setting off takes effect on subsequent requests, and already queued jobs check that it is still enabled before building.
 
-The job uses the same [configured engine cache](configuration.md#cache-store) as the web process, defaulting to `Rails.cache`. The host must already schedule the minute tick and have workers processing `low` (the tick) and `default` (snapshot builds); saving the setting does not start workers or install a recurring scheduler. PostgreSQL advisory locks serialize snapshot builds, and a one-minute enqueue lease prevents concurrent requests from immediately queuing duplicate refreshes. Workers verify the queued database, schema and definition fingerprint before building. Snapshot upkeep uses its existing cache lease rather than a cadence-registry row, so it does not appear among the jobs on Settings, Jobs. Hosts with tenant-specific database, schema or scoped-query contexts must establish that context for both their ticks and snapshot workers; the engine does not enumerate tenants.
+The job uses the same [configured engine cache](configuration.md#cache-store) as the web process, defaulting to `Rails.cache`. The host must enable the embedded scheduler or schedule the minute tick, and have workers processing `low` and `default` (snapshot builds); saving the setting does not start workers or enable the scheduler. PostgreSQL advisory locks serialize snapshot builds, and a one-minute enqueue lease prevents concurrent requests from immediately queuing duplicate refreshes. Workers verify the queued database, schema and definition fingerprint before building. Snapshot upkeep uses its existing cache lease rather than a cadence-registry row, so it does not appear among the jobs on Settings, Jobs. Hosts with tenant-specific database, schema or scoped-query contexts must establish that context for both their ticks and snapshot workers; the engine does not enumerate tenants.
 
-An asynchronous summary or panel request with no usable snapshot queues a rebuild and runs only its own ordinary queries. It never waits for a full-dashboard build. The explicit complete response (`?loading=complete`), linked for browsers without JavaScript, retains its synchronous fallback. A healthy minute tick and worker keep an idle dashboard prepared. Cache eviction, midnight date changes, definition changes or delayed workers can still leave the next request without a usable snapshot. Jobs do not reschedule themselves, and there is no boot hook. Ordinary analytical query caches still have their 30-second window. Snapshots expire after 270 seconds, bounding numerical age to five minutes including that window. See [Configuration](configuration.md#precomputed-default-dashboard) for eligibility, cache-store behavior and tenant context requirements.
+An asynchronous summary or panel request with no usable snapshot queues a rebuild and runs only its own ordinary queries. It never waits for a full-dashboard build. The explicit complete response (`?loading=complete`), linked for browsers without JavaScript, retains its synchronous fallback. A healthy minute tick and worker keep an idle dashboard prepared. Cache eviction, midnight date changes, definition changes or delayed workers can still leave the next request without a usable snapshot. Jobs do not reschedule themselves; ticks come from the embedded loop or the host scheduler. Ordinary analytical query caches still have their 30-second window. Snapshots expire after 270 seconds, bounding numerical age to five minutes including that window. See [Configuration](configuration.md#precomputed-default-dashboard) for eligibility, cache-store behavior and tenant context requirements.
 
 ## Settings, Jobs
 
@@ -103,7 +129,7 @@ Settings, Jobs lists every job in the cadence registry, whether or not it has ev
 
 A failed run shows its error. Under the table, "Recent runs" keeps the last 100 runs of each job (up to 50 shown at once, newest first), with how long each took and the first lines of any error. A run still marked Running after 6 hours shows as "Did not finish", which usually means no worker picked up the `low` queue or the worker died.
 
-"Nothing has run yet" at the top means the tick isn't scheduled.
+"Nothing has run yet" at the top means no scheduled job has started. Check the embedded scheduler or external recurring tick, the job requirements and the application log.
 
 ## What "Ran" means
 

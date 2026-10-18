@@ -14,6 +14,8 @@ module AhoyDashboard
 
     attr_accessor :alert_notifier
 
+    attr_accessor :embedded_scheduler
+
     attr_reader :alerts, :reports
 
     attr_reader :cache_store
@@ -32,6 +34,7 @@ module AhoyDashboard
       @assets_root = nil
       @cache_store = nil
       @alert_notifier = nil
+      @embedded_scheduler = false
       @alerts = ActiveSupport::OrderedOptions.new.merge!(mailer: "AhoyDashboard::AlertMailer", parent_mailer: "ActionMailer::Base")
       @reports = ActiveSupport::OrderedOptions.new.merge!(mailer: "AhoyDashboard::ReportMailer", parent_mailer: "ActionMailer::Base")
     end

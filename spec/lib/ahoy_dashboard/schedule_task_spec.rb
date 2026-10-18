@@ -13,7 +13,7 @@ RSpec.describe "ahoy_dashboard:schedule" do
     expect(lines.first(AhoyDashboard::Schedule::ALL.size).map { |line| line.split.first })
       .to eq(AhoyDashboard::Schedule::ALL.map(&:key))
     expect(lines).to include(a_string_starting_with("places runs monthly on the 2nd, "))
-    expect(lines.last).to eq("schedule AhoyDashboard::TickJob and this list runs itself")
+    expect(lines.last).to eq("enable the embedded scheduler or schedule AhoyDashboard::TickJob every minute and this list runs itself")
   end
 
   it "writes plain lines with nothing indented" do

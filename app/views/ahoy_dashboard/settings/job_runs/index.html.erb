@@ -6,7 +6,7 @@
 
 <% if @presenter.never_run? %>
   <%= dash_notice "Nothing has run yet.",
-        detail: "Schedule the ahoy_dashboard tick job to run every 15 minutes and these start on their own." %>
+        detail: "Enable the embedded scheduler or schedule the ahoy_dashboard tick job every minute to start these automatically." %>
 <% end %>
 
 <%= dash_card do %>

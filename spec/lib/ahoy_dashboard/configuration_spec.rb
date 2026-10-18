@@ -3,6 +3,10 @@ require "rails_helper"
 RSpec.describe AhoyDashboard::Configuration do
   subject(:config) { described_class.new }
 
+  it "leaves the embedded scheduler off by default" do
+    expect(config.embedded_scheduler).to be(false)
+  end
+
   it "keeps what is code: access, ahoy models, mailers and the notifier" do
     notifier = ->(_event) { }
     config.authorize = ->(_controller) { true }

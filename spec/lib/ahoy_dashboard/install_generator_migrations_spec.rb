@@ -132,16 +132,68 @@ RSpec.describe AhoyDashboard::Generators::InstallGenerator do
                                                  "add_ahoy_dashboard_chat_message_reasoning")
     end
 
-    it "refuses an app with only some of the migrations one of these replaces" do
+    it "refuses an app with only some of the migrations one of these replaces, when the database lacks it too" do
       install_legacy(described_class::LEGACY.values.flatten.uniq - %w[add_floor_to_ahoy_dashboard_alert_rules] +
                      names_in("core", "keywords", "backlinks", "places", "reports"))
       count = copied.size
+      connection = AhoyDashboard::Record.connection
+      allow(connection).to receive(:column_exists?).and_call_original
+      allow(connection).to receive(:column_exists?).with("ahoy_dashboard_alert_rules", "floor").and_return(false)
 
       output = run_generator
 
-      expect(output).to include("is missing some of its migrations: add_floor_to_ahoy_dashboard_alert_rules")
+      expect(output).to include("is missing some of its migrations: add_floor_to_ahoy_dashboard_alert_rules. copy those")
+      expect(output).not_to include("could not be reached")
       expect(output).not_to include("identical")
       expect(copied.size).to eq(count)
+    end
+
+    it "goes ahead when the files are gone but the database has what they made, as in a renamed app" do
+      gone = %w[
+        create_ahoy_dashboard_goals create_ahoy_dashboard_properties create_ahoy_dashboard_funnels
+        create_ahoy_dashboard_segments create_ahoy_dashboard_saved_queries create_ahoy_dashboard_page_groups
+        create_ahoy_dashboard_annotations change_ahoy_dashboard_annotations_to_happened_at
+        create_ahoy_dashboard_google_accounts create_ahoy_dashboard_search_console_rows
+        create_ahoy_dashboard_search_console_keywords create_ahoy_dashboard_serp_providers create_ahoy_dashboard_serp_sites
+        create_ahoy_dashboard_serp_keywords create_ahoy_dashboard_serp_runs create_ahoy_dashboard_serp_checks
+        create_ahoy_dashboard_serp_results create_ahoy_dashboard_chats create_ahoy_dashboard_assistant_providers
+        add_views_to_ahoy_dashboard_chat_messages add_context_to_ahoy_dashboard_chats
+      ]
+      install_legacy(described_class::LEGACY.values.flatten.uniq - gone +
+                     names_in("core", "keywords", "backlinks", "places", "reports") - %w[create_ahoy_dashboard_core])
+      before = copied
+
+      output = run_generator
+
+      expect(output).not_to include("missing some of its migrations")
+      expect(copied - before).to contain_exactly("remove_ahoy_dashboard_search_console_rows_date_index",
+                                                 "add_ahoy_dashboard_serp_lookup_indexes",
+                                                 "add_ahoy_dashboard_chat_message_reasoning")
+    end
+
+    it "goes by db/migrate alone and says so when the database cannot be reached" do
+      install_legacy(described_class::LEGACY.values.flatten.uniq - %w[create_ahoy_dashboard_goals] +
+                     names_in("core", "keywords", "backlinks", "places", "reports") - %w[create_ahoy_dashboard_core])
+      count = copied.size
+      allow(AhoyDashboard::Record).to receive(:connection).and_raise(ActiveRecord::ConnectionNotEstablished)
+
+      output = run_generator
+
+      expect(output).to include("is missing some of its migrations: create_ahoy_dashboard_goals. copy those")
+      expect(output).to include("the database could not be reached, so this is going by db/migrate alone")
+      expect(copied.size).to eq(count)
+    end
+
+    it "knows what every migration these replace made, and finds all of it in a full install" do
+      names = described_class::LEGACY.values.flatten.uniq
+      connection = AhoyDashboard::Record.connection
+
+      expect(AhoyDashboard::Installation::LegacyMigration::ALL.map(&:name)).to match_array(names)
+      aggregate_failures do
+        names.each do |name|
+          expect(AhoyDashboard::Installation::LegacyMigration.fetch(name).applied?(connection)).to be(true), "#{name} not found"
+        end
+      end
     end
 
     it "refuses a feature it does not know and both flags at once" do

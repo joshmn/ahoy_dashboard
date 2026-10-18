@@ -10,7 +10,7 @@ Stored means they're yours. Google only keeps 16 months, and the dashboard keeps
 
 - The site is verified in Search Console, under a Google account you can sign in with.
 - The site host is set to your real domain on [Settings, General](configuration.md#settings-general), or a redirect URL override is saved on Settings, Search Console. Without either, the settings screen still loads, but there's no redirect URI to register with Google yet, and "Connect Google account" stays disabled until you set one.
-- `AhoyDashboard::TickJob` is scheduled. See [Background jobs](background-jobs.md).
+- The embedded scheduler is enabled, or `AhoyDashboard::TickJob` is scheduled. See [Background jobs](background-jobs.md).
 
 ## Turn it on
 
