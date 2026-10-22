@@ -1,12 +1,15 @@
 require "csv"
 
 module AhoyDashboard
-  class BaseController < ActionController::Base
+  class BaseController < AhoyDashboard.config.parent_controller.constantize
     layout :dashboard_layout
 
     protect_from_forgery with: :exception
 
     include AhoyDashboard::ErrorScreens
+
+    helper AhoyDashboard::DashboardHelper, AhoyDashboard::ComponentsHelper,
+      AhoyDashboard::SeoHelper, AhoyDashboard::SettingsHelper
 
     VIEW_COOKIE = "dash_view".freeze
     VIEW_EXPIRY = 90.days
@@ -27,6 +30,18 @@ module AhoyDashboard
     after_action :remember_view, if: :dashboard_page?
 
     helper_method :query, :remembered_view?, :ask_panel, :ask_screen?, :ask_installed?, :palette, :seo_navigation?
+    helper_method :dashboard_allowed?
+
+    def default_url_options
+      super.merge(AhoyDashboard.url_options).except(*request.path_parameters.keys)
+    end
+
+    def dashboard_allowed?(permission)
+      @dashboard_permissions ||= {}
+      @dashboard_permissions.fetch(permission) do
+        @dashboard_permissions[permission] = AhoyDashboard.allowed?(self, permission)
+      end
+    end
 
     def cache_store
       AhoyDashboard.config.cache_store || super
@@ -71,11 +86,18 @@ module AhoyDashboard
     end
 
     def require_admin!
-      return if AhoyDashboard.authorized?(self)
+      if AhoyDashboard.authorized?(self)
+        AhoyDashboard::Context.current
+        return if dashboard_allowed?(required_permission)
+      end
 
       raise ActiveRecord::RecordNotFound if AhoyDashboard.signed_in?(self)
 
       redirect_to AhoyDashboard.sign_in_path(self)
+    end
+
+    def required_permission
+      request.get? || request.head? ? :read : :manage
     end
 
     def stream_csv(name, rows)
@@ -85,8 +107,11 @@ module AhoyDashboard
       response.headers["X-Accel-Buffering"] = "no"
       response.headers.delete("Content-Length")
 
+      context = AhoyDashboard::Context.current
       self.response_body = Enumerator.new do |out|
-        rows.each { |row| out << CSV.generate_line(row) }
+        AhoyDashboard::Context.with(context) do
+          rows.each { |row| out << CSV.generate_line(row) }
+        end
       end
     end
 
@@ -102,11 +127,12 @@ module AhoyDashboard
     end
 
     def query
-      @query ||= AhoyDashboard::QueryForm.from_params(params, remembered: cookies[VIEW_COOKIE])
+      @query ||= AhoyDashboard::QueryForm.from_params(params, remembered: cookies[dashboard_key(VIEW_COOKIE)])
     end
 
     def palette
-      @palette ||= PalettePresenter.new(query: query, screen: @presenter, routes: self)
+      @palette ||= PalettePresenter.new(query: query, screen: @presenter, routes: self,
+        manage: dashboard_allowed?(:manage), assistant: dashboard_allowed?(:assistant))
     end
 
     def remembered_view?
@@ -127,11 +153,11 @@ module AhoyDashboard
     end
 
     def ask_memory
-      @ask_memory ||= AhoyDashboard::Assistant::PanelMemory.read(cookies[ASK_COOKIE])
+      @ask_memory ||= AhoyDashboard::Assistant::PanelMemory.read(cookies[dashboard_key(ASK_COOKIE)])
     end
 
     def ask_installed?
-      Installation.installed?(:assistant)
+      dashboard_allowed?(:assistant) && Installation.installed?(:assistant)
     end
 
     def ask_panel
@@ -144,7 +170,7 @@ module AhoyDashboard
     end
 
     def remember_ask(open:, chat_id:)
-      cookies[ASK_COOKIE] = {
+      cookies[dashboard_key(ASK_COOKIE)] = {
         value: AhoyDashboard::Assistant::PanelMemory.new(open: open, chat_id: chat_id).to_s,
         expires: ASK_EXPIRY.from_now,
         httponly: true,
@@ -163,7 +189,7 @@ module AhoyDashboard
 
       return forget_view if view.blank?
 
-      cookies[VIEW_COOKIE] = {
+      cookies[dashboard_key(VIEW_COOKIE)] = {
         value: view,
         expires: VIEW_EXPIRY.from_now,
         httponly: true,
@@ -172,7 +198,12 @@ module AhoyDashboard
     end
 
     def forget_view
-      cookies.delete(VIEW_COOKIE)
+      cookies.delete(dashboard_key(VIEW_COOKIE))
+    end
+
+    def dashboard_key(name)
+      context = AhoyDashboard::Context.current
+      context ? "#{name}_#{Digest::SHA256.hexdigest(context.to_s).first(16)}" : name
     end
 
     def dashboard_page?

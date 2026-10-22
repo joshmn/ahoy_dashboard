@@ -15,6 +15,128 @@ end
 
 Registering the same key again replaces the old entry, which is what makes the reload safe.
 
+## Hosting the dashboard in a separate app
+
+A host app can supply authentication, navigation, permissions, and a site context. These are optional: the default mount still uses one database context and gives authorized users all capabilities. Users, memberships, site provisioning, and event collection belong to the host app.
+
+Configure the parent controller before the engine controllers load, normally in `config/initializers/ahoy_dashboard.rb`. Use class names so Rails can resolve reloaded classes:
+
+```ruby
+AhoyDashboard.configure do |config|
+  config.parent_controller = "DashboardController"
+  config.signed_in = ->(controller) { controller.current_user.present? }
+  config.sign_in_path = "/sign_in"
+  config.authorize = ->(controller) { controller.current_user.present? }
+  config.authorize_action = ->(controller, permission) do
+    permission == :read || controller.current_user.admin?
+  end
+  config.navigation_partial = "dashboard/navigation"
+end
+```
+
+The parent controller's authentication callbacks and helpers run on engine requests. The engine explicitly includes its own helpers as well. Supply a narrow dashboard parent if your main controller does other work, such as tracking page views.
+
+`authorize` remains the gate for every dashboard request. Once it passes, `authorize_action` receives the controller and one of these capabilities:
+
+| Capability | Allows |
+|---|---|
+| `:read` | Reports, filters, exports, assets, and clearing the reader's remembered view |
+| `:manage` | Every settings screen, including OAuth callbacks, and changes such as rank checks, syncs, tags, and saved definitions |
+| `:assistant` | Opening, creating, continuing, streaming, and deleting assistant conversations |
+
+An unset `authorize_action` allows all capabilities after `authorize`. A refusal has the same sign-in redirect or 404 behavior as `authorize`. Checks run before engine queries and actions. Navigation and management controls use the same capabilities; cached dashboard fragments also include them in their identity. A host partial can call `dashboard_allowed?(:manage)`.
+
+`navigation_partial` renders in the header beside the site name. The partial can use the host controller's helpers and `main_app` routes for a site selector, account links, or a user menu. Link to host-owned user management and installation pages from here. The installation page can offer a copyable tracking snippet using the site's collection endpoint and a locally served or CDN-hosted script. Collection, site credentials, and script hosting belong to that app; the engine reads the resulting Ahoy records. The existing `dash_header_controls` content slot is still available.
+
+### Site contexts
+
+The context hook carries a site's identity through engine jobs, caches, cookies, and streamed exports. **The host must establish actual data isolation.** An identifier alone does not scope SQL. Every site needs isolated Ahoy and dashboard tables, including credentials, settings, job leases, and optional features.
+
+Separate PostgreSQL schemas fit the engine's existing queries. The host provisions and migrates each schema, keeps its own users/sites in shared tables, and switches all connections used by the engine. Do not let a missing tenant table fall back to another site's tables through `search_path`. Shared tables require additional site columns, scoped constraints, and query/database isolation; these hooks do not implement row-based tenancy or add a default scope.
+
+Set `config.context` to a host class with two class methods:
+
+- `current` returns the current site's stable string or integer ID, or `nil` outside a site.
+- `with(identifier) { ... }` resolves that ID, establishes its database context, yields, and restores the previous context even after an exception. It must reject unknown or deleted sites.
+
+Keep this class independent of controller sessions: workers use it too. For example, if the host already has `Sites::ContextService` that handles its connection switching:
+
+```ruby
+class DashboardContext
+  class << self
+    def current
+      Current.site.id if Current.site
+    end
+
+    def with(identifier, &block)
+      Sites::ContextService.call(site: Site.find(identifier), &block)
+    end
+  end
+end
+```
+
+The host controller resolves the site through the user's permitted sites before entering the engine:
+
+```ruby
+class DashboardController < ApplicationController
+  before_action :require_login
+  around_action :within_dashboard_site
+
+  private
+
+  def within_dashboard_site
+    site = current_user.sites.find(params[:site_id])
+    AhoyDashboard::Context.with(site.id) { yield }
+  end
+end
+```
+
+The engine clears its memoized preferences and definitions on entry and exit. With a configured context, dashboard access and job execution raise `AhoyDashboard::Context::Missing` when no site is supplied. The host's context class must switch the engine records, visits, and events together. If models use different connection pools, switch each pool; connection state must stay local to the executing thread, including assistant streams.
+
+### Mounting beneath a site
+
+```ruby
+mount AhoyDashboard::Engine, at: "/sites/:site_id/analytics"
+```
+
+```ruby
+AhoyDashboard.configure do |config|
+  config.context = "DashboardContext"
+  config.url_options = -> do
+    { site_id: AhoyDashboard::Context.current, host: "analytics.example.com", protocol: "https" }
+  end
+end
+```
+
+`url_options` runs when a link is generated, including outside requests. Engine presenters, assistant tools, OAuth callbacks, and mailers use `AhoyDashboard.routes`, which includes these options. The `host` identifies the dashboard app; each site's tracked host stays in its own settings. A saved Search Console redirect URL still takes precedence. The host can use the route helpers too:
+
+```ruby
+AhoyDashboard::Context.with(site.id) do
+  AhoyDashboard.routes.root_path
+  AhoyDashboard.routes.root_url(host: "analytics.example.com", protocol: "https")
+end
+```
+
+Within requests, mount parameters already in the path are not repeated in the query string. The selected site stays in the URL, allowing independent tabs and bookmarked reports. Remembered dashboard and assistant cookies, and Google OAuth state in the session, are separated by context ID.
+
+### Jobs and scheduling
+
+Every job inheriting from `AhoyDashboard::Job` captures the active context when queued and restores it before Active Job resolves record arguments, acquires scheduling leases, or runs the job. Retries keep the original identity. A queued job without a context fails when context support is enabled; removing context configuration while site-specific jobs remain queued also fails. Drain or replace older jobs when enabling context support.
+
+Run the tick once per site from the host's scheduler:
+
+```ruby
+Site.find_each do |site|
+  AhoyDashboard::Context.with(site.id) do
+    AhoyDashboard::TickJob.perform_later
+  end
+end
+```
+
+Keep `embedded_scheduler` off with a configured context. Boot rejects that combination because the embedded loop has no site inventory. Host-owned jobs and rake tasks must enter a context explicitly before calling engine code. Keep the same context configuration in web and worker processes.
+
+Analytics, snapshots, referrer allowlists, rank-check queue markers, and provider model lists include the site context in their cache identity. Public favicon image bytes can be shared, while each site's allowed referrers remain separate. Use a shared cache for jobs and web processes as described in [Configuration](configuration.md#cache-store).
+
 ## Dimensions
 
 A dimension is anything you can break numbers down by and filter on. The built-in ones read the columns in [Tracking](tracking.md#visits). Register your own to read anything else in `ahoy_visits` or `ahoy_events`, including columns your app added.

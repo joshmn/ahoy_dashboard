@@ -112,7 +112,7 @@ module AhoyDashboard
       def cache_key
         digest = OpenSSL::Digest::SHA256.hexdigest([ @name, endpoint, OpenSSL::Digest::SHA256.hexdigest(api_key.to_s) ].join("\n"))
 
-        "#{CACHE_PREFIX}/#{digest}"
+        AnalyticsCache.key(key: [ CACHE_PREFIX, digest ], connection: AssistantProvider.connection)
       end
     end
   end

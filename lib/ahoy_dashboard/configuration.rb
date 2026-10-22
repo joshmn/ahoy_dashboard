@@ -2,6 +2,8 @@ module AhoyDashboard
   class Configuration
     attr_accessor :authorize
 
+    attr_accessor :authorize_action, :parent_controller, :navigation_partial, :url_options, :context
+
     attr_accessor :signed_in
 
     attr_accessor :sign_in_path
@@ -26,6 +28,11 @@ module AhoyDashboard
 
     def initialize
       @authorize = nil
+      @authorize_action = nil
+      @parent_controller = "ActionController::Base"
+      @navigation_partial = nil
+      @url_options = nil
+      @context = nil
       @signed_in = ->(_controller) { true }
       @sign_in_path = "/"
       @error_screens = nil

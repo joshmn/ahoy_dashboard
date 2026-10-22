@@ -78,7 +78,8 @@ module AhoyDashboard
       end
 
       def known_domains
-        Current.favicon_domains ||= AhoyDashboard.cache.fetch(DOMAINS_KEY, expires_in: DOMAINS_TTL) { referring_domains }
+        key = AnalyticsCache.key(key: DOMAINS_KEY, connection: AhoyDashboard.visit.connection)
+        Current.favicon_domains ||= AhoyDashboard.cache.fetch(key, expires_in: DOMAINS_TTL) { referring_domains }
       end
 
       def cache_key(domain)

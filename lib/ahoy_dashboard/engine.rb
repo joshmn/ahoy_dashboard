@@ -7,6 +7,9 @@ module AhoyDashboard
     config.paths["db/migrate"] = []
 
     initializer "ahoy_dashboard.embedded_scheduler", after: :load_config_initializers do |app|
+      if AhoyDashboard.config.embedded_scheduler && AhoyDashboard.config.context
+        raise ArgumentError, "Schedule a dashboard tick per site when context is configured"
+      end
       app.middleware.use(AhoyDashboard::Scheduler::Middleware) if AhoyDashboard.config.embedded_scheduler
     end
 

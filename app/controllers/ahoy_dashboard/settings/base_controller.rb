@@ -5,6 +5,10 @@ module AhoyDashboard
 
       private
 
+      def required_permission
+        :manage
+      end
+
       def rejected(form, template = :edit)
         @form = form
         render template, status: 422

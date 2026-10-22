@@ -10,7 +10,7 @@ Find what you're seeing in the left column. Each feature's own page has more.
 | `NoMethodError` for `current_user` or `admin?` on every request | The generated `authorize` assumes a `current_user` with an `admin?` method | Write your own lambda |
 | Signed-out people land on your home page | `signed_in` returns false and `sign_in_path` is still `"/"` | Set `sign_in_path` |
 | `UnsafeRedirectError` when signed out | `sign_in_path` is a URL on another host | Use a path, or a URL on the same host |
-| Your helpers or `Current` values are missing in `authorize` | The dashboard's controllers don't inherit your `ApplicationController` | Look the user up in the lambda. See [Your ApplicationController doesn't run](installation.md#your-applicationcontroller-doesnt-run). |
+| Your helpers or `Current` values are missing in `authorize` | The default controller parent is `ActionController::Base` | Configure `parent_controller` or look the user up in the lambda. See [Using your ApplicationController](installation.md#using-your-applicationcontroller). |
 | Links from Ask point at `/` | The mount has a custom `as:` name | Mount without `as:` |
 
 ## Installing and booting

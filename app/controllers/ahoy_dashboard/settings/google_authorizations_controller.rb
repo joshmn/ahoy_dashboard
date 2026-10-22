@@ -14,9 +14,10 @@ module AhoyDashboard
           return redirect_to settings_google_connection_path, alert: SearchConsole::NO_HOST_MESSAGE
         end
 
-        session[STATE_KEY] = SecureRandom.urlsafe_base64(32)
+        state = SecureRandom.urlsafe_base64(32)
+        session[dashboard_key(STATE_KEY)] = state
 
-        redirect_to SearchConsole.authorization_url(state: session[STATE_KEY]), allow_other_host: true
+        redirect_to SearchConsole.authorization_url(state: state), allow_other_host: true
       end
     end
   end

@@ -110,7 +110,7 @@ module AhoyDashboard
     end
 
     def path
-      AhoyDashboard::Engine.routes.url_helpers.public_send(route)
+      AhoyDashboard.routes.public_send(route)
     end
 
     def current?(controller_path)

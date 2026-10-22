@@ -35,7 +35,8 @@ module AhoyDashboard::DashboardHelper
     end
 
     [ "ahoy_dashboard/dashboard", section, generation,
-      request.base_url, request.script_name, I18n.locale, query.to_query ]
+      request.base_url, request.script_name, I18n.locale, query.to_query,
+      AhoyDashboard::Context.current, AhoyDashboard.url_options, dashboard_allowed?(:manage), dashboard_allowed?(:assistant) ]
   end
 
   CHANNEL_ICONS = {

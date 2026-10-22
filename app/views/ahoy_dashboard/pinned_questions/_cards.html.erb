@@ -3,7 +3,7 @@
       <header class="pq-hd">
         <h2 id="tm-pinned-title">Pinned questions</h2>
         <%= dash_button "Manage in Explore", settings_saved_queries_path,
-              tone: :link, data: { tm_frame: "_top" } %>
+              tone: :link, data: { tm_frame: "_top" } if dashboard_allowed?(:manage) %>
       </header>
 
       <div class="pq-grid">

@@ -16,6 +16,11 @@ The dashboard reads no environment variables and no Rails credentials. Keys and 
 
 | Setting | Default | Does |
 |---|---|---|
+| `parent_controller` | `"ActionController::Base"` | Host controller class name. Set before engine controllers load. |
+| `authorize_action` | `nil` | Optional lambda receiving the controller and `:read`, `:manage`, or `:assistant`. |
+| `navigation_partial` | `nil` | Host partial rendered beside the site name in the header. |
+| `context` | `nil` | Host class name providing `current` and `with(identifier)`. |
+| `url_options` | `nil` | Lambda returning URL defaults, including dynamic mount parameters. |
 | `authorize` | `nil` | A lambda called with the controller on every request. Truthy lets the request in. With no lambda, every request is refused. |
 | `signed_in` | `->(_controller) { true }` | Whether anybody is signed in. Decides what a refused request gets: a 404 when truthy, a redirect to `sign_in_path` when not. |
 | `sign_in_path` | `"/"` | Where a refused, signed-out request is sent. A string, or a lambda called with the controller. |
@@ -94,9 +99,9 @@ Snapshots use the [configured engine cache](#cache-store), defaulting to `Rails.
 
 A snapshot is fresh for 30 seconds. The minute tick queues upkeep while the setting is enabled, including when the dashboard is idle. A later eligible request can also serve the existing snapshot while queuing one refresh; a worker leaves an already fresh snapshot alone. The snapshot is retained for at most 270 seconds, allowing for the underlying analytical cache's 30-second freshness window and bounding numerical staleness to five minutes. A missing or expired snapshot queues a background build while each requested panel runs its own ordinary query. The initial shell and summary never wait for a full-dashboard rebuild. The explicit complete response (`?loading=complete`), used by the no-JavaScript link, retains its synchronous fallback. A healthy scheduled tick and worker keep idle snapshots prepared. Cache eviction, midnight range changes, changed definitions or a delayed worker can still cause a cold request. The host enables the embedded scheduler or configures the recurring schedule once; dashboard users only change the checkbox. See [Background jobs](background-jobs.md#precomputed-dashboard-refresh).
 
-Keys include database and schema identity for engine, visit and event models; their scoped SQL; the site host and time zone; the local date range; engine definitions and settings; and resolved report and dimension definitions. Changes to goals, funnels, pinned questions, annotations, exclusions, page groups, segments or settings use a different snapshot. Custom report and dimension registries are resolved into the fingerprint; no callable or model instance is stored. A worker whose database, schema or definitions no longer match the queued key leaves the entry alone. Tenant-aware hosts must establish their normal tenant context when running both the tick and snapshot jobs; the engine does not discover or iterate tenants.
+Keys include database and schema identity for engine, visit and event models; their scoped SQL; the site host and time zone; the local date range; engine definitions and settings; and resolved report and dimension definitions. Changes to goals, funnels, pinned questions, annotations, exclusions, page groups, segments or settings use a different snapshot. Custom report and dimension registries are resolved into the fingerprint; no callable or model instance is stored. A worker whose database, schema or definitions no longer match the queued key leaves the entry alone. Tenant-aware hosts must enter their site context before queuing each site's tick. With `config.context`, jobs restore that context automatically; the engine does not discover or iterate tenants.
 
-Tenant isolation must appear in the database, schema or model scope SQL used by the key. Session-variable-only PostgreSQL row-level security is not included in that identity; leave this feature disabled for those setups.
+Cache keys also include the configured host context ID. Isolation implemented through session variables needs this explicit identity; without it, leave precomputation disabled. See [Hosting the dashboard](extending.md#hosting-the-dashboard-in-a-separate-app) for the context contract and its data-isolation requirements.
 
 When the host enables Rails fragment caching, report and funnel HTML from a prepared snapshot can also use the configured engine cache for that snapshot generation. Realtime and session-specific controls remain uncached.
 
@@ -198,7 +203,7 @@ Until one of rank tracking, keyword research or backlinks is installed, this scr
 
 The OAuth client ID and secret, the Connect Google account button, the property picker, and a redirect URL override.
 
-The redirect URL is the override when you've saved one. Otherwise it's built as `https://<canonical host><mount path>/settings/google_callback`, where the canonical host falls back to the site host. With neither set and no override, there's no URL to register with Google yet, and the screen says so.
+The redirect URL is the override when you've saved one. Otherwise it's built as `https://<canonical host><mount path>/settings/google_callback`, where the canonical host falls back to the site host. Hosts using `config.url_options` can supply the dashboard app's host and protocol instead. With no host and no override, there's no URL to register with Google yet, and the screen says so.
 
 The built one is always `https`. Google only allows plain `http` for `localhost`, so in development save an override like:
 

@@ -8,7 +8,7 @@ Every dashboard request, including its stylesheet, script, icons and CSV exports
 
 - No `authorize` means no access for anybody.
 - A refused request gets a 404 by default, the same answer as if nothing were mounted, so the dashboard never confirms it exists to somebody who can't open it. Set `signed_in` and `sign_in_path` to send signed-out people to sign in instead. See [Installation](installation.md#whos-allowed-in).
-- There are no roles. Everybody who gets in sees everything and can change every setting, including provider keys, and can read every assistant conversation.
+- By default, everybody who gets in sees everything and can change every setting, including provider keys, and read every assistant conversation. A host can restrict `:read`, `:manage`, and `:assistant` through `config.authorize_action`; see [Hosting the dashboard](extending.md#hosting-the-dashboard-in-a-separate-app).
 
 Other protections on every response:
 
@@ -24,6 +24,8 @@ Other protections on every response:
 | `dash_ask` | Whether the Ask panel is open, and which conversation is in it | 90 days |
 
 Both are `HttpOnly` and `SameSite=Lax`, and neither grants anything. They aren't signed or encrypted, because they only hold preferences.
+
+With a configured host context, each cookie name has a digest of the site identity appended, so switching sites keeps separate remembered views and conversations.
 
 ## Stored secrets
 

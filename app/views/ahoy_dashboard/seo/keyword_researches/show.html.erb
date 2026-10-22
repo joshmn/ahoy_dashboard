@@ -6,32 +6,34 @@
   <% if @presenter.setup_notice %>
     <%= dash_empty_card card_class: "seo-notice-card", compact: true, **@presenter.setup_notice %>
   <% else %>
-    <%= dash_unavailable_notice "Look up", @presenter.lookup_reason, fix: @presenter.lookup_fix %>
+    <%= dash_unavailable_notice "Look up", @presenter.lookup_reason, fix: @presenter.lookup_fix if dashboard_allowed?(:manage) %>
   <% end %>
 
   <div class="seo-inline-form">
-    <%= dash_form_with url: @presenter.lookup_path, method: :post, stack: false, class: "seo-inline-form__form" do |form| %>
-      <%= form.label :seed, "Phrase", class: "seo-inline-form__label" %>
-      <%= form.text_field :seed, value: @presenter.seed, class: "form-control-sm",
-            placeholder: "running shoes", autocomplete: "off", "aria-describedby": "seed-hint" %>
-      <%= form.label :country, "Place", class: "seo-inline-form__label" %>
-      <%= form.select :country, @presenter.country_options, { selected: @presenter.place_country },
-            class: "form-select-sm seo-inline-form__country" %>
-      <%= form.label :city, "City", class: "visually-hidden" %>
-      <%= form.text_field :city, value: @presenter.place_city, class: "form-control-sm",
-            placeholder: "Whole country", autocomplete: "off", title: "Google's name for it, like Chicago,Illinois,United States" %>
-      <%= form.label :language, "Language", class: "seo-inline-form__label" %>
-      <%= form.text_field :language, value: @presenter.language, class: "form-control-sm seo-inline-form__language",
-            mono: true, placeholder: "en", autocomplete: "off" %>
-      <% if @presenter.lookup_reason %>
-        <%= dash_unavailable "Look up", reason: @presenter.lookup_reason, type: "submit" %>
-      <% else %>
-        <%= form.submit "Look up", class: dash_button_class, name: nil %>
+    <% if dashboard_allowed?(:manage) %>
+      <%= dash_form_with url: @presenter.lookup_path, method: :post, stack: false, class: "seo-inline-form__form" do |form| %>
+        <%= form.label :seed, "Phrase", class: "seo-inline-form__label" %>
+        <%= form.text_field :seed, value: @presenter.seed, class: "form-control-sm",
+              placeholder: "running shoes", autocomplete: "off", "aria-describedby": "seed-hint" %>
+        <%= form.label :country, "Place", class: "seo-inline-form__label" %>
+        <%= form.select :country, @presenter.country_options, { selected: @presenter.place_country },
+              class: "form-select-sm seo-inline-form__country" %>
+        <%= form.label :city, "City", class: "visually-hidden" %>
+        <%= form.text_field :city, value: @presenter.place_city, class: "form-control-sm",
+              placeholder: "Whole country", autocomplete: "off", title: "Google's name for it, like Chicago,Illinois,United States" %>
+        <%= form.label :language, "Language", class: "seo-inline-form__label" %>
+        <%= form.text_field :language, value: @presenter.language, class: "form-control-sm seo-inline-form__language",
+              mono: true, placeholder: "en", autocomplete: "off" %>
+        <% if @presenter.lookup_reason %>
+          <%= dash_unavailable "Look up", reason: @presenter.lookup_reason, type: "submit" %>
+        <% else %>
+          <%= form.submit "Look up", class: dash_button_class, name: nil %>
+        <% end %>
       <% end %>
-    <% end %>
-    <% if @presenter.any? %>
-      <%= dash_button_to "Look up again", @presenter.refresh_path, method: :post, params: @presenter.picked,
-            reason: @presenter.lookup_reason, confirm: @presenter.refresh_confirm %>
+      <% if @presenter.any? %>
+        <%= dash_button_to "Look up again", @presenter.refresh_path, method: :post, params: @presenter.picked,
+              reason: @presenter.lookup_reason, confirm: @presenter.refresh_confirm %>
+      <% end %>
     <% end %>
     <% if @presenter.lookups.many? %>
       <%= dash_link_menu(id: "tm-seo-seed", label: @presenter.lookup_label, section: "Saved phrases",

@@ -16,6 +16,7 @@ require "ahoy_dashboard/compatibility/upsert"
 require "ahoy_dashboard/compatibility/record"
 require "ahoy_dashboard/version"
 require "ahoy_dashboard/configuration"
+require "ahoy_dashboard/context"
 require "ahoy_dashboard/scheduler"
 require "ahoy_dashboard/scheduler/middleware"
 require "ahoy_dashboard/markdown"
@@ -87,12 +88,22 @@ module AhoyDashboard
       !!callable.call(controller)
     end
 
+    def allowed?(controller, permission)
+      callable = config.authorize_action
+      callable.nil? || !!callable.call(controller, permission)
+    end
+
+    def url_options
+      callable = config.url_options
+      callable ? callable.call : {}
+    end
+
+    def routes
+      Routes.new
+    end
+
     def mount_path(rest = nil)
-      base = begin
-        AhoyDashboard::Engine.routes.url_helpers.root_path.chomp("/").presence || "/"
-      rescue StandardError
-        "/"
-      end
+      base = routes.root_path.chomp("/").presence || "/"
 
       return base if rest.blank?
 

@@ -128,10 +128,12 @@ module AhoyDashboard
     def dash_empty(title = nil, hint: nil, action: nil, secondary: nil, compact: false, fill: false, **options)
       title ||= options.delete(:title)
       buttons = []
-      if action
+      if action && (action[:permission].nil? || dashboard_allowed?(action[:permission]))
         tone = action.fetch(:primary, true) ? :primary : :secondary
         buttons << dash_button(action[:label], action[:url], tone: tone, data: action[:data])
-        buttons << dash_button(secondary[:label], secondary[:url], data: secondary[:data]) if secondary
+        if secondary && (secondary[:permission].nil? || dashboard_allowed?(secondary[:permission]))
+          buttons << dash_button(secondary[:label], secondary[:url], data: secondary[:data])
+        end
       end
 
       parts = [

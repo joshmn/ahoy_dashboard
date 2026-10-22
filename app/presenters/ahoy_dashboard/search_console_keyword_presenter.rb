@@ -257,7 +257,7 @@ module AhoyDashboard
     end
 
     def tracking_phrases
-      [keyword]
+      [ keyword ]
     end
 
     private
@@ -331,7 +331,7 @@ module AhoyDashboard
     end
 
     def routes
-      AhoyDashboard::Engine.routes.url_helpers
+      AhoyDashboard.routes
     end
   end
 end

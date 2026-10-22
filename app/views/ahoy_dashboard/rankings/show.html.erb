@@ -3,9 +3,9 @@
 <%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "rankings", site: @site } do %>
   <% check = @presenter.check_now %>
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, id_prefix: "tm-rankings",
-        trailing: dash_button_to("Check now", check.path, reason: check.reason, method: :post, confirm: check.confirm) %>
+        trailing: (dash_button_to("Check now", check.path, reason: check.reason, method: :post, confirm: check.confirm) if dashboard_allowed?(:manage)) %>
 
-  <% unless @presenter.setup_notice %>
+  <% if dashboard_allowed?(:manage) && !@presenter.setup_notice %>
     <%= dash_unavailable_notice "Check now", check.notice_reason, fix: check.fix %>
   <% end %>
 
@@ -27,7 +27,7 @@
         <% else %>
           <span class="g-hint"><%= @presenter.site.domain %></span>
         <% end %>
-        <%= dash_button "Manage keywords", @presenter.keywords_path, tone: :link, data: { tm_frame: "_top" } %>
+        <%= dash_button "Manage keywords", @presenter.keywords_path, tone: :link, data: { tm_frame: "_top" } if dashboard_allowed?(:manage) %>
         <% if @presenter.rows.any? %>
           <%= seo_csv(@presenter, "tracked_searches") %>
         <% end %>
@@ -37,19 +37,22 @@
         <%= dash_empty compact: true, title: @presenter.band_empty_title,
               action: { label: "Show all", url: @presenter.all_bands_url, data: { tm_frame: "_top" } } %>
       <% else %>
-        <%= dash_form_with url: @presenter.tagging_path, method: :post, scope: :keyword_tag, stack: false,
-              id: "rankings-tagging", class: "d-flex flex-wrap align-items-end gap-2 px-3 py-2 border-bottom" do |form| %>
-          <%= hidden_field_tag :return_to, @presenter.return_to, id: nil %>
-          <%= form.text_field :tag, label: "Tag the ticked searches", id: "rankings-tag", class: "form-control-sm",
-                list: "rankings-tag-suggestions", autocomplete: "off", placeholder: "Brand",
-                maxlength: AhoyDashboard::SerpKeyword::MAX_TAG_LENGTH %>
-          <datalist id="rankings-tag-suggestions">
-            <% @presenter.tags.each do |tag| %>
-              <option value="<%= tag %>"></option>
-            <% end %>
-          </datalist>
-          <%= dash_button "Add tag", type: "submit", icon: :plus %>
-          <%= dash_button "Remove tag", type: "submit", name: "_method", value: "delete" %>
+        <% if dashboard_allowed?(:manage) %>
+          <%= dash_form_with url: @presenter.tagging_path, method: :post, scope: :keyword_tag, stack: false,
+                id: "rankings-tagging", class: "d-flex flex-wrap align-items-end gap-2 px-3 py-2 border-bottom" do |form| %>
+            <%= hidden_field_tag :return_to, @presenter.return_to, id: nil %>
+            <%= form.text_field :tag, label: "Tag the ticked searches", id: "rankings-tag", class: "form-control-sm",
+                  list: "rankings-tag-suggestions", autocomplete: "off", placeholder: "Brand",
+                  maxlength: AhoyDashboard::SerpKeyword::MAX_TAG_LENGTH %>
+            <datalist id="rankings-tag-suggestions">
+              <% @presenter.tags.each do |tag| %>
+                <option value="<%= tag %>"></option>
+              <% end %>
+            </datalist>
+            <%= dash_button "Add tag", type: "submit", icon: :plus %>
+            <%= dash_button "Remove tag", type: "submit", name: "_method", value: "delete" %>
+          <% end %>
+
         <% end %>
 
         <%= dash_table label: "Tracked searches", cols: @presenter.table_cols, data: { controller: "dash--check-all" } do %>
@@ -72,7 +75,7 @@
               <tr>
                 <td>
                   <%= check_box_tag "keyword_tag[keyword_ids][]", row.keyword.id, false,
-                        id: "rankings-select-#{index}", form: "rankings-tagging",
+                        id: "rankings-select-#{index}", form: "rankings-tagging", disabled: !dashboard_allowed?(:manage),
                         aria: { label: "Select #{row.keyword.query}#{", #{row.place.label}" if @presenter.places?}" },
                         data: { "dash--check-all-target": "box", action: "change->dash--check-all#sync" } %>
                 </td>

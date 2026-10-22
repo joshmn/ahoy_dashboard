@@ -4,7 +4,7 @@ module AhoyDashboard
       requires_installed :search_console
 
       def show
-        expected = session.delete(GoogleAuthorizationsController::STATE_KEY)
+        expected = session.delete(dashboard_key(GoogleAuthorizationsController::STATE_KEY))
 
         return refuse("That did not come back from a sign-in this browser started.") unless valid_state?(expected)
         return refuse(refusal_for(params[:error])) if params[:error].present?

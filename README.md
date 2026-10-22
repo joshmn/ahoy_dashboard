@@ -78,6 +78,7 @@ Getting set up
 
 - [Installation](docs/installation.md)
 - [Configuration](docs/configuration.md)
+- [Hosting multiple sites in a separate app](docs/extending.md#hosting-the-dashboard-in-a-separate-app)
 - [Tracking](docs/tracking.md)
 - [Background jobs](docs/background-jobs.md)
 

@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Chats
-    class MessagesController < AhoyDashboard::BaseController
+    class MessagesController < AhoyDashboard::Assistant::BaseController
       requires_installed :assistant
 
       def create

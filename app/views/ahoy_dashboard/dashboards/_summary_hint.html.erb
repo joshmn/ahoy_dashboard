@@ -6,7 +6,7 @@
     <% if query.hidden_visits.positive? %>
       <span><%= pluralize(query.hidden_visits, "visit") %> hidden</span>
       <%= dash_button "Show them", root_path(query.internal_toggle_params), tone: :link, data: { tm_frame: "_top" } %>
-      <%= dash_button "Manage", settings_exclusions_path, tone: :link, "aria-label": "Manage exclusions", data: { tm_frame: "_top" } %>
+      <%= dash_button "Manage", settings_exclusions_path, tone: :link, "aria-label": "Manage exclusions", data: { tm_frame: "_top" } if dashboard_allowed?(:manage) %>
     <% end %>
   </div>
 <% end %>

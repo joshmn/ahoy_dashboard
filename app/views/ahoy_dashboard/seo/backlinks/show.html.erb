@@ -4,13 +4,13 @@
   <% controls = dash_button_to("Sync now", @presenter.sync_path,
                                reason: @presenter.sync_reason,
                                method: :post,
-                               confirm: "Sync backlinks now? This is a paid request.") %>
+                               confirm: "Sync backlinks now? This is a paid request.") if dashboard_allowed?(:manage) %>
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false, controls: controls %>
 
   <% if @presenter.setup_notice %>
     <%= dash_empty_card card_class: "seo-notice-card", compact: true, **@presenter.setup_notice %>
   <% else %>
-    <%= dash_unavailable_notice "Sync now", @presenter.sync_reason, fix: @presenter.sync_fix %>
+    <%= dash_unavailable_notice "Sync now", @presenter.sync_reason, fix: @presenter.sync_fix if dashboard_allowed?(:manage) %>
   <% end %>
 
   <% if !@presenter.any? %>

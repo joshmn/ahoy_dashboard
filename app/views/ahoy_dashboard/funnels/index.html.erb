@@ -2,7 +2,7 @@
 
 <section class="sec">
   <%= dash_page_head title: "Funnels", lede: "Goals in order, and how many people make it through each step.",
-        actions: dash_button("Manage funnels", settings_funnels_path, tone: :link) %>
+        actions: (dash_button("Manage funnels", settings_funnels_path, tone: :link) if dashboard_allowed?(:manage)) %>
 
   <div class="d-flex align-items-center justify-content-between mb-3">
     <p class="mb-0 text-body-secondary"><%= @presenter.summary %> · <%= @presenter.range_label %></p>
@@ -11,7 +11,7 @@
 
   <% if @presenter.empty? %>
     <%= dash_empty_card title: "No funnels yet", hint: "Create a funnel to see how visitors move through your goals.",
-          action: { label: "Create a funnel", url: new_settings_funnel_path } %>
+          action: ({ label: "Create a funnel", url: new_settings_funnel_path } if dashboard_allowed?(:manage)) %>
   <% else %>
     <div class="grid row" aria-label="Funnels">
       <%= render partial: "ahoy_dashboard/dashboards/funnel", collection: @presenter.funnel_presenters, as: :presenter %>

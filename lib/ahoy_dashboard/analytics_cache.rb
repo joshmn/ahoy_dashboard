@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 module AhoyDashboard
-
   class AnalyticsCache
     PREFIX = "ahoy_dashboard/analytics/v1"
     DATABASE_FIELDS = %i[adapter host port database username schema_search_path].freeze
@@ -29,7 +28,7 @@ module AhoyDashboard
 
       def key(key:, connection:)
         identity = database_identity(connection)
-        digest = ActiveSupport::Digest.hexdigest([identity, AhoyDashboard.host, key].to_json)
+        digest = ActiveSupport::Digest.hexdigest([ identity, Context.current, AhoyDashboard.host, key ].to_json)
 
         "#{PREFIX}/#{digest}"
       end
@@ -40,7 +39,7 @@ module AhoyDashboard
         pool = connection.pool
         config = pool.respond_to?(:db_config) ? pool.db_config.configuration_hash : pool.spec.config
 
-        config.values_at(*DATABASE_FIELDS) + [connection.schema_search_path]
+        config.values_at(*DATABASE_FIELDS) + [ connection.schema_search_path ]
       end
     end
   end

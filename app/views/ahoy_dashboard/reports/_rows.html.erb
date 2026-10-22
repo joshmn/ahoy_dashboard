@@ -1,8 +1,8 @@
 <% if presenter.no_properties? %>
   <%= dash_empty "No custom properties in this range", compact: true,
         hint: "None of the events in this range carry a property of their own.",
-        action: { label: "Custom properties", url: settings_properties_path, primary: false,
-                  data: { tm_frame: "_top" } } %>
+        action: ({ label: "Custom properties", url: settings_properties_path, primary: false,
+                   data: { tm_frame: "_top" } } if dashboard_allowed?(:manage)) %>
 <% elsif presenter.empty? %>
   <%= dash_empty "Nothing here for this range", compact: true, hint: dash_range_hint %>
 <% else %>

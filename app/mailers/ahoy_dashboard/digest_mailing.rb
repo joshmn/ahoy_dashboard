@@ -9,7 +9,7 @@ module AhoyDashboard
     end
 
     def dashboard_url(name, **params)
-      AhoyDashboard::Engine.routes.url_helpers.public_send(:"#{name}_url", **default_url_options, **params)
+      AhoyDashboard.routes.public_send(:"#{name}_url", **default_url_options, **AhoyDashboard.url_options, **params)
     end
 
     def period_params(window)

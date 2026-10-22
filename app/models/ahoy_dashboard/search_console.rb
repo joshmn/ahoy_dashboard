@@ -153,11 +153,10 @@ module AhoyDashboard
       private
 
       def default_redirect_uri
-        host = AhoyDashboard.canonical_host
-        return nil if host.blank?
+        options = { host: AhoyDashboard.canonical_host, protocol: "https" }.merge(AhoyDashboard.url_options)
+        return nil if options[:host].blank?
 
-        AhoyDashboard::Engine.routes.url_helpers
-          .settings_google_callback_url(host: host, protocol: "https")
+        AhoyDashboard.routes.settings_google_callback_url(**options)
       end
     end
   end

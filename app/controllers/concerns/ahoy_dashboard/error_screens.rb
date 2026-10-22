@@ -52,7 +52,8 @@ module AhoyDashboard
     end
 
     def error_screen_allowed?
-      AhoyDashboard.authorized?(self)
+      AhoyDashboard::Context.current
+      AhoyDashboard.authorized?(self) && dashboard_allowed?(required_permission)
     rescue StandardError
       false
     end

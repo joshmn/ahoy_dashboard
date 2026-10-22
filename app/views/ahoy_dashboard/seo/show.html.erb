@@ -153,7 +153,7 @@
               <%= dash_badge "Done", tone: :success %>
             <% elsif !step.installed? %>
               <%= dash_badge step.state.badge, tone: :warning %>
-            <% else %>
+            <% elsif dashboard_allowed?(:manage) %>
               <%= dash_button step.action, step.url,
                     tone: (step == @presenter.steps.find { |candidate| candidate.installed? && !candidate.done? } ? :primary : :secondary),
                     data: { tm_frame: "_top" } %>

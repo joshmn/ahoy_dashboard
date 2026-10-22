@@ -6,14 +6,14 @@
 
     <%= render "ahoy_dashboard/search_console/slice_menus", menus: @presenter.menus %>
 
-    <%= dash_button_to "Sync now", @presenter.sync_path, reason: @presenter.sync_reason %>
+    <%= dash_button_to "Sync now", @presenter.sync_path, reason: @presenter.sync_reason if dashboard_allowed?(:manage) %>
   <% end %>
 
   <%= dash_page_head title: @presenter.title, lede: @presenter.blurb, actions: actions %>
   <%= render "ahoy_dashboard/search_console/problem" %>
 
   <% if @presenter.any? %>
-    <%= dash_unavailable_notice "Sync now", @presenter.sync_reason, fix: @presenter.sync_fix %>
+    <%= dash_unavailable_notice "Sync now", @presenter.sync_reason, fix: @presenter.sync_fix if dashboard_allowed?(:manage) %>
 
     <%= dash_card element: :section, class: "seo-chart-card",
           "aria-label": "Search performance over time",

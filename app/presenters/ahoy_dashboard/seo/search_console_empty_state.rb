@@ -11,7 +11,7 @@ module AhoyDashboard
         end
 
         def settings_action(routes)
-          { label: "Search Console settings", url: routes.settings_google_connection_path, data: TOP, primary: false }
+          { label: "Search Console settings", url: routes.settings_google_connection_path, data: TOP, primary: false, permission: :manage }
         end
       end
 
@@ -58,7 +58,7 @@ module AhoyDashboard
           action: { label: "Show #{dates}", data: TOP, primary: true,
                     url: path.call(period: AhoyDashboard::Period::CUSTOM_KEY, from: stored.first.to_s, to: stored.last.to_s) },
           secondary: { label: AhoyDashboard::SetupNotice::STEPS.fetch(step)[:label],
-                       url: AhoyDashboard::SetupNotice.search_console_url(routes, step), data: TOP } }
+                       url: AhoyDashboard::SetupNotice.search_console_url(routes, step), data: TOP, permission: :manage } }
       end
 
       def kept(stored)

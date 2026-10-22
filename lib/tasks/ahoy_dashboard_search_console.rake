@@ -53,7 +53,7 @@ namespace :ahoy_dashboard do
       end
     end
 
-    routes = AhoyDashboard::Engine.routes.url_helpers
+    routes = AhoyDashboard.routes
     connection_path = routes.settings_google_connection_path
 
     puts "next"

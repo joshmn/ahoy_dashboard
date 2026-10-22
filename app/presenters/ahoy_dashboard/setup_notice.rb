@@ -102,7 +102,7 @@ module AhoyDashboard
 
     def self.call(step, url: nil, hint: nil)
       entry = STEPS.fetch(step)
-      action = { label: entry[:label], url: url, data: TOP } if url && entry[:label]
+      action = { label: entry[:label], url: url, data: TOP, permission: :manage } if url && entry[:label]
 
       { title: entry[:title], hint: hint || entry[:hint], action: action }.compact
     end

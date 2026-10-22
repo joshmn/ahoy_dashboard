@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 
 module AhoyDashboard
-
   class PalettePresenter
-    def initialize(query:, screen:, routes:)
+    def initialize(query:, screen:, routes:, manage: true, assistant: true)
       @query = query
       @screen = screen
       @routes = routes
+      @manage = manage
+      @assistant = assistant
     end
 
     def path
@@ -17,9 +18,7 @@ module AhoyDashboard
     def groups
       {
         "Go to" => destinations,
-        "Settings" => SettingsSection::ALL.map do |section|
-          PaletteItem.new(label: section.label, icon: :gear, path: routes.public_send(section.route), badge: section.badge)
-        end,
+        "Settings" => settings,
         "Metrics" => Metric::ALL.map do |metric|
           PaletteItem.new(label: metric.label, icon: :empty, path: routes.root_path(query.with(metric: metric.key).to_query))
         end,
@@ -39,7 +38,15 @@ module AhoyDashboard
 
     private
 
-    attr_reader :query, :screen, :routes
+    attr_reader :query, :screen, :routes, :manage, :assistant
+
+    def settings
+      return [] unless manage
+
+      SettingsSection::ALL.map do |section|
+        PaletteItem.new(label: section.label, icon: :gear, path: routes.public_send(section.route), badge: section.badge)
+      end
+    end
 
     def destinations
       [
@@ -48,9 +55,9 @@ module AhoyDashboard
         PaletteItem.new(label: "Explore", icon: :compass, path: routes.explore_path),
         PaletteItem.new(label: "SEO", icon: :search, path: routes.seo_path,
           badge: (FeatureState::BADGE unless Seo::Surface.installed?(Seo::Surface::FEATURES))),
-        PaletteItem.new(label: "Ask", icon: :chat, path: routes.chats_path,
-          badge: (FeatureState::BADGE unless Installation.installed?(:assistant)))
-      ]
+        (PaletteItem.new(label: "Ask", icon: :chat, path: routes.chats_path,
+          badge: (FeatureState::BADGE unless Installation.installed?(:assistant))) if assistant)
+      ].compact
     end
 
     def periods

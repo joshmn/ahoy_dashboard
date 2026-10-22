@@ -43,14 +43,15 @@ A "Remove" button sits beside the client ID and beside the client secret. It ask
 It's the first of these that's set:
 
 1. The Redirect URL override on Settings, Search Console, as is
-2. `https://<canonical host><mount path>/settings/google_callback`, with the canonical host from Settings, General
-3. `https://<site host><mount path>/settings/google_callback`, with the site host from Settings, General
+2. The dashboard callback built with `config.url_options`, when it supplies a host; see [Hosting the dashboard](extending.md#hosting-the-dashboard-in-a-separate-app)
+3. `https://<canonical host><mount path>/settings/google_callback`, with the canonical host from Settings, General
+4. `https://<site host><mount path>/settings/google_callback`, with the site host from Settings, General
 
 So with the site host set to `example.com` and the default mount, it's `https://example.com/analytics-dashboard/settings/google_callback`. The Redirect URL card says which one is in use, for example "from the host under Settings, General".
 
 Google compares it character for character: scheme, host, path and any trailing slash. A mismatch is the most common way this setup fails, and Google's `redirect_uri_mismatch` page is all you'll see. If the address you're browsing from differs from the one the dashboard sends, the settings screen says so above the steps.
 
-The built URIs are always `https`. For local development, where there's no TLS, type it into Redirect URL override yourself and click "Save redirect URL". Google only allows plain `http` on `localhost`:
+Built URIs use `https` unless the host supplies a protocol in `config.url_options`. For local development, where there's no TLS, you can also type it into Redirect URL override and click "Save redirect URL". Google only allows plain `http` on `localhost`:
 
 ```
 http://localhost:3000/analytics-dashboard/settings/google_callback

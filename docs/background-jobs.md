@@ -2,6 +2,8 @@
 
 The dashboard runs its scheduled work (Search Console syncs, rank checks, backlinks, the place list, alerts, alert emails, traffic emails and AI visibility) through `AhoyDashboard::TickJob`. Enable the embedded scheduler or schedule that job yourself; the tick decides what's due. The optional [precomputed dashboard](#precomputed-dashboard-refresh) also uses the tick to stay prepared while idle, when enabled in Settings, General.
 
+Hosts with `config.context` schedule a tick per site. Engine jobs capture and restore that context automatically, including before record argument loading. Leave the embedded scheduler off for these hosts. See [Site contexts and scheduling](extending.md#site-contexts).
+
 ## Schedule the tick
 
 Run `AhoyDashboard::TickJob` every minute using one of the options below. Both use your Active Job backend for the resulting work, so keep workers processing `low` and `default`.

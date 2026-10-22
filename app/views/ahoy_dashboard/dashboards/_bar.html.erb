@@ -37,7 +37,7 @@
       <span class="tb-hint"><%= pluralize(query.hidden_visits, "visit") %> hidden</span>
       <%= dash_button "Show them", root_path(query.internal_toggle_params), tone: :link %>
       <%= dash_button "Manage", settings_exclusions_path, tone: :link,
-            "aria-label": "Manage exclusions" %>
+            "aria-label": "Manage exclusions" if dashboard_allowed?(:manage) %>
     <% end %>
 
     <% if query.filters.none? %>

@@ -38,6 +38,8 @@
           <span class="site-name"><%= dash_site_name %></span>
         <% end %>
 
+        <%= render AhoyDashboard.config.navigation_partial if AhoyDashboard.config.navigation_partial %>
+
         <nav class="hd-tabs" aria-label="Primary">
           <% tabs.each do |tab| %>
             <%= dash_button tab[:path],
@@ -65,28 +67,32 @@
 
           <%= yield :dash_header_controls %>
 
-          <% if ask_screen? %>
-            <%= dash_button chats_path, class: "hd-ask", title: "Ask", "aria-current": "page",
-                  data: { tm_frame: "_top" } do %>
-              <%= dash_icon(:chat, size: 14) %>
-              <span class="hd-nav-text">Ask</span>
-            <% end %>
-          <% else %>
-            <%= dash_button ask_path(ask_panel.params),
-                  class: "hd-ask",
-                  title: "Ask about this page",
-                  "aria-expanded": ask_panel.open?.to_s,
-                  "aria-controls": "dash-ask",
-                  data: { "dash--ask-target": "opener", action: "dash--ask#toggle" } do %>
-              <%= dash_icon(:chat, size: 14) %>
-              <span class="hd-nav-text">Ask</span>
+          <% if dashboard_allowed?(:assistant) %>
+            <% if ask_screen? %>
+              <%= dash_button chats_path, class: "hd-ask", title: "Ask", "aria-current": "page",
+                    data: { tm_frame: "_top" } do %>
+                <%= dash_icon(:chat, size: 14) %>
+                <span class="hd-nav-text">Ask</span>
+              <% end %>
+            <% else %>
+              <%= dash_button ask_path(ask_panel.params),
+                    class: "hd-ask",
+                    title: "Ask about this page",
+                    "aria-expanded": ask_panel.open?.to_s,
+                    "aria-controls": "dash-ask",
+                    data: { "dash--ask-target": "opener", action: "dash--ask#toggle" } do %>
+                <%= dash_icon(:chat, size: 14) %>
+                <span class="hd-nav-text">Ask</span>
+              <% end %>
             <% end %>
           <% end %>
 
-          <%= dash_icon_button :gear, label: "Settings", url: settings_goals_path,
-                title: "Settings",
-                "aria-current": ("page" if settings),
-                data: { tm_frame: "_top" } %>
+          <% if dashboard_allowed?(:manage) %>
+            <%= dash_icon_button :gear, label: "Settings", url: settings_goals_path,
+                  title: "Settings",
+                  "aria-current": ("page" if settings),
+                  data: { tm_frame: "_top" } %>
+          <% end %>
         </div>
       </div>
     </header>
@@ -100,7 +106,7 @@
     <% end %>
 
     <main id="main" class="container-xxl">
-      <%= render "ahoy_dashboard/shared/missing_tables", features: AhoyDashboard::Installation.switched_on_without_tables %>
+      <%= render "ahoy_dashboard/shared/missing_tables", features: AhoyDashboard::Installation.switched_on_without_tables if dashboard_allowed?(:manage) %>
       <% if settings %>
         <div class="set-wrap">
           <%= render "ahoy_dashboard/settings/shared/nav" %>
@@ -121,7 +127,7 @@
       </div>
     </footer>
 
-    <%= render "ahoy_dashboard/shared/ask", panel: ask_panel unless ask_screen? %>
+    <%= render "ahoy_dashboard/shared/ask", panel: ask_panel if dashboard_allowed?(:assistant) && !ask_screen? %>
     <%= render "ahoy_dashboard/shared/palette" %>
     <%= yield :dash_dialogs %>
 

@@ -4,10 +4,11 @@ require "rails_helper"
 require "open3"
 
 RSpec.describe "Embedded scheduler boot" do
-  def boot(embedded:)
+  def boot(embedded:, context: nil)
     script = <<~RUBY
       require #{AhoyDashboard::Engine.root.join("spec/dummy/config/application").to_s.inspect}
       AhoyDashboard.config.embedded_scheduler = #{embedded.inspect}
+      AhoyDashboard.config.context = #{context.inspect}
       require #{AhoyDashboard::Engine.root.join("spec/dummy/config/environment").to_s.inspect}
       puts JSON.generate([
         Rails.application.middleware.map(&:klass).include?(AhoyDashboard::Scheduler::Middleware),
@@ -26,5 +27,10 @@ RSpec.describe "Embedded scheduler boot" do
 
   it "installs the middleware when opted in without starting a thread during boot" do
     expect(boot(embedded: true)).to eq([ true, false ])
+  end
+
+  it "requires a host scheduler when site context is configured" do
+    expect { boot(embedded: true, context: "DashboardContext") }
+      .to raise_error(RuntimeError, /Schedule a dashboard tick per site/)
   end
 end

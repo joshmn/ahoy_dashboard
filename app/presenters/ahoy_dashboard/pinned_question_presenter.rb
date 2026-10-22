@@ -1,12 +1,11 @@
 # frozen_string_literal: true
 
 module AhoyDashboard
-
   class PinnedQuestionPresenter
     delegate :question, :metric, :change, :series, to: :reading
     delegate :name, :sentence, to: :question
 
-    def initialize(reading:, routes: AhoyDashboard::Engine.routes.url_helpers)
+    def initialize(reading:, routes: AhoyDashboard.routes)
       @reading = reading
       @routes = routes
     end

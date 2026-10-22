@@ -159,7 +159,7 @@ module AhoyDashboard
     private
 
     def path(overrides = {})
-      AhoyDashboard::Engine.routes.url_helpers.funnel_path(
+      AhoyDashboard.routes.funnel_path(
         funnel, query.to_query.merge(overrides)
       )
     end

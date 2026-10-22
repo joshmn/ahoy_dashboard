@@ -4,7 +4,7 @@
   <% controls = capture do %>
     <%= dash_button_to("Run now", @presenter.run_path,
           reason: @presenter.run_reason,
-          method: :post, confirm: @presenter.run_confirm) %>
+          method: :post, confirm: @presenter.run_confirm) if dashboard_allowed?(:manage) %>
     <%= dash_link_menu(id: "tm-seo-assistant", label: @presenter.assistant_label, section: "Assistant",
           items: @presenter.assistant_options) %>
   <% end %>
@@ -13,13 +13,13 @@
   <% if @presenter.setup_notice %>
     <%= dash_empty_card card_class: "seo-notice-card", compact: true, **@presenter.setup_notice %>
   <% else %>
-    <%= dash_unavailable_notice "Run now", @presenter.run_reason, fix: @presenter.run_fix %>
+    <%= dash_unavailable_notice "Run now", @presenter.run_reason, fix: @presenter.run_fix if dashboard_allowed?(:manage) %>
   <% end %>
 
   <% if @presenter.skipped_note %>
     <%= dash_notice "A run was skipped.", tone: :warning, class: "mb-3",
           detail: @presenter.skipped_note,
-          action: dash_button("AI visibility settings", @presenter.settings_path, data: { tm_frame: "_top" }) %>
+          action: (dash_button("AI visibility settings", @presenter.settings_path, data: { tm_frame: "_top" }) if dashboard_allowed?(:manage)) %>
   <% end %>
 
   <% if !@presenter.any? %>

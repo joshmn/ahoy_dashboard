@@ -87,7 +87,7 @@
       <% elsif query.hidden_visits.positive? %>
         <span class="g-hint"><%= pluralize(query.hidden_visits, "visit") %> hidden</span>
         <%= dash_button "Manage", settings_exclusions_path, tone: :link,
-              "aria-label": "Manage exclusions" %>
+              "aria-label": "Manage exclusions" if dashboard_allowed?(:manage) %>
       <% end %>
 
       <% if query.filters.any? %>

@@ -99,6 +99,8 @@ module AhoyDashboard
     end
 
     def seo_track_path(query, return_to: nil)
+      return unless dashboard_allowed?(:manage) || seo_tracked?(query)
+
       return unless seo_tracking?
 
       tracked = seo_tracked_keyword_id(query)
@@ -140,6 +142,8 @@ module AhoyDashboard
     end
 
     def seo_track_link(query, button: false, return_to: nil)
+      return unless dashboard_allowed?(:manage) || seo_tracked?(query)
+
       unless seo_tracking?
         return dash_unavailable(button ? "Track keyword" : "Track", reason: seo_untracked_reason,
                                 tone: button ? :secondary : :link)
@@ -156,6 +160,8 @@ module AhoyDashboard
     end
 
     def seo_track_form(id, return_to: nil)
+      return unless dashboard_allowed?(:manage)
+
       return dash_unavailable("Track these", reason: seo_untracked_reason, tone: :link) unless seo_tracking?
 
       form_with url: new_settings_serp_keyword_import_path, method: :get, id: id, data: { tm_frame: "_top" } do
@@ -168,6 +174,8 @@ module AhoyDashboard
     end
 
     def seo_track_all(form, label: nil)
+      return unless dashboard_allowed?(:manage)
+
       box = if seo_tracking?
         seo_track_all_box(form, label)
       else
@@ -180,12 +188,16 @@ module AhoyDashboard
     end
 
     def seo_track_all_box(form, label)
+      return unless dashboard_allowed?(:manage)
+
       tag.input(type: "checkbox", id: "#{form}-all",
                 "aria-label": (label.nil? ? "Select every search" : nil),
                 data: { "dash--check-all-target": "master", action: "change->dash--check-all#toggle" })
     end
 
     def seo_track_box(query, form:, index:, compact: false)
+      return unless dashboard_allowed?(:manage)
+
       return seo_disabled_box("#{form}-#{index}", "Track #{query}") unless seo_tracking?
 
       if seo_tracked?(query)

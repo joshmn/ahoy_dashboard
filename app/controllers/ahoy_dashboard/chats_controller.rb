@@ -1,5 +1,5 @@
 module AhoyDashboard
-  class ChatsController < AhoyDashboard::BaseController
+  class ChatsController < AhoyDashboard::Assistant::BaseController
     requires_installed :assistant
 
     THREAD_VIEW = "thread".freeze

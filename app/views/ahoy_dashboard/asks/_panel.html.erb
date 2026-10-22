@@ -37,7 +37,7 @@
         <p class="chat-blank__title">Ask is not available</p>
         <p class="chat-blank__hint"><%= AhoyDashboard::Settings::Display.assistant_notice %></p>
         <%= dash_button "Assistant settings", settings_assistant_providers_path,
-              data: { tm_frame: "_top" } %>
+              data: { tm_frame: "_top" } if dashboard_allowed?(:manage) %>
       </div>
     <% end %>
   </div>

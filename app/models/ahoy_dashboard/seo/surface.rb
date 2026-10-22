@@ -102,7 +102,7 @@ module AhoyDashboard
       end
 
       def path(params = {})
-        helpers = AhoyDashboard::Engine.routes.url_helpers
+        helpers = AhoyDashboard.routes
 
         params.present? ? helpers.public_send(route, params) : helpers.public_send(route)
       end

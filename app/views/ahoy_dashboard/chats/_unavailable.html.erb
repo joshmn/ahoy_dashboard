@@ -1,2 +1,2 @@
 <%= dash_notice detail: AhoyDashboard::Settings::Display.assistant_notice, class: local_assigns[:class_name],
-      action: dash_button("Assistant settings", settings_assistant_providers_path, data: { tm_frame: "_top" }) %>
+      action: (dash_button("Assistant settings", settings_assistant_providers_path, data: { tm_frame: "_top" }) if dashboard_allowed?(:manage)) %>

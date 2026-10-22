@@ -1,6 +1,6 @@
 module AhoyDashboard
   module Chats
-    class StreamsController < AhoyDashboard::BaseController
+    class StreamsController < AhoyDashboard::Assistant::BaseController
       requires_installed :assistant
 
       include ActionController::Live

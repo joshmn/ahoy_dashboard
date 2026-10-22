@@ -20,14 +20,14 @@
 
     <%= dash_button "See clicks", search_console_keyword_path(@presenter.query.to_query.merge(q: @presenter.heading)),
           data: { tm_frame: "_top" } %>
-    <%= dash_button_to "Check now", check.path, reason: check.reason, confirm: check.confirm %>
-    <%= dash_button "Edit keyword", @presenter.edit_path, data: { tm_frame: "_top" } %>
+    <%= dash_button_to "Check now", check.path, reason: check.reason, confirm: check.confirm if dashboard_allowed?(:manage) %>
+    <%= dash_button "Edit keyword", @presenter.edit_path, data: { tm_frame: "_top" } if dashboard_allowed?(:manage) %>
   <% end %>
 
   <%= dash_page_head back: { label: @back.label, url: @back.url }, title: @presenter.heading,
         lede: @presenter.summary, actions: actions %>
 
-  <%= dash_unavailable_notice "Check now", check.notice_reason, fix: check.fix %>
+  <%= dash_unavailable_notice "Check now", check.notice_reason, fix: check.fix if dashboard_allowed?(:manage) %>
 
   <% if @presenter.empty? %>
     <%= dash_empty_card title: @presenter.empty_title, hint: @presenter.empty_hint %>

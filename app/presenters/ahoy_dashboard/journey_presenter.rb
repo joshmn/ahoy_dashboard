@@ -181,7 +181,7 @@ module AhoyDashboard
     end
 
     def form_path
-      AhoyDashboard::Engine.routes.url_helpers.journey_path
+      AhoyDashboard.routes.journey_path
     end
 
     def pick_path(column, row)
@@ -230,7 +230,7 @@ module AhoyDashboard
       terms = trimmed(searches)
       params = params.merge(find: terms) if terms.any?
 
-      AhoyDashboard::Engine.routes.url_helpers.journey_path(params)
+      AhoyDashboard.routes.journey_path(params)
     end
 
     def trimmed(searches)

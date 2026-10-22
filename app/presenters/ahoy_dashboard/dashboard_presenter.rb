@@ -247,7 +247,7 @@ module AhoyDashboard
     end
 
     def routes
-      AhoyDashboard::Engine.routes.url_helpers
+      AhoyDashboard.routes
     end
   end
 end

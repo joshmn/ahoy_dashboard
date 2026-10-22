@@ -24,7 +24,7 @@
   </section>
 <% end %>
 
-<% if current.filters.any? %>
+<% if current.filters.any? && dashboard_allowed?(:manage) %>
   <% view = current.to_query.merge(carried).merge(return: destination, filters: applied).compact %>
   <section class="mb-3" aria-labelledby="tm-filter-rail-applied">
     <h3 class="<%= heading %>" id="tm-filter-rail-applied">Applied filters</h3>

@@ -44,6 +44,7 @@ module AhoyDashboard
       def source_label
         case source
         when :override then "the redirect URL saved on this screen"
+        when :url_options then "the dashboard host configured by your app"
         when :canonical_host then "the canonical host under Settings, General"
         when :host then "the host under Settings, General"
         else "nothing set"
@@ -69,11 +70,12 @@ module AhoyDashboard
     attr_reader :request
 
     def configured_host
-      AhoyDashboard.canonical_host
+      AhoyDashboard.url_options[:host] || AhoyDashboard.canonical_host
     end
 
     def source
       return :override if Preferences.read(:search_console, :redirect_uri).present?
+      return :url_options if AhoyDashboard.url_options[:host].present?
       return :canonical_host if Preferences.read(:site, :canonical_host).present?
       return :host if AhoyDashboard.host.present?
 
@@ -83,7 +85,7 @@ module AhoyDashboard
     def browsing
       return nil if request.nil?
 
-      Engine.routes.url_helpers.settings_google_callback_url(
+      AhoyDashboard.routes.settings_google_callback_url(
         host: request.host_with_port, protocol: request.protocol
       )
     rescue StandardError

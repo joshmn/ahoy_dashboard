@@ -201,9 +201,9 @@ config.sign_in_path = ->(_controller) { Rails.application.routes.url_helpers.new
 
 `sign_in_path` takes a string or a lambda. The engine only knows its own routes, which is why the example goes through `Rails.application.routes.url_helpers`. It's a plain redirect, so it has to be a path or a URL on the same host.
 
-### Your ApplicationController doesn't run
+### Using your ApplicationController
 
-The dashboard's controllers inherit from `ActionController::Base`, not from your `ApplicationController`. Helpers and `before_action`s defined there don't exist on the dashboard. Devise works anyway because it adds its helpers to `ActionController::Base`.
+By default, the dashboard's controllers inherit from `ActionController::Base`. Set `config.parent_controller = "DashboardController"` to inherit a host controller's authentication callbacks and helpers. See [Hosting the dashboard](extending.md#hosting-the-dashboard-in-a-separate-app). With the default parent, callbacks in your `ApplicationController` do not run. Devise works because it adds its helpers to `ActionController::Base`.
 
 With the Rails 8 authentication generator, `Current.session` is set by a `before_action` in your `ApplicationController`, so it's empty on the dashboard. Look the session up in the lambda instead:
 

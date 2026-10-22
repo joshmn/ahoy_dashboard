@@ -1,5 +1,5 @@
 module AhoyDashboard
-  class AsksController < AhoyDashboard::BaseController
+  class AsksController < AhoyDashboard::Assistant::BaseController
     requires_installed :assistant, except: :destroy
 
     FRAME = "dash_ask_panel".freeze

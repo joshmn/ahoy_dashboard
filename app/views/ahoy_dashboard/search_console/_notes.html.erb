@@ -9,7 +9,7 @@
     <% if presenter.problem_note.present? %>
       <p class="mb-0">
         <%= presenter.problem_note %>
-        <%= link_to "Fix connection", settings_google_connection_path, data: { tm_frame: "_top" } %>
+        <%= link_to "Fix connection", settings_google_connection_path, data: { tm_frame: "_top" } if dashboard_allowed?(:manage) %>
       </p>
     <% end %>
 

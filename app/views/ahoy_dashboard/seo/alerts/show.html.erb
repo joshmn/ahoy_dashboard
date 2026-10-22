@@ -2,7 +2,7 @@
 
 <%= render layout: "ahoy_dashboard/seo/shared/shell", locals: { current: "alerts", site: @site } do %>
   <%= render "ahoy_dashboard/seo/shared/head", presenter: @presenter, sites: false,
-        controls: dash_button_to("Check now", @presenter.run_path, reason: @presenter.run_reason, method: :post) %>
+        controls: (dash_button_to("Check now", @presenter.run_path, reason: @presenter.run_reason, method: :post) if dashboard_allowed?(:manage)) %>
 
   <% if (notice = @presenter.notice) %>
     <%= dash_empty_card card_class: "seo-notice-card", compact: true, **notice %>
@@ -11,7 +11,7 @@
   <% if (sample = @presenter.sample_notice) %>
     <%= dash_notice sample[:title], tone: :warning, class: "mb-3", id: "tm-alerts-sample",
           detail: sample[:detail],
-          action: dash_button("Choose provider", @presenter.providers_path, data: { tm_frame: "_top" }) %>
+          action: (dash_button("Choose provider", @presenter.providers_path, data: { tm_frame: "_top" }) if dashboard_allowed?(:manage)) %>
   <% end %>
 
   <%= render "ahoy_dashboard/seo/shared/tiles", tiles: @presenter.tiles %>
@@ -80,7 +80,7 @@
     <%= dash_card_header "Rules that are on" do %>
       <span class="g-hint"><%= live.size %> of <%= @presenter.rules.size %></span>
       <%= seo_csv(@presenter, "rules") if live.any? %>
-      <%= dash_button "Manage rules", @presenter.rules_path, tone: :link, data: { tm_frame: "_top" } %>
+      <%= dash_button "Manage rules", @presenter.rules_path, tone: :link, data: { tm_frame: "_top" } if dashboard_allowed?(:manage) %>
     <% end %>
 
     <% if live.any? %>
@@ -98,7 +98,7 @@
             <tr>
               <td>
                 <div class="t-main">
-                  <%= seo_link(rule.name, @presenter.edit_rule_path(rule)) %>
+                  <%= dashboard_allowed?(:manage) ? seo_link(rule.name, @presenter.edit_rule_path(rule)) : seo_label(rule.name) %>
                 </div>
               </td>
               <td class="text-body-secondary"><%= @presenter.condition_for(rule) %></td>

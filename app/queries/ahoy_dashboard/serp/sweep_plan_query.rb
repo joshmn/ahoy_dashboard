@@ -17,7 +17,7 @@ module AhoyDashboard
         end
 
         def queued_key(keyword)
-          "#{QUEUED_KEY}/#{keyword.id}"
+          AnalyticsCache.key(key: [ QUEUED_KEY, keyword.id ], connection: SerpKeyword.connection)
         end
       end
 
