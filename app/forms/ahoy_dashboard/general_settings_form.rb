@@ -9,6 +9,7 @@ module AhoyDashboard
     attribute :host, :string
     attribute :canonical_host, :string
     attribute :internal_ips, :string
+    attribute :hide_known_crawlers, :boolean, default: false
     attribute :precomputed_dashboard, :boolean, default: false
 
     validates :time_zone, presence: { message: "has to be picked" }
@@ -21,6 +22,7 @@ module AhoyDashboard
           host: AhoyDashboard.host || request_host,
           canonical_host: Preferences.read(:site, :canonical_host),
           internal_ips: Preferences.read(:site, :internal_ips).join("\n"),
+          hide_known_crawlers: Preferences.read(:site, :hide_known_crawlers),
           precomputed_dashboard: Preferences.read(:site, :precomputed_dashboard))
     end
 
@@ -60,7 +62,7 @@ module AhoyDashboard
 
     def preferences
       { time_zone: zone.name, host: host, canonical_host: canonical_host, internal_ips: internal_ip_list,
-        precomputed_dashboard: precomputed_dashboard }
+        hide_known_crawlers: hide_known_crawlers, precomputed_dashboard: precomputed_dashboard }
     end
 
     private

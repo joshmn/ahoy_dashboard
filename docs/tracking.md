@@ -76,7 +76,7 @@ Keep these two out of your goals. They fire on every page view.
 
 Every event with a `crawler` property that isn't null is treated as a crawler: left out of every number by default, and shown with "Show crawlers" in the command palette. A visit with nothing but crawler events is dropped.
 
-The dashboard doesn't detect bots. ahoy already skips known bots unless you set `Ahoy.track_bots = true`, so with ahoy's defaults you don't need this at all. It's for apps that record bots on purpose and want them kept apart:
+ahoy already skips known bots unless you set `Ahoy.track_bots = true`, so with ahoy's defaults you mostly don't need this. To hide visits by user agent without tagging anything, turn on [Hide known crawlers](excluded-traffic.md#known-crawlers). The `crawler` property is for apps that record bots on purpose and want them kept apart:
 
 ```ruby
 ahoy.track "page_view", path: request.path, crawler: "Googlebot"
@@ -96,6 +96,7 @@ These `ahoy_visits` columns are read. A visit without one of them shows "(not se
 | `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content` | The UTM tabs, Source, Channel |
 | `country`, `region`, `city` | Locations |
 | `browser`, `os`, `os_version`, `device_type` | Devices |
+| `user_agent` | [Hide known crawlers](excluded-traffic.md#known-crawlers), when it's on. Without the column that switch does nothing, and nothing else breaks. |
 
 A `country` stored as a two-letter code (`US`) shows as a name with a flag. Anything else prints as stored, without a flag.
 

@@ -114,7 +114,7 @@ Every other setting is stored in the `ahoy_dashboard_settings` table and changed
 | Screen | What's on it |
 |---|---|
 | [Settings, Features](#settings-features) | Every optional feature, switched on or off |
-| [Settings, General](#settings-general) | Site host, canonical host, time zone, internal addresses, precomputed dashboard |
+| [Settings, General](#settings-general) | Site host, canonical host, time zone, internal addresses, known crawlers, precomputed dashboard |
 | [Settings, Search provider](#settings-search-provider) | Rank tracking providers and their keys, keyword research and backlinks providers, the place list |
 | [Settings, Search Console](#settings-search-console) | Google OAuth client, the Google connection, the property, the redirect URL |
 | [Settings, Emails](#settings-emails) | Alert emails and traffic emails |
@@ -167,6 +167,7 @@ Nothing is hidden when it isn't installed or isn't on. A screen or report for a 
 | Canonical host | Empty | Only for a site that answers on more than one name. Links the dashboard builds back to your site use this one, including the Search Console redirect URL. Blank means the site host. |
 | Time zone | UTC | The zone every range, day, chart, annotation, email and job time is read in |
 | Internal addresses | The private and loopback ranges | Visits from these are left out of every number. See [Excluded traffic](excluded-traffic.md). |
+| Hide known crawlers | Off | Visits whose user agent names a known crawler are left out of every number. See [Known crawlers](excluded-traffic.md#known-crawlers). |
 | Precompute default dashboard | Off | Saves a reusable snapshot of the default 30-day dashboard and queues its first build when saved. See [Precomputed default dashboard](#precomputed-default-dashboard). |
 
 The site host does a lot for one field:
@@ -244,7 +245,7 @@ It writes to `ahoy_dashboard_settings`, so it has to run after the dashboard's m
 
 | Scope | Settings |
 |---|---|
-| `:site` | `host`, `canonical_host`, `time_zone`, `internal_ips`, `precomputed_dashboard` |
+| `:site` | `host`, `canonical_host`, `time_zone`, `internal_ips`, `hide_known_crawlers`, `precomputed_dashboard` |
 | `:search_console` | `enabled`, `redirect_uri` |
 | `:keywords` | `enabled`, `provider`, `location`, `language` |
 | `:backlinks` | `enabled`, `provider` |

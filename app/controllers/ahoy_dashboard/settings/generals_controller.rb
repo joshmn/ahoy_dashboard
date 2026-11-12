@@ -17,7 +17,8 @@ module AhoyDashboard
       private
 
       def general_params
-        params.fetch(:general, {}).permit(:time_zone, :host, :canonical_host, :internal_ips, :precomputed_dashboard)
+        params.fetch(:general, {}).permit(:time_zone, :host, :canonical_host, :internal_ips, :hide_known_crawlers,
+                                              :precomputed_dashboard)
       end
     end
   end

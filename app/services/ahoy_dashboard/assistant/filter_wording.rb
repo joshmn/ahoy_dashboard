@@ -20,6 +20,7 @@ module AhoyDashboard
 
           names = []
           names << "internal addresses" if AhoyDashboard::Sql::InternalAddresses.enabled?
+          names << "known crawlers" if AhoyDashboard::Sql::KnownCrawlers.enabled?
           names.concat(AhoyDashboard::Sql::ExcludedTraffic.exclusions.map(&:name))
 
           { hidden_traffic: "excluded", hidden_by: names.presence }.compact

@@ -3,7 +3,7 @@ module AhoyDashboard
     class ExcludedTraffic
       class << self
         def enabled?
-          InternalAddresses.enabled? || AhoyDashboard::Exclusion.active.any?
+          InternalAddresses.enabled? || KnownCrawlers.enabled? || AhoyDashboard::Exclusion.active.any?
         end
 
         def exclusions
@@ -11,7 +11,7 @@ module AhoyDashboard
         end
 
         def condition(floor: nil)
-          parts = [ InternalAddresses.condition ]
+          parts = [ InternalAddresses.condition, KnownCrawlers.condition ]
           parts.concat(exclusions.map { |exclusion| match_sql(exclusion.to_blocks, floor: floor) })
           parts = parts.compact
           return nil if parts.empty?

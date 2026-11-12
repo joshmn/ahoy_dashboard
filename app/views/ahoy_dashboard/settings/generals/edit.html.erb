@@ -37,6 +37,16 @@
           hint: "One address or range per line, or separated by commas. A visit from one of these is left out of every number. " \
                 "Empty the box to count every visit. The defaults are #{defaults.to_sentence}." %>
 
+    <% crawler_hint = capture do %>
+      Leave out visits whose user agent names a known crawler, uptime checker, link previewer or HTTP library,
+      like Googlebot, GPTBot, Slackbot or curl. ahoy already skips most bots unless you set
+      <code>Ahoy.track_bots = true</code>, so this mostly catches what gets past it.
+      <% unless AhoyDashboard::Sql::KnownCrawlers.readable? %>
+        <b>Your visits table has no user_agent column</b>, so this can't hide anything.
+      <% end %>
+    <% end %>
+    <%= form.check :hide_known_crawlers, label: "Hide known crawlers", hint: crawler_hint %>
+
     <%= form.check :precomputed_dashboard, label: "Precompute default dashboard",
           hint: "Save a snapshot of the default 30-day dashboard and refresh it in the background. " \
                 "Numbers may be up to five minutes behind; realtime keeps refreshing. " \

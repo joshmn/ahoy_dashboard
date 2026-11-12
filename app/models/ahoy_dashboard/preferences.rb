@@ -29,6 +29,7 @@ module AhoyDashboard
       [ :site, :internal_ips, :list, INTERNAL_IPS ],
       [ :site, :time_zone, :string, "UTC", Setting::TIME_ZONE ],
       [ :site, :precomputed_dashboard, :boolean, false ],
+      [ :site, :hide_known_crawlers, :boolean, false ],
       [ :search_console, :redirect_uri, :string, nil ],
       [ :search_console, :property, :string, nil, SearchConsole::STORED_PROPERTY_SETTING ],
       [ :assistant, :withheld, :list, [], Assistant::WITHHELD_KEY ],

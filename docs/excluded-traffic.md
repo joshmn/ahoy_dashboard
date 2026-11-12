@@ -61,7 +61,29 @@ Realtime ignores the switch and always leaves hidden traffic out.
 
 Visits from your own network are hidden the same way, from the Internal addresses box on Settings, General. The default is the private and loopback ranges: `127.0.0.0/8`, `::1/128`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` and `fc00::/7`.
 
-Add your office's public range to that list, one per line, or empty the box to count everything. "Use the defaults" under the form puts the list back. An entry that isn't an address or a range is refused when you save. The same "Show them" switch covers these and your exclusions together.
+Add your office's public range to that list, one per line, or empty the box to count everything. "Use the defaults" under the form puts the list back. An entry that isn't an address or a range is refused when you save. The same "Show them" switch covers these, [known crawlers](#known-crawlers) and your exclusions together.
+
+## Known crawlers
+
+ahoy skips the bots it recognizes unless you set `Ahoy.track_bots = true`. Anything it doesn't recognize gets recorded as a visit, and so does every bot when that setting is on. "Hide known crawlers" on Settings, General leaves out any visit whose user agent names one:
+
+- search and ad crawlers: Googlebot and the other Google agents, Bingbot, Baiduspider, Yahoo Slurp, Sogou, Yandex, Naver, Applebot, DuckDuckBot
+- AI crawlers and assistants: GPTBot, ChatGPT-User, OAI-SearchBot, ClaudeBot, Claude-User, CCBot, PerplexityBot, Bytespider, Amazonbot
+- link previews: Facebook, Meta, Slack, Discord, Telegram, WhatsApp, LinkedIn, Twitter, Pinterest
+- SEO tools: Ahrefs, Semrush, Majestic, BrightEdge, HubSpot
+- uptime and health checks: Pingdom, Better Uptime, UptimeRobot, GTmetrix, Lighthouse, Cloudflare and AWS load balancer checks
+- headless browsers and HTTP libraries: HeadlessChrome, Lightpanda, curl, Wget, python-requests, Go, Java, okhttp, axios, Scrapy
+- anything that calls itself a bot, spider or crawler, like `ExampleBot/1.0`
+
+Cubot phones are the one exception, because their model names end in "bot". The match is case-insensitive and reads the raw `ahoy_visits.user_agent`. A visit with no user agent is never hidden.
+
+The switch is off until you turn it on, and turning it on changes your history too, since nothing is applied when a visit is recorded. It works like internal addresses: the toolbar counts what it hides, "Show them" puts those visits back, and it reaches everything listed under [What it reaches](#what-it-reaches).
+
+If your visits table has no `user_agent` column, the switch hides nothing and the settings page says so.
+
+It costs something on every query, because the user agent is checked when the numbers are read. Expect about a second and a half of extra database time per million visits in the range, for each query that reads them. That's barely noticeable on most sites. On a very busy one, leave it off and stop the crawlers before they're recorded, with ahoy's `Ahoy.exclude_method`.
+
+The list is a starting point, based on the [Sentry Relay web crawler filter](https://github.com/getsentry/relay/blob/master/relay-filter/src/web_crawlers.rs). For anything it misses, make an exclusion on Network, Browser or a property your app records.
 
 ## Manage exclusions
 

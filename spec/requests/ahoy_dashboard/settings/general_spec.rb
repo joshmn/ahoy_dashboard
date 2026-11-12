@@ -77,6 +77,29 @@ RSpec.describe "Dashboard general settings", type: :request do
       expect(AhoyDashboard::Sql::InternalAddresses.ranges.map(&:cidr)).to eq([ "10.0.0.0/8", "203.0.113.7/32" ])
     end
 
+    it "starts with known crawlers counted and saves the switch" do
+      get "/telemetry/settings/general/edit"
+
+      expect(field("general_hide_known_crawlers")["checked"]).to be_nil
+
+      patch "/telemetry/settings/general", params: { general: valid.merge(hide_known_crawlers: "1") }
+
+      expect(response).to redirect_to("/telemetry/settings/general/edit")
+      expect(AhoyDashboard::Sql::KnownCrawlers).to be_enabled
+
+      get "/telemetry/settings/general/edit"
+
+      expect(field("general_hide_known_crawlers")["checked"]).to be_present
+    end
+
+    it "says when the visits table has no user agent to read" do
+      allow(AhoyDashboard::Sql::KnownCrawlers).to receive(:readable?).and_return(false)
+
+      get "/telemetry/settings/general/edit"
+
+      expect(document.at_css("#general_hide_known_crawlers_hint").text.squish).to include("no user_agent column")
+    end
+
     it "takes a comma separated list of addresses" do
       patch "/telemetry/settings/general", params: { general: valid.merge(internal_ips: "10.0.0.0/8, ::1/128") }
 
