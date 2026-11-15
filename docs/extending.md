@@ -219,7 +219,7 @@ end
 
 The `grep` in the example matters. Anything recorded under that property reaches the block, and comparing a value like `abc` to a bigint column raises in Postgres instead of matching nothing.
 
-Works on any dimension key: built in (`country`), registered (`app_version`) or a custom property (`prop:team_id`).
+Works on any dimension key: built in (`country`), registered (`app_version`) or a custom property (`prop:team_id`). The key `user_id` also names users on the [visitor journey](visitor-journey.md#show-who-a-user-is), whether or not it's a dimension.
 
 ### Where labels show
 

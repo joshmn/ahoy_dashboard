@@ -198,6 +198,10 @@ The lists only count people with a page view in the window, while the count take
 
 The window is 5 minutes and isn't configurable.
 
+## Visitors
+
+"Visitors" in the toolbar lists the people behind the numbers, for the same range and filters, and opens any one of them with every visit and event in order. See [Visitor journey](visitor-journey.md).
+
 ## Remembered view
 
 The dashboard remembers how you last looked at it. Leave it on "Last 7 days, Total pageviews" and that's what you get next time you open it with a bare URL.
@@ -262,7 +266,7 @@ The command list loads when you first open the palette. With JavaScript off, or 
 
 | Group | What's in it |
 |---|---|
-| Go to | Dashboard, Realtime, Explore, SEO, Ask |
+| Go to | Dashboard, Realtime, Explore, Visitors, SEO, Ask |
 | Settings | Every settings screen |
 | Metrics | The seven metrics |
 | Date range | Every range except Custom range |

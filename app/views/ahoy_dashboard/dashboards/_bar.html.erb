@@ -40,6 +40,8 @@
             "aria-label": "Manage exclusions" if dashboard_allowed?(:manage) %>
     <% end %>
 
+    <%= dash_button "Visitors", visitors_path(query.to_query), tone: :link, icon: :user, data: { tm_frame: "_top" } %>
+
     <% if query.filters.none? %>
       <span class="tb-hint">Click any row to drill down</span>
     <% else %>

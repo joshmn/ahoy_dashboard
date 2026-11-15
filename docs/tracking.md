@@ -100,11 +100,13 @@ These `ahoy_visits` columns are read. A visit without one of them shows "(not se
 
 A `country` stored as a two-letter code (`US`) shows as a name with a flag. Anything else prints as stored, without a flag.
 
-Never read: `visit_token`, `user_id`, `ip`, `user_agent`, `latitude`, `longitude`, `app_version` and `platform`. Your app can still add any of them as a dimension. See [Extending](extending.md#dimensions).
+The [visitor journey](visitor-journey.md) also reads `visit_token`, `user_id` and `platform`, and shows them when they're there. Nothing else does.
+
+Never read: `ip`, `latitude`, `longitude` and `app_version`. Your app can still add any of them, or `user_id` and `platform`, as a dimension. See [Extending](extending.md#dimensions).
 
 ## Events
 
-These `ahoy_events` columns are read: `id`, `visit_id`, `name`, `time` and `properties`.
+These `ahoy_events` columns are read: `id`, `visit_id`, `name`, `time` and `properties`. The [visitor journey](visitor-journey.md) reads `user_id` too, when it's there.
 
 - `properties` has to be `jsonb`. It is on Postgres with ahoy's generator.
 - An event counts when its visit started in the date range, even if the event itself came later.

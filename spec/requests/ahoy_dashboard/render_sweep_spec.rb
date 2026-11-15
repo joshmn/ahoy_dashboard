@@ -12,6 +12,7 @@ RSpec.describe "Dashboard render sweep", type: :request do
     "ahoy_dashboard/filter_options" => "answers json",
     "ahoy_dashboard/filter_dialogs" => "redirects to the filter values page",
     "ahoy_dashboard/asks" => "redirects back to the screen it opened over",
+    "ahoy_dashboard/visitors/lookups" => "redirects to the visitor, visit or user it finds",
     "ahoy_dashboard/search_console_keywords" => "redirects without a keyword",
     "ahoy_dashboard/rank_keywords" => "redirects without a keyword",
     "ahoy_dashboard/settings/google_authorizations" => "redirects to Google",

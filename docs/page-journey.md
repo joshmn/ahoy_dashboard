@@ -57,4 +57,4 @@ The path you picked is in the URL, so a journey can be linked to:
 
 The path stops at the first step that isn't a path, and anything after `__exit__` is dropped.
 
-Related: [Dashboard](dashboard.md), [Goals and funnels](goals-and-funnels.md#funnels), [Metrics and dimensions](metrics-and-dimensions.md#dimensions).
+Related: [Visitor journey](visitor-journey.md), [Dashboard](dashboard.md), [Goals and funnels](goals-and-funnels.md#funnels), [Metrics and dimensions](metrics-and-dimensions.md#dimensions).

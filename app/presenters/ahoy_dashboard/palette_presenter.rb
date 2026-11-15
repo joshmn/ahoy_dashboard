@@ -53,6 +53,7 @@ module AhoyDashboard
         PaletteItem.new(label: "Dashboard", icon: :home, path: routes.root_path),
         PaletteItem.new(label: "Realtime", icon: :monitor, path: routes.realtime_path),
         PaletteItem.new(label: "Explore", icon: :compass, path: routes.explore_path),
+        PaletteItem.new(label: "Visitors", icon: :user, path: routes.visitors_path(query.to_query)),
         PaletteItem.new(label: "SEO", icon: :search, path: routes.seo_path,
           badge: (FeatureState::BADGE unless Seo::Surface.installed?(Seo::Surface::FEATURES))),
         (PaletteItem.new(label: "Ask", icon: :chat, path: routes.chats_path,

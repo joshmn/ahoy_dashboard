@@ -14,6 +14,7 @@ Nothing is sent anywhere to be counted. There's no tracking script, no third-par
 - [Goals and funnels](docs/goals-and-funnels.md): count page visits and custom events as conversions, with revenue, and see where people drop out of a sequence of steps.
 - [Custom properties](docs/custom-properties.md): break numbers down by anything your events carry.
 - [Page journey](docs/page-journey.md): where people go next from any page, one step at a time.
+- [Visitor journey](docs/visitor-journey.md): one person's every visit and event in order, merged across devices once they sign in, with links your app can use.
 - [Explore](docs/explore.md): one number broken down by one dimension, with the columns you want. Save a question, and pin up to three to the dashboard.
 - Realtime, CSV exports, a command palette, and a view that remembers where you left it.
 
@@ -91,6 +92,7 @@ Analytics
 - [Goals and funnels](docs/goals-and-funnels.md)
 - [Custom properties](docs/custom-properties.md)
 - [Page journey](docs/page-journey.md)
+- [Visitor journey](docs/visitor-journey.md)
 - [Explore](docs/explore.md)
 - [Email reports](docs/email-reports.md) (optional)
 

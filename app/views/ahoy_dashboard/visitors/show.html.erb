@@ -1,0 +1,116 @@
+<% content_for :title, @presenter.title %>
+
+<section class="sec">
+  <%= dash_page_head title: @presenter.title, clip: true, back: @presenter.back %>
+
+  <% if @presenter.lede %>
+    <p class="font-monospace text-body-secondary text-break mb-3"><%= @presenter.lede %></p>
+  <% end %>
+
+  <%= dash_card class: "mb-3" do %>
+    <%= dash_tiles label: "About this person", ruled: true, compact: true do %>
+      <%= dash_tile "Visits", @presenter.number(@presenter.total_visits) %>
+      <%= dash_tile "Events", @presenter.number(@presenter.total_events) %>
+      <%= dash_tile "First visit", dash_value(@presenter.first_seen), status: true %>
+      <%= dash_tile "Last visit", dash_value(@presenter.last_seen), status: true, value_title: @presenter.last_seen_title %>
+      <% if @presenter.identified_path %>
+        <%= dash_tile "Identified", @presenter.identified_label, status: true, url: @presenter.identified_path %>
+      <% else %>
+        <%= dash_tile "Identified", @presenter.identified_label, status: true %>
+      <% end %>
+    <% end %>
+
+    <% if @presenter.identities.any? %>
+      <%= dash_card_footer class: "d-flex flex-wrap align-items-center gap-2" do %>
+        <% @presenter.identities.each do |identity| %>
+          <span class="text-body-secondary small"><%= identity.label %></span>
+          <%= link_to identity.value, identity.path, class: class_names("link-quiet me-2", "font-monospace" => identity.mono),
+                data: { tm_frame: "_top" } %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if @presenter.hidden? || @presenter.showing_hidden? %>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+      <% if @presenter.hidden? %>
+        <span class="text-body-secondary"><%= @presenter.hidden_label %></span>
+      <% end %>
+      <%= dash_button (@presenter.showing_hidden? ? "Hide hidden traffic" : "Show them"), @presenter.toggle_hidden_path, tone: :link %>
+    </div>
+  <% end %>
+
+  <% if @presenter.empty? %>
+    <%= dash_empty_card "Every visit is hidden" %>
+  <% else %>
+    <% @presenter.visits.each do |visit| %>
+      <%= dash_card element: :section, class: "mb-3", id: visit.anchor, "aria-labelledby": visit.heading_id do %>
+        <%= dash_card_header "#{visit.day_label}, #{visit.time_label}", id: visit.heading_id do %>
+          <% if visit.identified? %>
+            <%= dash_badge "Identified", tone: :success %>
+          <% end %>
+          <% if visit.gap_label %>
+            <span class="g-hint"><%= visit.gap_label %></span>
+          <% end %>
+        <% end %>
+
+        <dl class="px-3 py-2 d-flex flex-wrap column-gap-3 row-gap-1 mb-0 small">
+          <% visit.facts.each do |fact| %>
+            <div class="d-flex gap-1 text-break">
+              <dt class="text-body-secondary fw-normal"><%= fact.label %></dt>
+              <dd class="mb-0<%= " font-monospace" if fact.mono %>">
+                <% if fact.path %>
+                  <%= link_to fact.value, fact.path, class: "link-quiet", data: { tm_frame: "_top" } %>
+                <% else %>
+                  <%= fact.value %>
+                <% end %>
+              </dd>
+            </div>
+          <% end %>
+        </dl>
+
+        <% if visit.empty? %>
+          <%= dash_empty "No events in this visit", compact: true %>
+        <% else %>
+          <%= dash_table label: "Events in this visit", compact: true,
+                cols: "104px 72px minmax(160px, 1fr) minmax(0, 1.4fr)" do %>
+            <thead>
+              <tr>
+                <th scope="col">Time</th>
+                <th scope="col">After</th>
+                <th scope="col">Event</th>
+                <th scope="col">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% visit.events.each do |event| %>
+                <tr id="<%= event.anchor %>">
+                  <td class="t-when"><%= event.time_label %></td>
+                  <td class="t-when"><%= dash_value(event.gap_label) %></td>
+                  <td class="text-break">
+                    <span class="<%= "font-monospace" if event.page_view? %>"><%= event.title %></span>
+                    <% if event.identified? %>
+                      <%= dash_badge "Identified", tone: :success, class: "ms-1" %>
+                    <% end %>
+                  </td>
+                  <td class="text-break small text-body-secondary"><%= dash_value(event.details) %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          <% end %>
+
+          <% if visit.cap_note %>
+            <%= dash_card_footer do %>
+              <span class="g-hint"><%= visit.cap_note %></span>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <% if @presenter.pages > 1 %>
+      <%= dash_pager @presenter.page_label, label: "Pages of visits",
+            previous: @presenter.previous_page_path, following: @presenter.next_page_path %>
+    <% end %>
+  <% end %>
+</section>

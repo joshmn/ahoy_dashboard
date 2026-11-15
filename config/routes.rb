@@ -25,6 +25,13 @@ AhoyDashboard::Engine.routes.draw do
   resources :favicons, only: :show, param: :site, constraints: { site: %r{[^/]+} }
   resource :explore, only: :show
   resource :journey, only: :show
+  namespace :visitors do
+    resource :lookup, only: :show
+    resources :users, only: :show, constraints: { id: %r{[^/]+} }, format: false
+    resources :visits, only: :show, param: :token, constraints: { token: %r{[^/]+} }, format: false
+  end
+  resources :visitors, only: :index
+  resources :visitors, only: :show, param: :token, constraints: { token: %r{[^/]+} }, format: false
   resource :goal_conversions, only: :show
   resource :pinned_questions, only: :show
   resources :funnels, only: [ :index, :show ]

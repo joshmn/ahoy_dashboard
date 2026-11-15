@@ -1,0 +1,63 @@
+<% content_for :title, @presenter.title %>
+
+<section class="sec">
+  <%= dash_page_head title: @presenter.title,
+        lede: "Who visited in the range, most recent first.",
+        actions: dash_button("Back to dashboard", @presenter.dashboard_path, tone: :link, data: { tm_frame: "_top" }) %>
+
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <p class="mb-0 text-body-secondary"><%= @presenter.summary %></p>
+
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <% if @presenter.identifiable? %>
+        <%= dash_segmented @presenter.who_items, label: "Which visitors" %>
+      <% end %>
+
+      <%= form_with url: @presenter.lookup_path, method: :get, class: "d-flex align-items-center gap-2" do %>
+        <%= render "ahoy_dashboard/shared/query_fields" %>
+        <%= dash_search_field "q", nil, label: "Find a visitor, visit or user", id: "dash-visitor-lookup",
+              placeholder: "Visitor token, visit token or user id" %>
+        <%= dash_button "Find", type: "submit" %>
+      <% end %>
+    </div>
+  </div>
+
+  <%= dash_card do %>
+    <% if @presenter.empty? %>
+      <%= dash_empty @presenter.empty_title, hint: @presenter.empty_hint %>
+    <% else %>
+      <%= dash_table label: "Visitors", cols: "minmax(160px, 1.2fr) 120px 72px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)" do %>
+        <thead>
+          <tr>
+            <th scope="col">Visitor</th>
+            <th scope="col">Last visit</th>
+            <th scope="col" class="num">Visits</th>
+            <th scope="col">First source</th>
+            <th scope="col">First entry page</th>
+            <th scope="col">Location</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @presenter.rows.each do |row| %>
+            <tr>
+              <td class="text-truncate">
+                <%= link_to row.label, row.path, class: class_names("link-quiet", "font-monospace" => !row.identified?),
+                      title: row.visitor_token, data: { tm_frame: "_top" } %>
+              </td>
+              <td class="t-when" title="<%= row.last_seen_title %>"><%= row.last_seen %></td>
+              <td class="num"><%= dash_number(row.visits) %></td>
+              <td class="text-truncate"><%= dash_value(row.source) %></td>
+              <td class="text-truncate font-monospace"><%= dash_value(row.entry) %></td>
+              <td class="text-truncate"><%= dash_value(row.location) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if @presenter.paged? %>
+    <%= dash_pager @presenter.page_label, label: "Pages of visitors", class: "mt-3",
+          previous: @presenter.previous_page_path, following: @presenter.next_page_path %>
+  <% end %>
+</section>
