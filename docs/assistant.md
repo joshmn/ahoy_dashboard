@@ -160,7 +160,7 @@ If a table or chart can't fit everything a tool read, past 25 rows, 400 points o
 
 ## What it can read
 
-The model gets six tools. It can only read, and every read goes through the same queries as the dashboard, so its dates and numbers match what the dashboard shows.
+The model gets six tools, and two more while [AI visibility](ai-visibility.md) is on. It can only read, and every read goes through the same queries as the dashboard, so its dates and numbers match what the dashboard shows. The one thing it can put on screen that isn't a chart or a table is a list of suggested prompts, and nothing on that list is saved until a person clicks Add.
 
 | Tool | Reads | Draws |
 |---|---|---|
@@ -170,6 +170,8 @@ The model gets six tools. It can only read, and every read goes through the same
 | `search_console` | Search Console queries with clicks and impressions, or one query's history | A table |
 | `rankings` | Your tracked rank positions, best and change, AI overview citations, or one keyword's history | A table |
 | `app_context` | The dashboard's own screens, what each is for, and where it lives, so a "how do I" question gets a link | Nothing |
+| `prompt_evidence` | Works backwards from the visitors who converted in the range: how they first arrived, where they landed, the Google searches behind those pages, paid search terms, the pages they read before converting, and the pages AI assistants send people to. Also your tracked prompts, the ones you aren't mentioned in, and who gets cited instead. Only while AI visibility is on. | A table |
+| `propose_prompts` | Nothing. It checks the model's suggested prompts and puts them on screen. Only while AI visibility is on. | A list of prompts, each with an Add button |
 
 Every read:
 
@@ -181,11 +183,11 @@ Every read:
 
 ### Filters
 
-`traffic_summary`, `breakdown` and `trend` take the filters saved on the conversation. The saved filters always apply. The model can add a filter of its own on top of them, like country is Germany, and it can't take the saved ones off.
+`traffic_summary`, `breakdown`, `trend` and `prompt_evidence` take the filters saved on the conversation. The saved filters always apply. The model can add a filter of its own on top of them, like country is Germany, and it can't take the saved ones off.
 
 `search_console` and `rankings` can't be filtered by visitor, since their rows have no visitor attached. When the conversation has filters, their results say "Not filtered: Search Console rows have no visitor attached." or "Not filtered: rank checks have no visitor attached.", and the model is told to pass that on.
 
-`app_context` doesn't read data, so filters don't apply to it.
+`app_context` and `propose_prompts` don't read data, so filters don't apply to them. The tracked prompts and AI visibility answers `prompt_evidence` hands back aren't filtered either, for the same reason as Search Console.
 
 Every chart or table a tool draws lists the filters it used under its title, and its "Open on the dashboard" or "Open in Explore" link carries them.
 

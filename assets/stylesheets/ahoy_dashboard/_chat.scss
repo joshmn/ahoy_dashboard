@@ -491,6 +491,73 @@
   }
 }
 
+.chat-proposals {
+  &__error {
+    border-bottom: 1px solid var(--border);
+    color: var(--bs-danger-text-emphasis);
+    font-size: $font-size-sm;
+    margin: 0;
+    padding: 8px 11px;
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__item {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    padding: 9px 11px;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  &__text {
+    color: var(--t1);
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  &__because {
+    color: var(--t3);
+    font-size: $font-size-sm;
+    margin: 0;
+  }
+
+  &__flag {
+    align-self: flex-start;
+  }
+
+  &__action {
+    flex-shrink: 0;
+  }
+
+  &__ft {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    justify-content: space-between;
+    padding: 8px 11px;
+  }
+
+  &__cost {
+    color: var(--t3);
+    font-size: $font-size-sm;
+    margin: 0;
+  }
+}
+
 .ask-panel {
   background: #0f1014;
   border-left: 1px solid rgba(255, 255, 255, 0.1);

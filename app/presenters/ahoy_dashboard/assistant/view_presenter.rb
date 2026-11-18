@@ -13,7 +13,7 @@ module AhoyDashboard
 
       attr_reader :view
 
-      delegate :kind, :title, :subtitle, :path, :path_label, :series?, :table?, :figures?,
+      delegate :kind, :title, :subtitle, :path, :path_label, :series?, :table?, :figures?, :prompts?,
                :columns, :rows, :figures, :metric, to: :view
 
       def chart_data

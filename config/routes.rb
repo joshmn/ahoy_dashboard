@@ -46,6 +46,7 @@ AhoyDashboard::Engine.routes.draw do
   resources :chats, only: [ :index, :show, :create, :destroy ] do
     scope module: :chats do
       resources :messages, only: :create
+      resources :prompts, only: :create
       resource :stream, only: :show
     end
   end

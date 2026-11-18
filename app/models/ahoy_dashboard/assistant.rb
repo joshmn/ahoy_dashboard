@@ -65,6 +65,8 @@ module AhoyDashboard
       "AhoyDashboard::Assistant::Tools::Trend",
       "AhoyDashboard::Assistant::Tools::SearchConsole",
       "AhoyDashboard::Assistant::Tools::Rankings",
+      "AhoyDashboard::Assistant::Tools::PromptEvidence",
+      "AhoyDashboard::Assistant::Tools::ProposePrompts",
       "AhoyDashboard::Assistant::Tools::AppContext"
     ].freeze
 

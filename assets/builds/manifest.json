@@ -4,7 +4,7 @@
     "inputs": {
       "Rakefile": "2e5e537a053141157e681f54d84a27f28d5392d111cb01ccdeb73faaa8bb19e1",
       "assets/stylesheets/ahoy_dashboard/_base.scss": "c4ae960c20e049992aa2aa08fc2f82a59eb291db5794db17367772dd98326000",
-      "assets/stylesheets/ahoy_dashboard/_chat.scss": "c017c3fa9f6fab3087cf1329b8618ccb116fcb06d0fa8ee0d3c3da476ad6022d",
+      "assets/stylesheets/ahoy_dashboard/_chat.scss": "f3532e5ab89c700372625ace491b48c04e361cdf85373e3f91e5d580f30ee1ac",
       "assets/stylesheets/ahoy_dashboard/_chip.scss": "c90c14cd52256399e8f93a9307e36dfc38605b6f02bc538b16410b05f66b56cf",
       "assets/stylesheets/ahoy_dashboard/_chrome.scss": "ff57c27859fcaf8a5e4f4a6b011adb33cd8fcdf3d6d87149080499da182ae73d",
       "assets/stylesheets/ahoy_dashboard/_components.scss": "3dc19df88f46546ecaabecad32a57e4bce4804cdfbddc32c2736e55cfd9b0c1e",
@@ -24,7 +24,7 @@
       "assets/stylesheets/ahoy_dashboard.scss": "4ddaa73cfda4f4d3a30e58b01b199c90f87f40ed3243ead5a6f00e5eef6d8bcb"
     },
     "outputs": {
-      "assets/builds/ahoy_dashboard.css": "0560f24408a454e93f5e3f59a6c618f6fc728da83d2c04dde60295c72e13a8b1"
+      "assets/builds/ahoy_dashboard.css": "b03a484dd4099260df88075dcf5a210f47c890a61b60d492e1adeaf9c7162f2a"
     }
   },
   "javascript": {

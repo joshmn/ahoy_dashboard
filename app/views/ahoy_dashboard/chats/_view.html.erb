@@ -35,6 +35,9 @@
         <% end %>
       </tbody>
     <% end %>
+  <% elsif view.prompts? %>
+    <%= render "ahoy_dashboard/chats/prompt_proposals", view: view, chat: local_assigns[:chat],
+                                                        error: local_assigns[:prompt_error] %>
   <% else %>
     <div class="chat-view__figures">
       <% view.figures.each do |figure| %>

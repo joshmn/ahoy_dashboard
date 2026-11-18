@@ -4,7 +4,8 @@ module AhoyDashboard
       SERIES = "series".freeze
       TABLE = "table".freeze
       FIGURES = "figures".freeze
-      KINDS = [ SERIES, TABLE, FIGURES ].freeze
+      PROMPTS = "prompts".freeze
+      KINDS = [ SERIES, TABLE, FIGURES, PROMPTS ].freeze
 
       MAX_ROWS = 25
       MAX_POINTS = 400
@@ -23,6 +24,10 @@ module AhoyDashboard
 
       def self.figures(title:, figures:, **rest)
         new(kind: FIGURES, title: title, figures: figures, **rest)
+      end
+
+      def self.prompts(title:, rows:, **rest)
+        new(kind: PROMPTS, title: title, rows: rows, **rest)
       end
 
       def self.from(stored)
@@ -66,9 +71,13 @@ module AhoyDashboard
         kind == FIGURES
       end
 
+      def prompts?
+        kind == PROMPTS
+      end
+
       def drawable?
         return points.size >= 2 if series?
-        return rows.any? if table?
+        return rows.any? if table? || prompts?
 
         figures.any?
       end

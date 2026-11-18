@@ -39,7 +39,8 @@
               <% shown = AhoyDashboard::Assistant::ViewPresenter.wrap(message.shown) %>
               <% if shown.any? %>
                 <div class="chat-views">
-                  <%= render partial: "ahoy_dashboard/chats/view", collection: shown, as: :view %>
+                  <%= render partial: "ahoy_dashboard/chats/view", collection: shown, as: :view,
+                             locals: { chat: chat, prompt_error: local_assigns[:prompt_error] } %>
                 </div>
               <% end %>
 

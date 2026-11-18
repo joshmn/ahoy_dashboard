@@ -1,0 +1,56 @@
+<% proposals = AhoyDashboard::Assistant::ProposalsPresenter.new(view) %>
+<% addable = chat.present? && proposals.installed? && dashboard_allowed?(:manage) %>
+<% frame = { data: { tm_frame: AhoyDashboard::ChatsController::THREAD_FRAME } } %>
+
+<div class="chat-proposals">
+  <% if error.present? %>
+    <p class="chat-proposals__error" role="alert"><%= error %></p>
+  <% end %>
+
+  <ol class="chat-proposals__list">
+    <% proposals.proposals.each do |proposal| %>
+      <li class="chat-proposals__item">
+        <div class="chat-proposals__body">
+          <p class="chat-proposals__text"><%= proposal.text %></p>
+          <% if proposal.because %>
+            <p class="chat-proposals__because"><%= proposal.because %></p>
+          <% end %>
+          <% if proposal.names_the_site? %>
+            <%= dash_badge "Has your name in it", tone: :warning, class: "chat-proposals__flag" %>
+          <% end %>
+        </div>
+
+        <div class="chat-proposals__action">
+          <% if proposal.added? %>
+            <%= dash_badge "Tracked", tone: :success %>
+          <% elsif addable %>
+            <%= dash_button_to "Add", chat_prompts_path(chat), params: { prompts: { texts: [ proposal.text ] } },
+                                                               form: frame %>
+          <% end %>
+        </div>
+      </li>
+    <% end %>
+  </ol>
+
+  <div class="chat-proposals__ft">
+    <p class="chat-proposals__cost"><%= proposals.cost_line %></p>
+
+    <% if proposals.all_added? %>
+      <%= dash_link "See them on AI visibility", seo_ai_visibility_path, data: { tm_frame: "_top" } %>
+    <% elsif !addable %>
+      <p class="chat-proposals__cost">
+        Someone who can change settings can add these on
+        <%= dash_link "Settings, AI visibility", edit_settings_ai_visibility_path, data: { tm_frame: "_top" } %>.
+      </p>
+    <% elsif proposals.full? %>
+      <p class="chat-proposals__cost">
+        Only <%= proposals.room %> more fit in the set. Remove some on
+        <%= dash_link "Settings, AI visibility", edit_settings_ai_visibility_path, data: { tm_frame: "_top" } %>
+        to make room.
+      </p>
+    <% elsif proposals.waiting.size > 1 %>
+      <%= dash_button_to "Add all #{proposals.waiting.size}", chat_prompts_path(chat),
+                         params: { prompts: { texts: proposals.waiting.map(&:text) } }, tone: :primary, form: frame %>
+    <% end %>
+  </div>
+</div>

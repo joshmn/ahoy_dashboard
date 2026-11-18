@@ -80,6 +80,7 @@ Every question asked in Ask sends the model provider:
 - when asked from the Ask panel, the screen's name, date range and filter labels, like "Country is US". A filter on a value puts that value in the prompt.
 - the question, and up to 20 earlier messages from the same conversation, text only
 - the tool results the model asked for: headline numbers, and breakdowns by any dimension, which can mean page paths, referrer URLs, UTM tags, cities, custom property values, Search Console queries, and your tracked keywords and ranking URLs
+- with AI visibility on, the `prompt_evidence` results: counts of converting visitors by channel, landing page, paid search term and pages read before converting, the Search Console queries behind those landing pages, the pages AI assistants sent visitors to and which assistant sent them, your tracked prompts, your brand terms, and the domains AI answers cite instead of you. All counts, never one visitor's visits.
 - the error message, when a tool fails, which can be a database error
 
 It doesn't send raw visits or events, visitor tokens, or anything about the person asking. It does send whatever values your dimensions hold, so if your app registers an IP address dimension, IP addresses can be in a tool result.
@@ -90,7 +91,7 @@ With OpenAI-compatible on its default endpoint, `http://localhost:1234/v1`, it a
 
 ### AI visibility
 
-Each run sends your prompts, with that assistant's key, to every assistant that's on and has a key. Web search is turned on, since an answer with no search has nothing to cite. Nothing about your visitors is sent.
+Each run sends your prompts, with that assistant's key, to every assistant that's on and has a key. Web search is turned on, since an answer with no search has nothing to cite. Nothing about your visitors is sent. A prompt added from a suggestion in Ask is sent like any other once it's added. The visitor counts the suggestion came from went to the Ask provider, not to these assistants.
 
 Answers are stored in your database until you delete the prompt that produced them. See [AI visibility](ai-visibility.md).
 

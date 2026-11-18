@@ -48,6 +48,41 @@ How often applies to the whole set. A run asks every prompt of every model of ev
 
 Deleting a prompt deletes every answer to it.
 
+## Suggestions from Ask
+
+Ask can suggest prompts, worked out backwards from the visitors who converted. Ask it something like "suggest AI visibility prompts from last quarter's signups" and it reads what those visitors did, then lists a few prompts with the reason for each. Add puts one in the set, and "Add all" adds every one that isn't tracked yet. You stay in the conversation, and anything already in the set shows as Tracked.
+
+It needs [Ask](assistant.md) set up, and AI visibility turned on. Only somebody who can change settings sees the Add buttons. Everybody else gets the list and a pointer to this screen.
+
+### What it works back from
+
+A conversion is a [goal](goals-and-funnels.md) completed in the date range. Ask it about one goal by name, or it uses every goal. With no goals at all, it uses the first time each user signed in, which needs `user_id` on `ahoy_visits`. With neither, it says to add a goal.
+
+For each person who converted, it reads their visits from the 90 days before the conversion, including days before the date range, and adds them up:
+
+- the channel their first visit came from
+- the pages they landed on, on their first visit and on any visit
+- the top Google searches that land on those pages, when [Search Console](search-console.md) is connected
+- the paid search terms they arrived on, from `utm_term`
+- the pages they read before converting, and how much more likely they were to read each one than everyone else in the range
+- the pages AI assistants send people to, and how many of those people converted
+
+Alongside that, it gets your tracked prompts, the prompts no assistant mentioned you in over the last 90 days, the domains cited instead, and your brand terms. It follows the conversation's filters, like the rest of Ask, and anything you keep out of Ask on Settings, Assistant stays out of this too.
+
+### What it can't do
+
+Nobody's prompt is recorded anywhere. A visit from ChatGPT says it came from `chatgpt.com` and nothing about what was asked. So every suggestion is the model's guess at what a person who did those things would type. The Google searches are the closest thing to real wording, and they're searches anyone made to reach that page, not only the people who converted.
+
+Under 20 conversions in the range is too few to read much into, and Ask is told to say so and suggest a longer range. With Search Console not connected, it has page paths to go on and not much else.
+
+It only sees what already converts. A topic where you show up nowhere won't have converters behind it, so the domains cited instead are the only part of this that points at ground you don't have yet.
+
+### What it won't suggest
+
+A suggestion is turned away when it's already tracked (ignoring case), repeats another one, is blank, or runs past 500 characters. Ten at most are shown at once, and never more than the set has room for. One with your domain or a brand term in it is shown with "Has your name in it", since a prompt that names you gets you mentioned whether you're any good or not.
+
+Under the list is what adding them costs: requests per run for each one, roughly how many a month at your current How often, and how much of the cap is used. Adding a prompt doesn't run it. It's asked on the next scheduled run, like the rest.
+
 ## The monthly cap
 
 The cap is in requests. It starts at 200, and 0 means no cap. Set it on Settings, AI visibility, where "Used this month" shows how many have gone out.

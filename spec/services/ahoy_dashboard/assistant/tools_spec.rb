@@ -300,7 +300,8 @@ RSpec.describe "Dashboard assistant tools" do
     end
 
     it "offers every data tool the same filters param" do
-      AhoyDashboard::Assistant.tool_classes.excluding(AhoyDashboard::Assistant::Tools::AppContext).each do |tool|
+      AhoyDashboard::Assistant.tool_classes.excluding(AhoyDashboard::Assistant::Tools::AppContext,
+                                                      AhoyDashboard::Assistant::Tools::ProposePrompts).each do |tool|
         filters = tool.to_function.dig("function", "parameters", "properties", "filters")
 
         expect(filters).to include("type" => "array")

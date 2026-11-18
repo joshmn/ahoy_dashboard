@@ -32,6 +32,7 @@ module AhoyDashboard
     }.freeze
 
     DEFAULT_FREQUENCY = "weekly".freeze
+    DAYS_PER_MONTH = 30.44
     DEFAULT_CAP = 200
 
     FREQUENCY_KEY = "ai_visibility_frequency".freeze
@@ -117,6 +118,14 @@ module AhoyDashboard
 
       def monthly_cap
         Preferences.read(:ai_visibility, :monthly_cap)
+      end
+
+      def runs_per_month
+        DAYS_PER_MONTH / (every / 1.day)
+      end
+
+      def monthly_requests(prompts, targets: self.targets.size)
+        (prompts * targets * runs_per_month).round
       end
 
       def capped?

@@ -175,7 +175,15 @@ RSpec.describe AhoyDashboard::Assistant do
 
     it "offers search console and rankings when both are installed" do
       expect(offered).to include("search_console", "rankings")
-      expect(offered.size).to eq(described_class::TOOLS.size)
+      expect(offered).not_to include("prompt_evidence", "propose_prompts")
+      expect(offered.size).to eq(described_class::TOOLS.size - 2)
+    end
+
+    it "offers the prompt tools only while AI visibility is on" do
+      ai_visibility_settings(enabled: true) do
+        expect(offered).to include("prompt_evidence", "propose_prompts")
+        expect(offered.size).to eq(described_class::TOOLS.size)
+      end
     end
 
     it "leaves out search console when its tables are not installed" do
